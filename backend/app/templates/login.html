@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login Admin · Telegram Signal</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; background: #f2f5f9; color: #172033; display: grid; min-height: 100vh; place-items: center; margin: 0; }
+    main { width: min(360px, calc(100% - 40px)); background: white; padding: 28px; border-radius: 14px; box-shadow: 0 12px 36px #10204018; }
+    label { display: block; margin: 16px 0 6px; font-weight: 600; }
+    input, button { width: 100%; box-sizing: border-box; font: inherit; padding: 11px; border: 1px solid #cbd3df; border-radius: 8px; }
+    button { margin-top: 20px; color: white; background: #2458d3; border: 0; cursor: pointer; }
+    #message { min-height: 1.4em; color: #a21d2d; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Login Admin</h1>
+    <form id="login-form">
+      <label for="username">Username</label>
+      <input id="username" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Masuk</button>
+      <p id="message" role="status"></p>
+    </form>
+  </main>
+  <script>
+    document.querySelector("#login-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: document.querySelector("#username").value, password: document.querySelector("#password").value })
+      });
+      if (response.ok) window.location.assign("/");
+      else document.querySelector("#message").textContent = "Login gagal. Periksa username dan password.";
+    });
+  </script>
+</body>
+</html>
