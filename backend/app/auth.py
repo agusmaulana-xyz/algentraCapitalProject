@@ -7,10 +7,13 @@ from .models import AdminUser
 
 def seed_admin(db: Session, settings: Settings) -> None:
     user = db.get(AdminUser, settings.admin_username)
+    password = settings.admin_password.get_secret_value().encode("utf-8")
     if user is None:
-        password = settings.admin_password.get_secret_value().encode("utf-8")
         password_hash = bcrypt.hashpw(password, bcrypt.gensalt(rounds=12)).decode("ascii")
         db.add(AdminUser(username=settings.admin_username, password_hash=password_hash))
+        db.commit()
+    elif not verify_password(password.decode("utf-8"), user.password_hash):
+        user.password_hash = bcrypt.hashpw(password, bcrypt.gensalt(rounds=12)).decode("ascii")
         db.commit()
 
 

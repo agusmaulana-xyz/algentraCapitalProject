@@ -10,7 +10,7 @@ Backend awal untuk sistem copy trading Telegram. M1 menyediakan kerangka FastAPI
 4. Jalankan `run.bat` di Windows atau `./run.sh` di Linux/macOS. Backend bind ke `127.0.0.1:8000`.
 5. Buka `http://127.0.0.1:8000/login` dan masuk memakai kredensial dari `.env`.
 
-Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpan sebagai hash bcrypt. Endpoint dashboard memerlukan cookie sesi admin; gunakan login melalui halaman web terlebih dahulu.
+Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpan sebagai hash bcrypt. Saat backend mulai, password admin di `.env` disinkronkan ke database, jadi perubahan password berlaku setelah server direstart. Endpoint dashboard memerlukan cookie sesi admin; gunakan login melalui halaman web terlebih dahulu.
 
 ## Endpoint M1
 
