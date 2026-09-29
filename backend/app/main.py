@@ -9,7 +9,7 @@ from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting
-from .routers import auth, dashboard, parser as parser_router, settings, tg as tg_router
+from .routers import auth, dashboard, ea, parser as parser_router, settings, tg as tg_router
 from .signal_service import SignalService
 
 
@@ -60,6 +60,7 @@ app.include_router(dashboard.router, dependencies=[Depends(require_admin)])
 app.include_router(settings.router, dependencies=[Depends(require_admin)])
 app.include_router(parser_router.router, dependencies=[Depends(require_admin)])
 app.include_router(tg_router.router, dependencies=[Depends(require_admin)])
+app.include_router(ea.router)
 
 
 @app.get("/health")

@@ -40,6 +40,7 @@ def migrate_schema() -> None:
         columns = {column["name"] for column in inspector.get_columns("signals")}
         additions = {
             "content_hash": "VARCHAR(64)",
+            "claimed_at": "DATETIME",
             "sender_id": "VARCHAR(128)",
             "sender_name": "VARCHAR(255)",
         }

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     enable_regex_fallback: bool = Field(default=False, validation_alias="ENABLE_REGEX_FALLBACK")
     telegram_api_id: int | None = Field(default=None, validation_alias="TELEGRAM_API_ID", gt=0)
     telegram_api_hash: SecretStr | None = Field(default=None, validation_alias="TELEGRAM_API_HASH")
+    ea_api_key: SecretStr | None = Field(default=None, validation_alias="EA_API_KEY")
     database_url: str = Field(
         default="sqlite:///backend/data/app.db",
         validation_alias="DATABASE_URL",
@@ -44,6 +45,8 @@ class Settings(BaseSettings):
             raise ValueError("GEMINI_MODEL cannot be empty")
         if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
+        if self.ea_api_key is not None and len(self.ea_api_key.get_secret_value()) < 24:
+            raise ValueError("EA_API_KEY must contain at least 24 characters")
         return self
 
 

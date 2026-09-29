@@ -24,6 +24,7 @@ Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpa
 - `GET /api/settings` dan `PUT /api/settings` dengan body `{"values":{"confidence_threshold":0.75}}`
 - `POST /api/parser/test` untuk menguji klasifikasi dan validasi. Halaman admin tersedia di `/parser-test`.
 - Telegram: `GET /api/tg/status`, `POST /api/tg/send-code`, `POST /api/tg/verify-code`, `POST /api/tg/verify-2fa`, `POST /api/tg/logout`, `POST /api/tg/reconnect`, `GET /api/tg/groups`, dan `POST /api/tg/groups/select`.
+- EA: `GET /api/ea/pending`, `POST /api/ea/report`, `POST /api/ea/result`, dan `POST /api/ea/heartbeat` memakai header `X-API-Key` yang nilainya sama dengan `EA_API_KEY`.
 
 ## Uji login Telegram manual
 
@@ -36,10 +37,20 @@ Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpa
 
 Session Telethon berada di `backend/data/telegram_user.session`, tidak disajikan oleh FastAPI, dan folder `backend/data` masuk `.gitignore`. Logout dari halaman Telegram Setup mencabut session yang tersimpan.
 
+## Memasang EA MT5
+
+1. Buat `EA_API_KEY` acak minimal 24 karakter di `.env`, restart backend, lalu buka `mt5/TelegramSignalEA.mq5` di MetaEditor.
+2. Compile dengan **F7**. Salin file ke `MQL5/Experts` bila MetaEditor tidak membukanya langsung dari folder proyek.
+3. Di MT5, buka **Tools > Options > Expert Advisors**, aktifkan **Allow WebRequest for listed URL**, lalu tambahkan persis `http://127.0.0.1:8000`.
+4. Pasang EA ke chart akun demo, isi `ApiKey` dengan nilai `EA_API_KEY`, dan biarkan `DemoMode=true`. Backend juga memulai `demo_mode=true`.
+5. Periksa tab Experts/Journal untuk heartbeat, status koneksi, dan laporan signal.
+
+`GET /api/ea/pending` mengklaim signal selama 90 detik. EA menyimpan penanda idempotensi lokal dan mengirim ulang laporan bila perlu agar polling/restart tidak membuat order ganda. EA memakai TP pertama bila signal berisi beberapa TP.
+
 ## Test
 
 Jalankan dari folder proyek: `.venv\Scripts\python -m pytest backend/tests` di Windows atau `.venv/bin/python -m pytest backend/tests` di Linux/macOS.
 
 ## Belum teruji
 
-Koneksi Gemini dan Telegram dengan akun/kredensial sungguhan belum diuji. Eksekusi EA/kompilasi MQL5 dan perilaku di akun demo belum diuji; fitur tersebut dikerjakan pada milestone berikutnya dan memerlukan MetaEditor atau kredensial layanan eksternal.
+Koneksi Gemini dan Telegram dengan akun/kredensial sungguhan belum diuji. Kode EA belum dikompilasi di MetaEditor dan belum diuji pada terminal atau akun demo; validasi itu memerlukan MetaEditor/MT5 di Windows.
