@@ -20,6 +20,7 @@ def test_admin_login_protects_and_unlocks_dashboard_routes():
         )
         assert response.status_code == 200
         assert response.json()["status"] == "authenticated"
+        assert client.get("/parser-test").status_code == 200
         assert client.get("/api/stats").json()["winrate"] == 0.0
 
         assert client.post("/api/auth/logout").status_code == 200

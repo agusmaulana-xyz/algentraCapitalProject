@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tes Parser · Telegram Signal</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; background: #f2f5f9; color: #172033; margin: 0; padding: 32px 16px; }
+    main { max-width: 760px; margin: auto; background: white; padding: 24px; border-radius: 14px; box-shadow: 0 12px 36px #10204018; }
+    label { display: block; margin: 16px 0 6px; font-weight: 600; }
+    textarea, button { width: 100%; box-sizing: border-box; font: inherit; padding: 11px; border: 1px solid #cbd3df; border-radius: 8px; }
+    textarea { min-height: 100px; }
+    button { margin-top: 18px; color: white; background: #2458d3; border: 0; cursor: pointer; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fb; padding: 14px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Tes Parser Signal</h1>
+    <form id="parser-form">
+      <label for="message">Pesan baru</label>
+      <textarea id="message" required placeholder="Contoh: BUY XAUUSD, entry 2400, TP 2420, SL 2380"></textarea>
+      <label for="context">Konteks pesan sebelumnya (opsional)</label>
+      <textarea id="context" placeholder="Contoh: BUY NOW"></textarea>
+      <button type="submit">Parse pesan</button>
+    </form>
+    <h2>Hasil</h2>
+    <pre id="result" aria-live="polite">Masukkan pesan untuk menguji parser.</pre>
+  </main>
+  <script>
+    document.querySelector("#parser-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const output = document.querySelector("#result");
+      output.textContent = "Memproses…";
+      try {
+        const response = await fetch("/api/parser/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: document.querySelector("#message").value,
+            context: document.querySelector("#context").value || null
+          })
+        });
+        const payload = await response.json();
+        output.textContent = JSON.stringify(payload, null, 2);
+      } catch (error) {
+        output.textContent = "Parser tidak dapat dihubungi.";
+      }
+    });
+  </script>
+</body>
+</html>

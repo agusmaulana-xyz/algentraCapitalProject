@@ -7,13 +7,14 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
-from .database import Base, SessionLocal, engine
+from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting
-from .routers import auth, dashboard, settings
+from .routers import auth, dashboard, parser as parser_router, settings
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    migrate_schema()
     Base.metadata.create_all(bind=engine)
     config = get_settings()
     with SessionLocal() as db:
@@ -49,6 +50,7 @@ def require_admin(request: Request) -> str:
 app.include_router(auth.router)
 app.include_router(dashboard.router, dependencies=[Depends(require_admin)])
 app.include_router(settings.router, dependencies=[Depends(require_admin)])
+app.include_router(parser_router.router, dependencies=[Depends(require_admin)])
 
 
 @app.get("/health")
@@ -59,6 +61,11 @@ def health() -> dict[str, str]:
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="login.html", context={})
+
+
+@app.get("/parser-test", response_class=HTMLResponse)
+def parser_test_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="parser_test.html", context={})
 
 
 @app.get("/")

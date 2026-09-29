@@ -12,7 +12,10 @@ def utc_now() -> datetime:
 
 class Signal(Base):
     __tablename__ = "signals"
-    __table_args__ = (Index("ix_signals_created_at", "created_at"),)
+    __table_args__ = (
+        Index("ix_signals_created_at", "created_at"),
+        Index("ux_signals_content_hash", "content_hash", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     group_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -22,6 +25,7 @@ class Signal(Base):
     parsed_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     normalized_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="PENDING", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 

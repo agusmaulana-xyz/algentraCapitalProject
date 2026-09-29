@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     admin_username: str = Field(default="admin", validation_alias="ADMIN_USERNAME")
     admin_password: SecretStr = Field(validation_alias="ADMIN_PASSWORD")
     cookie_secure: bool = Field(default=False, validation_alias="COOKIE_SECURE")
+    gemini_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-3.8-flash", validation_alias="GEMINI_MODEL")
+    gemini_timeout_seconds: float = Field(default=25.0, validation_alias="GEMINI_TIMEOUT_SECONDS", gt=0, le=120)
+    gemini_retry_attempts: int = Field(default=3, validation_alias="GEMINI_RETRY_ATTEMPTS", ge=1, le=6)
+    enable_regex_fallback: bool = Field(default=False, validation_alias="ENABLE_REGEX_FALLBACK")
     database_url: str = Field(
         default="sqlite:///backend/data/app.db",
         validation_alias="DATABASE_URL",
@@ -32,6 +37,8 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_PASSWORD must contain at least 12 characters")
         if not self.admin_username.strip():
             raise ValueError("ADMIN_USERNAME cannot be empty")
+        if not self.gemini_model.strip():
+            raise ValueError("GEMINI_MODEL cannot be empty")
         return self
 
 

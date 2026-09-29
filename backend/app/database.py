@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -29,6 +29,18 @@ def _make_engine():
 
 engine = _make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def migrate_schema() -> None:
+    """Apply the small additive SQLite changes needed between early milestones."""
+    if engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(engine)
+    if "signals" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("signals")}
+        if "content_hash" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE signals ADD COLUMN content_hash VARCHAR(64)"))
 
 
 def get_db() -> Generator[Session, None, None]:
