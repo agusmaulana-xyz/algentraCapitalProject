@@ -24,6 +24,8 @@ class SignalResponse(BaseModel):
     confidence: float | None
     status: str
     created_at: datetime
+    ticket: str | None = None
+    profit: float | None = None
 
 
 class LogResponse(BaseModel):

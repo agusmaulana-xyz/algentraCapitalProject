@@ -1,16 +1,19 @@
 from contextlib import asynccontextmanager
+import asyncio
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
-from .models import AppSetting
+from .models import AppSetting, Signal
 from .routers import auth, dashboard, ea, parser as parser_router, settings, tg as tg_router
 from .signal_service import SignalService
+from .stats_service import get_dashboard_stats
 
 
 @asynccontextmanager
@@ -83,6 +86,37 @@ def telegram_setup_page(request: Request, _: str = Depends(require_admin)) -> HT
     return templates.TemplateResponse(request=request, name="telegram_setup.html", context={})
 
 
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={})
+
+
 @app.get("/")
-def root(_: str = Depends(require_admin)) -> dict[str, str]:
-    return {"status": "authenticated", "message": "Backend M1 siap. Dashboard lengkap menyusul pada M5."}
+def root(_: str = Depends(require_admin)) -> RedirectResponse:
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@app.websocket("/ws")
+async def dashboard_websocket(websocket: WebSocket) -> None:
+    if not websocket.scope.get("session", {}).get("admin_username"):
+        await websocket.close(code=1008)
+        return
+    await websocket.accept()
+    try:
+        while True:
+            with SessionLocal() as db:
+                stats = get_dashboard_stats(db)
+                latest = db.execute(
+                    select(Signal.id, Signal.status, Signal.created_at)
+                    .order_by(Signal.created_at.desc(), Signal.id.desc())
+                    .limit(1)
+                ).first()
+            await websocket.send_json({
+                "type": "dashboard_refresh",
+                "stats": stats,
+                "latest_signal_id": latest.id if latest else None,
+                "server_time": asyncio.get_running_loop().time(),
+            })
+            await asyncio.sleep(3)
+    except WebSocketDisconnect:
+        return

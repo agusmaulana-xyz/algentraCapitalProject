@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 from typing import Literal
+from weakref import WeakSet
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -130,6 +131,8 @@ def regex_fallback(message: str) -> SignalClassification:
 
 
 class GeminiParser:
+    _instances: WeakSet = WeakSet()
+
     def __init__(
         self,
         settings: Settings | None = None,
@@ -139,6 +142,14 @@ class GeminiParser:
         self.settings = settings or get_settings()
         self._client = client
         self.retry_delay = max(0.0, retry_delay)
+        self._instances.add(self)
+
+    @classmethod
+    def reload_instances(cls) -> None:
+        settings = get_settings()
+        for parser in list(cls._instances):
+            parser.settings = settings
+            parser._client = None
 
     def _client_or_create(self):
         if self._client is not None:

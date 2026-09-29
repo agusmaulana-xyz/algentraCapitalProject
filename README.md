@@ -1,6 +1,6 @@
 # EA Telegram Signal
 
-Backend awal untuk sistem copy trading Telegram. M1 menyediakan kerangka FastAPI, database SQLite, login admin, dan endpoint statistik, signal, log, serta settings. Proses Telegram, parsing Gemini, EA MT5, dan dashboard lengkap dikerjakan pada milestone berikutnya.
+Backend untuk sistem copy trading Telegram dengan FastAPI, SQLite, parser Gemini, login Telegram via Telethon, REST API untuk EA MT5, dan dashboard web admin.
 
 ## Menjalankan backend
 
@@ -25,6 +25,12 @@ Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpa
 - `POST /api/parser/test` untuk menguji klasifikasi dan validasi. Halaman admin tersedia di `/parser-test`.
 - Telegram: `GET /api/tg/status`, `POST /api/tg/send-code`, `POST /api/tg/verify-code`, `POST /api/tg/verify-2fa`, `POST /api/tg/logout`, `POST /api/tg/reconnect`, `GET /api/tg/groups`, dan `POST /api/tg/groups/select`.
 - EA: `GET /api/ea/pending`, `POST /api/ea/report`, `POST /api/ea/result`, dan `POST /api/ea/heartbeat` memakai header `X-API-Key` yang nilainya sama dengan `EA_API_KEY`.
+
+## Dashboard M5
+
+Setelah login admin, buka `/dashboard` untuk melihat statistik signal dan trade, heartbeat EA, status Telegram/Gemini, signal terbaru, statistik grup, grafik profit, log, dan riwayat trade. WebSocket `/ws` mengirim pembaruan berkala; dashboard mencoba menyambung ulang otomatis. Log dan riwayat trade dapat difilter serta diekspor ke CSV. Halaman settings saat ini mengatur confidence, symbol default/mapping, demo mode, update signal, kill switch, dan konfigurasi Gemini. Chart.js dimuat dari CDN sehingga grafik memerlukan akses jaringan browser.
+
+Endpoint dashboard (semuanya memerlukan sesi admin): `GET /api/stats`, `GET /api/signals`, `GET /api/groups/stats`, `GET /api/logs`, `GET /api/logs/export.csv`, `GET /api/trades`, `GET /api/trades/export.csv`, `GET/PUT /api/settings`, `PUT /api/settings/gemini-config`, serta `WS /ws`.
 
 ## Uji login Telegram manual
 
