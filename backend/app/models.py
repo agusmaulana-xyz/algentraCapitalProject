@@ -21,6 +21,8 @@ class Signal(Base):
     group_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     group_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     message_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sender_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sender_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     raw_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     parsed_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     normalized_text: Mapped[str | None] = mapped_column(Text, nullable=True)

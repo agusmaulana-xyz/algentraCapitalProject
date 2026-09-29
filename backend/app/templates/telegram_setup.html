@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Telegram Setup · Telegram Signal</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; background: #f2f5f9; color: #172033; margin: 0; padding: 32px 16px; }
+    main { max-width: 800px; margin: auto; background: white; padding: 24px; border-radius: 14px; box-shadow: 0 12px 36px #10204018; }
+    label { display: block; margin: 12px 0 6px; font-weight: 600; }
+    input, button { font: inherit; padding: 10px; border: 1px solid #cbd3df; border-radius: 8px; }
+    input { box-sizing: border-box; }
+    button { color: white; background: #2458d3; border: 0; cursor: pointer; margin: 8px 6px 8px 0; }
+    button.secondary { color: #172033; background: #e7ebf2; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    .row input[type=checkbox] { width: auto; }
+    .row .alias { margin-left: auto; width: min(250px, 45%); }
+    #notice { min-height: 1.5em; color: #334a70; }
+    #groups { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Telegram Setup</h1>
+    <p id="status">Status: memeriksa…</p>
+    <section id="login">
+      <label for="phone">Nomor telepon (format internasional)</label>
+      <input id="phone" autocomplete="tel" placeholder="+628123456789" style="width: min(320px,100%)">
+      <button id="send-code">Kirim kode Telegram</button>
+      <div id="code-step" hidden>
+        <label for="code">Kode Telegram</label>
+        <input id="code" autocomplete="one-time-code" inputmode="numeric">
+        <button id="verify-code">Verifikasi kode</button>
+      </div>
+      <div id="password-step" hidden>
+        <label for="password">Password 2FA</label>
+        <input id="password" type="password" autocomplete="current-password">
+        <button id="verify-password">Verifikasi 2FA</button>
+      </div>
+    </section>
+    <section>
+      <button id="reconnect" class="secondary">Reconnect</button>
+      <button id="logout" class="secondary">Logout Telegram</button>
+      <button id="refresh-groups" class="secondary">Muat grup</button>
+    </section>
+    <p id="notice" role="status"></p>
+    <section>
+      <h2>Grup dan channel</h2>
+      <div id="groups">Login untuk memuat daftar grup.</div>
+      <button id="save-groups">Simpan whitelist</button>
+    </section>
+  </main>
+  <script>
+    const notice = document.querySelector("#notice");
+    async function request(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || `Request gagal (${response.status})`);
+      return body;
+    }
+    async function refreshStatus() {
+      try {
+        const status = await request("/api/tg/status");
+        document.querySelector("#status").textContent = status.connected
+          ? `Status: connected — ${status.account_name || "akun Telegram"}`
+          : `Status: ${status.state}${status.configured ? "" : " (API ID/HASH belum diatur di .env)"}`;
+        if (status.connected) await loadGroups();
+      } catch (error) { notice.textContent = error.message; }
+    }
+    async function loadGroups() {
+      try {
+        const groups = await request("/api/tg/groups");
+        const container = document.querySelector("#groups");
+        container.replaceChildren();
+        if (!groups.length) { container.textContent = "Tidak ada grup atau channel."; return; }
+        for (const group of groups) {
+          const row = document.createElement("div"); row.className = "row";
+          const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = group.enabled; checkbox.dataset.chatId = group.chat_id;
+          const name = document.createElement("span"); name.textContent = group.name;
+          const alias = document.createElement("input"); alias.className = "alias"; alias.placeholder = "Alias (opsional)"; alias.value = group.alias || ""; alias.dataset.aliasFor = group.chat_id;
+          row.append(checkbox, name, alias); container.append(row);
+        }
+      } catch (error) { notice.textContent = error.message; }
+    }
+    document.querySelector("#send-code").addEventListener("click", async () => {
+      try {
+        const result = await request("/api/tg/send-code", { method: "POST", body: JSON.stringify({ phone: document.querySelector("#phone").value }) });
+        document.querySelector("#code-step").hidden = false;
+        notice.textContent = `Kode dikirim ke ${result.phone}.`;
+      } catch (error) { notice.textContent = error.message; }
+    });
+    document.querySelector("#verify-code").addEventListener("click", async () => {
+      try {
+        const result = await request("/api/tg/verify-code", { method: "POST", body: JSON.stringify({ code: document.querySelector("#code").value }) });
+        if (result.requires_2fa) document.querySelector("#password-step").hidden = false;
+        else await refreshStatus();
+        notice.textContent = result.requires_2fa ? "Masukkan password 2FA Telegram." : "Login Telegram berhasil.";
+      } catch (error) { notice.textContent = error.message; }
+    });
+    document.querySelector("#verify-password").addEventListener("click", async () => {
+      try {
+        await request("/api/tg/verify-2fa", { method: "POST", body: JSON.stringify({ password: document.querySelector("#password").value }) });
+        document.querySelector("#password").value = "";
+        await refreshStatus(); notice.textContent = "Login Telegram berhasil.";
+      } catch (error) { notice.textContent = error.message; }
+    });
+    document.querySelector("#reconnect").addEventListener("click", async () => {
+      try { await request("/api/tg/reconnect", { method: "POST" }); await refreshStatus(); }
+      catch (error) { notice.textContent = error.message; }
+    });
+    document.querySelector("#logout").addEventListener("click", async () => {
+      try { await request("/api/tg/logout", { method: "POST" }); await refreshStatus(); notice.textContent = "Telegram logout."; }
+      catch (error) { notice.textContent = error.message; }
+    });
+    document.querySelector("#refresh-groups").addEventListener("click", loadGroups);
+    document.querySelector("#save-groups").addEventListener("click", async () => {
+      try {
+        const rows = [...document.querySelectorAll("#groups input[type=checkbox]")].map((checkbox) => ({
+          chat_id: checkbox.dataset.chatId,
+          enabled: checkbox.checked,
+          alias: document.querySelector(`[data-alias-for="${CSS.escape(checkbox.dataset.chatId)}"]`).value || null
+        }));
+        await request("/api/tg/groups/select", { method: "POST", body: JSON.stringify({ groups: rows }) });
+        notice.textContent = "Whitelist grup tersimpan.";
+      } catch (error) { notice.textContent = error.message; }
+    });
+    refreshStatus();
+  </script>
+</body>
+</html>

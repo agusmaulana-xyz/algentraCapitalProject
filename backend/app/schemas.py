@@ -16,6 +16,8 @@ class SignalResponse(BaseModel):
     group_id: str | None
     group_name: str | None
     message_id: str | None
+    sender_id: str | None
+    sender_name: str | None
     raw_text: str
     parsed_json: str | None
     normalized_text: str | None

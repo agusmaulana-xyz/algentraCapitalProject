@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
         extra="ignore",
     )
 
@@ -24,6 +25,8 @@ class Settings(BaseSettings):
     gemini_timeout_seconds: float = Field(default=25.0, validation_alias="GEMINI_TIMEOUT_SECONDS", gt=0, le=120)
     gemini_retry_attempts: int = Field(default=3, validation_alias="GEMINI_RETRY_ATTEMPTS", ge=1, le=6)
     enable_regex_fallback: bool = Field(default=False, validation_alias="ENABLE_REGEX_FALLBACK")
+    telegram_api_id: int | None = Field(default=None, validation_alias="TELEGRAM_API_ID", gt=0)
+    telegram_api_hash: SecretStr | None = Field(default=None, validation_alias="TELEGRAM_API_HASH")
     database_url: str = Field(
         default="sqlite:///backend/data/app.db",
         validation_alias="DATABASE_URL",
@@ -39,6 +42,8 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_USERNAME cannot be empty")
         if not self.gemini_model.strip():
             raise ValueError("GEMINI_MODEL cannot be empty")
+        if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
+            raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
         return self
 
 

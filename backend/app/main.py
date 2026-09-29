@@ -9,7 +9,8 @@ from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting
-from .routers import auth, dashboard, parser as parser_router, settings
+from .routers import auth, dashboard, parser as parser_router, settings, tg as tg_router
+from .signal_service import SignalService
 
 
 @asynccontextmanager
@@ -24,7 +25,11 @@ async def lifespan(_: FastAPI):
             if db.get(AppSetting, key) is None:
                 db.add(AppSetting(key=key, value=value))
         db.commit()
-    yield
+    await telegram_manager.startup()
+    try:
+        yield
+    finally:
+        await telegram_manager.shutdown()
 
 
 app = FastAPI(title="Telegram Copy Trading Backend", version="0.1.0", lifespan=lifespan)
@@ -38,6 +43,9 @@ app.add_middleware(
     https_only=config.cookie_secure,
 )
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "backend" / "app" / "templates"))
+signal_service = SignalService()
+telegram_manager = tg_router.telegram_manager
+telegram_manager.set_processor(signal_service)
 
 
 def require_admin(request: Request) -> str:
@@ -51,6 +59,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router, dependencies=[Depends(require_admin)])
 app.include_router(settings.router, dependencies=[Depends(require_admin)])
 app.include_router(parser_router.router, dependencies=[Depends(require_admin)])
+app.include_router(tg_router.router, dependencies=[Depends(require_admin)])
 
 
 @app.get("/health")
@@ -66,6 +75,11 @@ def login_page(request: Request) -> HTMLResponse:
 @app.get("/parser-test", response_class=HTMLResponse)
 def parser_test_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="parser_test.html", context={})
+
+
+@app.get("/telegram-setup", response_class=HTMLResponse)
+def telegram_setup_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="telegram_setup.html", context={})
 
 
 @app.get("/")

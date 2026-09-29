@@ -38,9 +38,16 @@ def migrate_schema() -> None:
     inspector = inspect(engine)
     if "signals" in inspector.get_table_names():
         columns = {column["name"] for column in inspector.get_columns("signals")}
-        if "content_hash" not in columns:
+        additions = {
+            "content_hash": "VARCHAR(64)",
+            "sender_id": "VARCHAR(128)",
+            "sender_name": "VARCHAR(255)",
+        }
+        missing = {name: sql_type for name, sql_type in additions.items() if name not in columns}
+        if missing:
             with engine.begin() as connection:
-                connection.execute(text("ALTER TABLE signals ADD COLUMN content_hash VARCHAR(64)"))
+                for name, sql_type in missing.items():
+                    connection.execute(text(f"ALTER TABLE signals ADD COLUMN {name} {sql_type}"))
 
 
 def get_db() -> Generator[Session, None, None]:
