@@ -51,7 +51,15 @@ Session Telethon berada di `backend/data/telegram_user.session`, tidak disajikan
 4. Pasang EA ke chart akun demo, isi `ApiKey` dengan nilai `EA_API_KEY`, dan biarkan `DemoMode=true`. Backend juga memulai `demo_mode=true`.
 5. Periksa tab Experts/Journal untuk heartbeat, status koneksi, dan laporan signal.
 
-`GET /api/ea/pending` mengklaim signal selama 90 detik. EA menyimpan penanda idempotensi lokal dan mengirim ulang laporan bila perlu agar polling/restart tidak membuat order ganda. EA memakai TP pertama bila signal berisi beberapa TP.
+`GET /api/ea/pending` mengklaim signal selama 90 detik. EA menyimpan penanda idempotensi per entry dan mengirim ulang laporan bila perlu agar polling/restart tidak membuat order ganda. Untuk signal zona, backend menunggu laporan kedua entry sebelum menandai signal selesai.
+
+### Entry berupa rentang harga
+
+Pesan seperti `XAUUSD BUY NOW 4100:::4093` atau `XAUUSD BUY 4000-4010` disimpan sebagai zona entry 4093–4100 atau 4000–4010. Parser menyimpan batas bawah dan atas; rentang eksplisit mengesampingkan kata BUY NOW/SELL NOW. EA membuat dua order, satu pada batas bawah dan satu pada batas atas. Jenis order tiap entry (Limit atau Stop) mengikuti posisi harga pasar MT5. Kedua entry memakai TP terakhir terjauh: TP tertinggi untuk BUY dan terendah untuk SELL. Lot yang dikonfigurasi berlaku untuk setiap entry.
+
+Kedua entry zona memerlukan akun MT5 mode hedging agar menjadi dua posisi terpisah; akun netting ditolak. Pending order berlaku 60 menit secara default (`PendingOrderExpiryMinutes`) lalu dihapus jika belum terisi. EA memakai expiration broker bila tersedia dan penghapusan berkala saat EA berjalan sebagai fallback.
+
+SL dan setiap TP divalidasi terhadap seluruh zona: SL BUY harus di bawah batas bawah dan TP BUY di atas batas atas; aturan SELL kebalikannya. EA tetap menghormati Demo mode, kill switch, batas lot, spread, dan batas risiko yang sudah dikonfigurasi.
 
 ## Test
 
@@ -59,4 +67,4 @@ Jalankan dari folder proyek: `.venv\Scripts\python -m pytest backend/tests` di W
 
 ## Belum teruji
 
-Koneksi Gemini dan Telegram dengan akun/kredensial sungguhan belum diuji. Kode EA belum dikompilasi di MetaEditor dan belum diuji pada terminal atau akun demo; validasi itu memerlukan MetaEditor/MT5 di Windows.
+Koneksi Gemini dan Telegram dengan akun/kredensial sungguhan belum diuji. Versi EA 0.5.0 belum dikompilasi di MetaEditor dan belum diuji pada terminal atau akun demo; validasi itu memerlukan MetaEditor/MT5 di Windows.

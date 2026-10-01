@@ -1,5 +1,5 @@
 #property strict
-#property version   "0.4.0"
+#property version   "0.5.0"
 #property description "Telegram signal polling EA with backend reporting and safe demo default"
 
 #include <Trade/Trade.mqh>
@@ -27,6 +27,7 @@ input int DefaultSLPoints = 500;
 input int DefaultTPPoints = 1000;
 input string SymbolSuffix = "";
 input int MaxSignalAgeSeconds = 120;
+input int PendingOrderExpiryMinutes = 60;
 input bool TradeOnlyAllowedSymbols = true;
 input string AllowedSymbolsCsv = "XAUUSD,EURUSD,GBPUSD,USDJPY,AUDUSD";
 input bool DemoMode = true;
@@ -36,6 +37,7 @@ input int MaxRetries = 3;
 
 CTrade g_trade;
 datetime g_last_heartbeat = 0;
+datetime g_last_expiry_scan = 0;
 string g_connection_status = "starting";
 string g_last_signal = "none";
 int g_signal_count = 0;
@@ -237,57 +239,93 @@ double FirstArrayNumber(const string array_json)
    return StringToDouble(values);
   }
 
-string SignalMarker(const long signal_id)
+double FinalArrayNumber(const string array_json, const string action)
   {
-   return "CTS:" + IntegerToString(signal_id);
+   if(StringLen(array_json) < 3)
+      return 0.0;
+   string values = StringSubstr(array_json, 1, StringLen(array_json) - 2);
+   int start = 0;
+   double final_value = 0.0;
+   while(start < StringLen(values))
+     {
+      int comma = StringFind(values, ",", start);
+      string token = comma < 0 ? StringSubstr(values, start) : StringSubstr(values, start, comma - start);
+      double value = StringToDouble(token);
+      if(value > 0.0 && (final_value <= 0.0 || (action == "BUY" && value > final_value) || (action == "SELL" && value < final_value)))
+         final_value = value;
+      if(comma < 0)
+         break;
+      start = comma + 1;
+     }
+   return final_value;
   }
 
-string GlobalKey(const long signal_id, const string field)
+string SignalMarker(const long signal_id, const int leg=0)
   {
-   return StringFormat("CT_%I64d_%I64d_%I64d_%s", AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber, signal_id, field);
+   string marker = "CTS:" + IntegerToString(signal_id);
+   if(leg > 0)
+      marker += ":" + IntegerToString(leg);
+   return marker;
   }
 
-int SavedState(const long signal_id)
+long SignalIdFromComment(const string comment)
   {
-   string key = GlobalKey(signal_id, "S");
+   if(StringFind(comment, "CTS:") != 0)
+      return 0;
+   int separator = StringFind(comment, ":", 4);
+   string value = separator < 0 ? StringSubstr(comment, 4) : StringSubstr(comment, 4, separator - 4);
+   return (long)StringToInteger(value);
+  }
+
+string GlobalKey(const long signal_id, const string field, const int leg=0)
+  {
+   string suffix = field;
+   if(leg > 0)
+      suffix += IntegerToString(leg);
+   return StringFormat("CT_%I64d_%I64d_%I64d_%s", AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber, signal_id, suffix);
+  }
+
+int SavedState(const long signal_id, const int leg=0)
+  {
+   string key = GlobalKey(signal_id, "S", leg);
    if(!GlobalVariableCheck(key))
       return 0;
    return (int)GlobalVariableGet(key);
   }
 
-void SaveReport(const long signal_id, const int state, const long ticket, const double price, const double lots)
+void SaveReport(const long signal_id, const int state, const long ticket, const double price, const double lots, const int leg=0)
   {
-   GlobalVariableSet(GlobalKey(signal_id, "S"), state);
-   GlobalVariableSet(GlobalKey(signal_id, "T"), (double)ticket);
-   GlobalVariableSet(GlobalKey(signal_id, "P"), price);
-   GlobalVariableSet(GlobalKey(signal_id, "L"), lots);
+   GlobalVariableSet(GlobalKey(signal_id, "S", leg), state);
+   GlobalVariableSet(GlobalKey(signal_id, "T", leg), (double)ticket);
+   GlobalVariableSet(GlobalKey(signal_id, "P", leg), price);
+   GlobalVariableSet(GlobalKey(signal_id, "L", leg), lots);
   }
 
 bool SendReport(const long signal_id, const string status, const long ticket, const string symbol,
-                const string action, const double lots, const double price, const string reason)
+                const string action, const double lots, const double price, const string reason, const int leg=0)
   {
    string body = StringFormat(
-      "{\"signal_id\":%I64d,\"status\":\"%s\",\"ticket\":\"%I64d\",\"symbol\":\"%s\",\"action\":\"%s\",\"lots\":%.8f,\"exec_price\":%.8f,\"reason\":\"%s\"}",
-      signal_id, status, ticket, JsonEscape(symbol), action, lots, price, JsonEscape(reason));
+      "{\"signal_id\":%I64d,\"status\":\"%s\",\"ticket\":\"%I64d\",\"symbol\":\"%s\",\"action\":\"%s\",\"lots\":%.8f,\"exec_price\":%.8f,\"reason\":\"%s\",\"leg\":%d}",
+      signal_id, status, ticket, JsonEscape(symbol), action, lots, price, JsonEscape(reason), leg);
    string response;
    return HttpRequest("POST", "/api/ea/report", body, response);
   }
 
-void RepeatSavedReport(const long signal_id, const string symbol, const string action)
+void RepeatSavedReport(const long signal_id, const string symbol, const string action, const int leg=0)
   {
-   int state = SavedState(signal_id);
+   int state = SavedState(signal_id, leg);
    if(state == 0)
       return;
-   long ticket = (long)GlobalVariableGet(GlobalKey(signal_id, "T"));
-   double price = GlobalVariableGet(GlobalKey(signal_id, "P"));
-   double lots = GlobalVariableGet(GlobalKey(signal_id, "L"));
+   long ticket = (long)GlobalVariableGet(GlobalKey(signal_id, "T", leg));
+   double price = GlobalVariableGet(GlobalKey(signal_id, "P", leg));
+   double lots = GlobalVariableGet(GlobalKey(signal_id, "L", leg));
    string status = state == 1 ? "EXECUTED" : state == 4 ? "DRY_RUN" : state == 3 ? "FAILED" : "REJECTED";
-   SendReport(signal_id, status, ticket, symbol, action, lots, price, "Idempotent report retry");
+   SendReport(signal_id, status, ticket, symbol, action, lots, price, "Idempotent report retry", leg);
   }
 
-bool FindExistingSignalOrder(const long signal_id, long &ticket_out, double &lots_out, double &price_out)
+bool FindExistingSignalOrder(const long signal_id, long &ticket_out, double &lots_out, double &price_out, const int leg=0)
   {
-   string marker = SignalMarker(signal_id);
+   string marker = SignalMarker(signal_id, leg);
    for(int i = OrdersTotal() - 1; i >= 0; i--)
      {
       ulong ticket = OrderGetTicket(i);
@@ -451,13 +489,16 @@ bool CheckPriceLevels(const string symbol, const string action, const double ref
   }
 
 bool PlaceOrder(const string action, const string order_type, const string symbol, const double entry,
-                const double sl, const double tp, const double lots, const long signal_id)
+                const double sl, const double tp, const double lots, const long signal_id, const int leg)
   {
-   string comment = SignalMarker(signal_id);
+   string comment = SignalMarker(signal_id, leg);
    g_trade.SetExpertMagicNumber((ulong)MagicNumber);
    g_trade.SetDeviationInPoints((ulong)MaxSlippage);
    g_trade.SetTypeFillingBySymbol(symbol);
    bool placed = false;
+   int expiration_modes = (int)SymbolInfoInteger(symbol, SYMBOL_EXPIRATION_MODE);
+   ENUM_ORDER_TYPE_TIME time_type = (expiration_modes & SYMBOL_EXPIRATION_SPECIFIED) != 0 ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
+   datetime expiration = TimeCurrent() + PendingOrderExpiryMinutes * 60;
    for(int attempt = 0; attempt < MathMax(1, MaxRetries); attempt++)
      {
       if(order_type == "MARKET")
@@ -467,15 +508,13 @@ bool PlaceOrder(const string action, const string order_type, const string symbo
         }
       else if(order_type == "LIMIT")
         {
-         datetime expiration = TimeCurrent() + 24 * 60 * 60;
-         if(action == "BUY") placed = g_trade.BuyLimit(lots, entry, symbol, sl, tp, ORDER_TIME_SPECIFIED, expiration, comment);
-         else placed = g_trade.SellLimit(lots, entry, symbol, sl, tp, ORDER_TIME_SPECIFIED, expiration, comment);
+         if(action == "BUY") placed = g_trade.BuyLimit(lots, entry, symbol, sl, tp, time_type, expiration, comment);
+         else placed = g_trade.SellLimit(lots, entry, symbol, sl, tp, time_type, expiration, comment);
         }
       else
         {
-         datetime expiration = TimeCurrent() + 24 * 60 * 60;
-         if(action == "BUY") placed = g_trade.BuyStop(lots, entry, symbol, sl, tp, ORDER_TIME_SPECIFIED, expiration, comment);
-         else placed = g_trade.SellStop(lots, entry, symbol, sl, tp, ORDER_TIME_SPECIFIED, expiration, comment);
+         if(action == "BUY") placed = g_trade.BuyStop(lots, entry, symbol, sl, tp, time_type, expiration, comment);
+         else placed = g_trade.SellStop(lots, entry, symbol, sl, tp, time_type, expiration, comment);
         }
       uint retcode = g_trade.ResultRetcode();
       if(placed && (retcode == TRADE_RETCODE_DONE || retcode == TRADE_RETCODE_PLACED || retcode == TRADE_RETCODE_DONE_PARTIAL))
@@ -486,11 +525,214 @@ bool PlaceOrder(const string action, const string order_type, const string symbo
    return false;
   }
 
+string ExpiryReportKey(const ulong ticket)
+  {
+   return StringFormat("CTEXP_%I64d_%I64d_%I64d", AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber, (long)ticket);
+  }
+
+void ReportExpiredOrder(const ulong ticket)
+  {
+   string key = ExpiryReportKey(ticket);
+   if(GlobalVariableCheck(key))
+      return;
+   string body = StringFormat(
+      "{\"ticket\":\"%I64d\",\"profit\":0.0,\"result\":\"EXPIRED\"}", (long)ticket);
+   string response;
+   if(HttpRequest("POST", "/api/ea/result", body, response))
+      GlobalVariableSet(key, (double)TimeCurrent());
+  }
+
+void ExpirePendingOrders()
+  {
+   if(PendingOrderExpiryMinutes <= 0)
+      return;
+   datetime now = TimeCurrent();
+   int lifetime = PendingOrderExpiryMinutes * 60;
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = OrderGetTicket(i);
+      if(ticket == 0 || (long)OrderGetInteger(ORDER_MAGIC) != MagicNumber)
+         continue;
+      if(StringFind(OrderGetString(ORDER_COMMENT), "CTS:") != 0)
+         continue;
+      datetime setup_time = (datetime)OrderGetInteger(ORDER_TIME_SETUP);
+      if(setup_time <= 0 || now - setup_time < lifetime)
+         continue;
+      long position_id = OrderGetInteger(ORDER_POSITION_ID);
+      if(g_trade.OrderDelete(ticket) && g_trade.ResultRetcode() == TRADE_RETCODE_DONE)
+        {
+         Print("[TelegramSignalEA] pending order ", ticket, " expired after ", PendingOrderExpiryMinutes, " minutes");
+         if(position_id <= 0)
+            ReportExpiredOrder(ticket);
+        }
+      else
+         Print("[TelegramSignalEA] could not expire pending order ", ticket, ": ", g_trade.ResultRetcodeDescription());
+     }
+  }
+
+void ReportExpiredOrdersFromHistory()
+  {
+   datetime now = TimeCurrent();
+   if(g_last_expiry_scan > 0 && now - g_last_expiry_scan < 30)
+      return;
+   g_last_expiry_scan = now;
+   if(!HistorySelect(now - 30 * 24 * 60 * 60, now))
+      return;
+   for(int i = HistoryOrdersTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = HistoryOrderGetTicket(i);
+      if(ticket == 0 || (long)HistoryOrderGetInteger(ticket, ORDER_MAGIC) != MagicNumber)
+         continue;
+      if((ENUM_ORDER_STATE)HistoryOrderGetInteger(ticket, ORDER_STATE) != ORDER_STATE_EXPIRED)
+         continue;
+      if(StringFind(HistoryOrderGetString(ticket, ORDER_COMMENT), "CTS:") != 0)
+         continue;
+      if(HistoryOrderGetInteger(ticket, ORDER_POSITION_ID) <= 0)
+         ReportExpiredOrder(ticket);
+     }
+  }
+
 void RejectSignal(const long signal_id, const string symbol, const string action, const string reason)
   {
    SaveReport(signal_id, 2, 0, 0.0, 0.0);
    SendReport(signal_id, "REJECTED", 0, symbol, action, 0.0, 0.0, reason);
    Print("[TelegramSignalEA] signal ", signal_id, " rejected: ", reason);
+  }
+
+void ReportLegOutcome(const long signal_id, const string symbol, const string action, const int leg,
+                      const string status, const double lots, const string reason)
+  {
+   int state = status == "FAILED" ? 3 : 2;
+   SaveReport(signal_id, state, 0, 0.0, lots, leg);
+   SendReport(signal_id, status, 0, symbol, action, lots, 0.0, reason, leg);
+   Print("[TelegramSignalEA] signal ", signal_id, " entry ", leg, " ", status, ": ", reason);
+  }
+
+string ZoneOrderType(const string action, const double entry, const double bid, const double ask, const double tick_size)
+  {
+   double tolerance = tick_size > 0.0 ? tick_size * 0.5 : 0.00000001;
+   if(action == "BUY")
+     {
+      if(entry < ask - tolerance) return "LIMIT";
+      if(entry > ask + tolerance) return "STOP";
+      return "MARKET";
+     }
+   if(entry > bid + tolerance) return "LIMIT";
+   if(entry < bid - tolerance) return "STOP";
+   return "MARKET";
+  }
+
+bool ProcessOrderLeg(const long signal_id, const string symbol, const string action,
+                     const string requested_type, const bool zone_order, const double requested_entry,
+                     const double sl_input, const double tp_input, const int leg,
+                     const double bid, const double ask)
+  {
+   int saved_state = SavedState(signal_id, leg);
+   if(saved_state != 0)
+     {
+      RepeatSavedReport(signal_id, symbol, action, leg);
+      return true;
+     }
+
+   long old_ticket = 0;
+   double old_lots = 0.0;
+   double old_price = 0.0;
+   if(FindExistingSignalOrder(signal_id, old_ticket, old_lots, old_price, leg))
+     {
+      SaveReport(signal_id, 1, old_ticket, old_price, old_lots, leg);
+      SendReport(signal_id, "EXECUTED", old_ticket, symbol, action, old_lots, old_price,
+                 "Recovered existing order after restart", leg);
+      return true;
+     }
+
+   string order_type = zone_order ? ZoneOrderType(action, NormalizePrice(symbol, requested_entry), bid, ask,
+                                                   SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE)) : requested_type;
+   if(order_type != "MARKET" && order_type != "LIMIT" && order_type != "STOP")
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Order type tidak valid");
+      return false;
+     }
+   bool market = order_type == "MARKET";
+   double current_price = action == "BUY" ? ask : bid;
+   double entry = market ? 0.0 : NormalizePrice(symbol, requested_entry);
+   if((market && current_price <= 0.0) || (!market && entry <= 0.0))
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Missing entry/current quote");
+      return false;
+     }
+   if(market && requested_entry > 0.0 && current_price > 0.0 &&
+      MathAbs(requested_entry - current_price) / current_price * 100.0 > MaxMarketDeviationPct)
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Market entry deviates too far from current price");
+      return false;
+     }
+
+   double reference = market ? current_price : entry;
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double sl = sl_input;
+   double tp = tp_input;
+   if(UseDefaultSLTP && point > 0.0)
+     {
+      if(sl <= 0.0 && DefaultSLPoints > 0)
+         sl = action == "BUY" ? reference - DefaultSLPoints * point : reference + DefaultSLPoints * point;
+      if(tp <= 0.0 && DefaultTPPoints > 0)
+         tp = action == "BUY" ? reference + DefaultTPPoints * point : reference - DefaultTPPoints * point;
+     }
+   sl = NormalizePrice(symbol, sl);
+   tp = NormalizePrice(symbol, tp);
+   if(!CheckPriceLevels(symbol, action, reference, sl, tp))
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "SL/TP invalid or inside broker stops level");
+      return false;
+     }
+
+   double lots = CalculateLots(symbol, reference, sl);
+   if(lots <= 0.0)
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Lot size invalid or risk sizing requires SL");
+      return false;
+     }
+   ENUM_ORDER_TYPE margin_type = action == "BUY" ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   if(!market && order_type == "LIMIT")
+      margin_type = action == "BUY" ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT;
+   if(!market && order_type == "STOP")
+      margin_type = action == "BUY" ? ORDER_TYPE_BUY_STOP : ORDER_TYPE_SELL_STOP;
+   if(!CheckMargin(margin_type, symbol, lots, reference))
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", lots, "Insufficient free margin or margin calculation failed");
+      return false;
+     }
+
+   if(!PlaceOrder(action, order_type, symbol, entry, sl, tp, lots, signal_id, leg))
+     {
+      string failure = StringFormat("Order failed: %s (%u)", g_trade.ResultRetcodeDescription(), g_trade.ResultRetcode());
+      ReportLegOutcome(signal_id, symbol, action, leg, "FAILED", lots, failure);
+      return false;
+     }
+
+   long ticket = (long)g_trade.ResultOrder();
+   double fill_price = g_trade.ResultPrice();
+   double fill_lots = g_trade.ResultVolume();
+   if(ticket <= 0)
+     {
+      if(!FindExistingSignalOrder(signal_id, ticket, fill_lots, fill_price, leg) || ticket <= 0)
+        {
+         Print("[TelegramSignalEA] signal ", signal_id, " entry ", leg,
+               " accepted but ticket is not available yet; will recover by order marker");
+         return false;
+        }
+     }
+   if(fill_price <= 0.0)
+      fill_price = market ? current_price : entry;
+   if(fill_lots <= 0.0)
+      fill_lots = lots;
+   SaveReport(signal_id, 1, ticket, fill_price, fill_lots, leg);
+   SendReport(signal_id, "EXECUTED", ticket, symbol, action, fill_lots, fill_price,
+              StringFormat("Order accepted at entry %s", DoubleToString(market ? fill_price : entry, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS))), leg);
+   Print("[TelegramSignalEA] signal ", signal_id, " entry ", leg, " executed ticket ", ticket,
+         " at ", DoubleToString(fill_price, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)),
+         " lots ", DoubleToString(fill_lots, 2));
+   return true;
   }
 
 void ProcessSignal(const string item)
@@ -503,18 +745,36 @@ void ProcessSignal(const string item)
    string symbol = ResolveSymbol(JsonValue(item, "symbol"));
    if(symbol == "") symbol = _Symbol;
    g_last_signal = StringFormat("%s %s #%I64d", action, symbol, signal_id);
-   if(SavedState(signal_id) != 0)
+   if(SavedState(signal_id, 0) != 0)
      {
-      RepeatSavedReport(signal_id, symbol, action);
+      RepeatSavedReport(signal_id, symbol, action, 0);
       return;
      }
-   long old_ticket = 0;
-   double old_lots = 0.0;
-   double old_price = 0.0;
-   if(FindExistingSignalOrder(signal_id, old_ticket, old_lots, old_price))
+
+   double entry_low = JsonNumber(item, "entry_low");
+   double entry_high = JsonNumber(item, "entry_high");
+   bool has_low = entry_low > 0.0;
+   bool has_high = entry_high > 0.0;
+   bool zone_order = has_low && has_high;
+   if(has_low != has_high)
      {
-      SaveReport(signal_id, 1, old_ticket, old_price, old_lots);
-      SendReport(signal_id, "EXECUTED", old_ticket, symbol, action, old_lots, old_price, "Recovered existing order after restart");
+      RejectSignal(signal_id, symbol, action, "Entry zone requires both lower and upper prices");
+      return;
+     }
+   if(zone_order && entry_low > entry_high)
+     {
+      double swap = entry_low;
+      entry_low = entry_high;
+      entry_high = swap;
+     }
+   if(zone_order && entry_low == entry_high)
+     {
+      RejectSignal(signal_id, symbol, action, "Entry zone prices must be different");
+      return;
+     }
+   if(!zone_order && order_type == "AUTO")
+     {
+      RejectSignal(signal_id, symbol, action, "AUTO order requires an entry zone");
       return;
      }
 
@@ -546,11 +806,6 @@ void ProcessSignal(const string item)
       RejectSignal(signal_id, symbol, action, "AutoTrading is disabled");
       return;
      }
-   if(MaxOpenTrades > 0 && CountOpenTrades() >= MaxOpenTrades)
-     {
-      RejectSignal(signal_id, symbol, action, "MaxOpenTrades limit reached");
-      return;
-     }
    if(!CheckSpread(symbol))
      {
       RejectSignal(signal_id, symbol, action, "Spread exceeds MaxSpreadPoints");
@@ -559,78 +814,45 @@ void ProcessSignal(const string item)
 
    double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
    double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double reference = action == "BUY" ? ask : bid;
-   double entry = JsonNumber(item, "entry");
    double sl = JsonNumber(item, "sl");
-   double tp = FirstArrayNumber(JsonValue(item, "tp"));
-   bool market = order_type == "MARKET";
-   if(market && entry > 0.0 && MathAbs(entry - reference) / reference * 100.0 > MaxMarketDeviationPct)
+   double tp = zone_order ? FinalArrayNumber(JsonValue(item, "tp"), action) : FirstArrayNumber(JsonValue(item, "tp"));
+   int order_count = zone_order ? 2 : 1;
+
+   if(zone_order && AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
      {
-      RejectSignal(signal_id, symbol, action, "Market entry deviates too far from current price");
-      return;
-     }
-   if(!market)
-      reference = entry;
-   if(reference <= 0.0)
-     {
-      RejectSignal(signal_id, symbol, action, "Missing entry/current quote");
-      return;
-     }
-   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   if(UseDefaultSLTP && point > 0.0)
-     {
-      if(sl <= 0.0 && DefaultSLPoints > 0)
-         sl = action == "BUY" ? reference - DefaultSLPoints * point : reference + DefaultSLPoints * point;
-      if(tp <= 0.0 && DefaultTPPoints > 0)
-         tp = action == "BUY" ? reference + DefaultTPPoints * point : reference - DefaultTPPoints * point;
-     }
-   if(!market && entry <= 0.0)
-     {
-      RejectSignal(signal_id, symbol, action, "Pending order requires entry");
-      return;
-     }
-   entry = NormalizePrice(symbol, entry);
-   reference = market ? reference : entry;
-   sl = NormalizePrice(symbol, sl);
-   tp = NormalizePrice(symbol, tp);
-   if(!CheckPriceLevels(symbol, action, reference, sl, tp))
-     {
-      RejectSignal(signal_id, symbol, action, "SL/TP invalid or inside broker stops level");
-      return;
-     }
-   double lots = CalculateLots(symbol, reference, sl);
-   if(lots <= 0.0)
-     {
-      RejectSignal(signal_id, symbol, action, "Lot size invalid or risk sizing requires SL");
-      return;
-     }
-   ENUM_ORDER_TYPE margin_type = ORDER_TYPE_BUY;
-   if(action == "SELL") margin_type = ORDER_TYPE_SELL;
-   if(!market && order_type == "LIMIT") margin_type = action == "BUY" ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT;
-   if(!market && order_type == "STOP") margin_type = action == "BUY" ? ORDER_TYPE_BUY_STOP : ORDER_TYPE_SELL_STOP;
-   if(!CheckMargin(margin_type, symbol, lots, reference))
-     {
-      RejectSignal(signal_id, symbol, action, "Insufficient free margin or margin calculation failed");
+      RejectSignal(signal_id, symbol, action, "Two-entry zone requires an MT5 hedging account");
       return;
      }
 
-   bool success = PlaceOrder(action, order_type, symbol, entry, sl, tp, lots, signal_id);
-   if(!success)
+   int needed_orders = 0;
+   for(int i = 0; i < order_count; i++)
      {
-      string failure = StringFormat("Order failed: %s (%u)", g_trade.ResultRetcodeDescription(), g_trade.ResultRetcode());
-      SaveReport(signal_id, 3, 0, 0.0, lots);
-      SendReport(signal_id, "FAILED", 0, symbol, action, lots, 0.0, failure);
-      Print("[TelegramSignalEA] signal ", signal_id, " failed: ", failure, " / error ", GetLastError());
+      int leg = zone_order ? i + 1 : 0;
+      if(SavedState(signal_id, leg) == 0)
+        {
+         long existing_ticket = 0;
+         double existing_lots = 0.0;
+         double existing_price = 0.0;
+         if(!FindExistingSignalOrder(signal_id, existing_ticket, existing_lots, existing_price, leg))
+            needed_orders++;
+        }
+     }
+   if(MaxOpenTrades > 0 && CountOpenTrades() + needed_orders > MaxOpenTrades)
+     {
+      RejectSignal(signal_id, symbol, action, "MaxOpenTrades limit does not allow all signal entries");
       return;
      }
-   long ticket = (long)g_trade.ResultOrder();
-   double fill_price = g_trade.ResultPrice();
-   double fill_lots = g_trade.ResultVolume();
-   if(fill_lots <= 0.0) fill_lots = lots;
-   SaveReport(signal_id, 1, ticket, fill_price, fill_lots);
-   SendReport(signal_id, "EXECUTED", ticket, symbol, action, fill_lots, fill_price, "Order accepted by MT5");
+
+   if(zone_order)
+     {
+      ProcessOrderLeg(signal_id, symbol, action, "AUTO", true, entry_low, sl, tp, 1, bid, ask);
+      ProcessOrderLeg(signal_id, symbol, action, "AUTO", true, entry_high, sl, tp, 2, bid, ask);
+     }
+   else
+     {
+      ProcessOrderLeg(signal_id, symbol, action, order_type, false, JsonNumber(item, "entry"), sl, tp, 0, bid, ask);
+     }
    g_signal_count++;
-   Print("[TelegramSignalEA] signal ", signal_id, " executed ticket ", ticket, " lots ", DoubleToString(fill_lots, 2));
   }
 
 void PollSignals()
@@ -648,7 +870,7 @@ void SendHeartbeat()
   {
    string symbol = JsonEscape(_Symbol);
    string body = StringFormat(
-      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"0.4.0\",\"symbol\":\"%s\"}",
+      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"0.5.0\",\"symbol\":\"%s\"}",
       JsonEscape(TerminalInfoString(TERMINAL_NAME)), symbol);
    string response;
    HttpRequest("POST", "/api/ea/heartbeat", body, response);
@@ -719,7 +941,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
       string comment = HistoryDealGetString(trans.deal, DEAL_COMMENT);
       if(StringFind(comment, "CTS:") == 0)
         {
-         long signal_id = (long)StringToInteger(StringSubstr(comment, 4));
+         long signal_id = SignalIdFromComment(comment);
          long ticket = (long)HistoryDealGetInteger(trans.deal, DEAL_ORDER);
          GlobalVariableSet(StringFormat("CTPOS_%I64d_%I64d_S", AccountInfoInteger(ACCOUNT_LOGIN), position_id), signal_id);
          GlobalVariableSet(StringFormat("CTPOS_%I64d_%I64d_T", AccountInfoInteger(ACCOUNT_LOGIN), position_id), (double)ticket);
@@ -733,7 +955,7 @@ void UpdatePanel()
   {
    int closed = g_wins + g_losses;
    double winrate = closed > 0 ? (double)g_wins / closed * 100.0 : 0.0;
-   Comment("TelegramSignalEA 0.4.0\n",
+   Comment("TelegramSignalEA 0.5.0\n",
            "Backend: ", g_connection_status, "\n",
            "Mode: ", DemoMode ? "DEMO / DRY RUN" : "LIVE", "\n",
            "Signals this session: ", g_signal_count, "\n",
@@ -746,6 +968,11 @@ int OnInit()
    if(PollIntervalMs < 100)
      {
       Print("[TelegramSignalEA] PollIntervalMs must be >= 100");
+      return INIT_PARAMETERS_INCORRECT;
+     }
+   if(PendingOrderExpiryMinutes < 1)
+     {
+      Print("[TelegramSignalEA] PendingOrderExpiryMinutes must be >= 1");
       return INIT_PARAMETERS_INCORRECT;
      }
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
@@ -766,6 +993,8 @@ void OnDeinit(const int reason)
 
 void OnTimer()
   {
+   ExpirePendingOrders();
+   ReportExpiredOrdersFromHistory();
    PollSignals();
    if(TimeCurrent() - g_last_heartbeat >= 30)
       SendHeartbeat();

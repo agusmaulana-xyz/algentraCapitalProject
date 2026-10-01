@@ -35,18 +35,28 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_credentials(self) -> "Settings":
-        if len(self.app_secret_key.get_secret_value()) < 32:
+        app_secret = self.app_secret_key.get_secret_value()
+        admin_password = self.admin_password.get_secret_value()
+        if len(app_secret) < 32:
             raise ValueError("APP_SECRET_KEY must contain at least 32 characters")
-        if len(self.admin_password.get_secret_value()) < 12:
+        if any(marker in app_secret.casefold() for marker in ("replace-with", "change-this", "changethis", "your-secret")):
+            raise ValueError("APP_SECRET_KEY masih memakai placeholder; ganti dengan secret acak")
+        if len(admin_password) < 12:
             raise ValueError("ADMIN_PASSWORD must contain at least 12 characters")
+        if any(marker in admin_password.casefold() for marker in ("replace-with", "change-this", "changethis", "your-password")):
+            raise ValueError("ADMIN_PASSWORD masih memakai placeholder; ganti sebelum menjalankan aplikasi")
         if not self.admin_username.strip():
             raise ValueError("ADMIN_USERNAME cannot be empty")
         if not self.gemini_model.strip():
             raise ValueError("GEMINI_MODEL cannot be empty")
         if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
-        if self.ea_api_key is not None and len(self.ea_api_key.get_secret_value()) < 24:
-            raise ValueError("EA_API_KEY must contain at least 24 characters")
+        if self.ea_api_key is not None:
+            ea_key = self.ea_api_key.get_secret_value()
+            if len(ea_key) < 24:
+                raise ValueError("EA_API_KEY must contain at least 24 characters")
+            if any(marker in ea_key.casefold() for marker in ("replace-with", "change-this", "changethis", "your-api-key")):
+                raise ValueError("EA_API_KEY masih memakai placeholder; ganti sebelum menjalankan EA")
         return self
 
 

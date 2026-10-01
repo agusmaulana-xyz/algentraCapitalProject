@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..models import Signal, SystemLog, Trade
 from ..routers.tg import telegram_manager
+from ..risk_controls import risk_state
 from ..schemas import LogResponse, SignalResponse
 from ..stats_service import get_dashboard_stats, get_group_stats
 
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api", tags=["dashboard"])
 @router.get("/stats")
 async def stats(db: Session = Depends(get_db)) -> dict[str, object]:
     payload: dict[str, object] = get_dashboard_stats(db)
+    payload.update(risk_state(db))
     telegram = await telegram_manager.status()
     settings = get_settings()
     payload.update({
@@ -62,8 +64,15 @@ def _logs_query(level: str | None, search: str | None):
     if level:
         query = query.where(SystemLog.level == level.upper())
     if search:
-        query = query.where(SystemLog.message.contains(search))
+        query = query.where(SystemLog.message.contains(search, autoescape=True))
     return query
+
+
+def _csv_text(value: str | None) -> str:
+    text = value or ""
+    if text.lstrip(" \t\r\n")[:1] in {"=", "+", "-", "@"}:
+        return "'" + text
+    return text
 
 
 @router.get("/logs", response_model=list[LogResponse])
@@ -89,7 +98,7 @@ def export_logs(
     writer = csv.writer(output)
     writer.writerow(["id", "created_at", "level", "source", "message"])
     for row in rows:
-        writer.writerow([row.id, row.created_at.isoformat(), row.level, row.source, row.message])
+        writer.writerow([row.id, row.created_at.isoformat(), _csv_text(row.level), _csv_text(row.source), _csv_text(row.message)])
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=logs.csv"})
 
 
@@ -105,6 +114,8 @@ def _trades_query(
     symbol: str | None,
     result: str | None,
 ):
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status_code=422, detail="date_from harus sebelum atau sama dengan date_to")
     query = select(Trade, Signal.group_id, Signal.group_name).outerjoin(Signal, Signal.id == Trade.signal_id)
     if date_from:
         query = query.where(Trade.opened_at >= date_from)
@@ -170,7 +181,7 @@ def export_trades(
     writer.writerow(["ticket", "group", "symbol", "action", "lots", "entry", "exec_price", "profit", "result", "opened_at", "closed_at"])
     for trade, _, group_name in rows:
         writer.writerow([
-            trade.ticket, group_name, trade.symbol, trade.action, trade.lots, trade.entry,
+            _csv_text(trade.ticket), _csv_text(group_name), _csv_text(trade.symbol), _csv_text(trade.action), trade.lots, trade.entry,
             trade.exec_price, trade.profit, trade.result,
             trade.opened_at.isoformat() if trade.opened_at else "",
             trade.closed_at.isoformat() if trade.closed_at else "",

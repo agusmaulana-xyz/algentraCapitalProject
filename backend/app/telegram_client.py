@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -41,6 +42,20 @@ class TelegramManager:
         self._monitor_task: asyncio.Task | None = None
         self._auth_lock = asyncio.Lock()
 
+    def _secure_session_files(self) -> None:
+        if os.name != "nt":
+            try:
+                self.session_path.parent.chmod(0o700)
+            except OSError:
+                logger.warning("Could not restrict Telegram session directory permissions")
+            for suffix in (".session", ".session-journal", ".session-wal", ".session-shm"):
+                path = self.session_path.with_suffix(suffix)
+                if path.exists():
+                    try:
+                        path.chmod(0o600)
+                    except OSError:
+                        logger.warning("Could not restrict Telegram session file permissions")
+
     @property
     def configured(self) -> bool:
         return self.settings.telegram_api_id is not None and self.settings.telegram_api_hash is not None
@@ -55,7 +70,9 @@ class TelegramManager:
     def _get_client(self):
         self._ensure_configured()
         if self.client is None:
-            self.session_path.parent.mkdir(parents=True, exist_ok=True)
+            self.session_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if os.name != "nt":
+                self.session_path.parent.chmod(0o700)
             api_hash = self.settings.telegram_api_hash.get_secret_value()
             self.client = self.client_factory(
                 str(self.session_path),
@@ -121,6 +138,7 @@ class TelegramManager:
         self.pending_phone = None
         self.phone_code_hash = None
         self.awaiting_2fa = False
+        self._secure_session_files()
         self._attach_message_handler()
         self._start_monitor()
         return {"status": "connected", "requires_2fa": False, "account_name": self.account_name}
@@ -159,6 +177,7 @@ class TelegramManager:
         try:
             client = await self._connect()
             if await client.is_user_authorized():
+                self._secure_session_files()
                 me = await client.get_me()
                 self.account_name = " ".join(
                     part for part in (getattr(me, "first_name", ""), getattr(me, "last_name", "")) if part
@@ -179,6 +198,7 @@ class TelegramManager:
                 pass
         if self.client is not None and self.client.is_connected():
             await self.client.disconnect()
+        self._secure_session_files()
         self._handler_bound = False
 
     async def reconnect(self) -> dict[str, object]:

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -80,17 +81,34 @@ def validate_classification(
         return ValidationResult("REJECTED", classification, None, None, "Confidence di bawah threshold")
     if classification.action not in {"BUY", "SELL"}:
         return ValidationResult("REJECTED", classification, None, None, "Action BUY/SELL tidak valid")
-    if classification.order_type not in {"MARKET", "LIMIT", "STOP"}:
+    if classification.order_type not in {"MARKET", "LIMIT", "STOP", "AUTO"}:
         return ValidationResult("REJECTED", classification, None, None, "Order type tidak valid")
+    has_entry_range = classification.entry_low is not None or classification.entry_high is not None
+    if has_entry_range and (classification.entry_low is None or classification.entry_high is None):
+        return ValidationResult("REJECTED", classification, None, None, "Zona entry harus memiliki batas bawah dan atas")
+    if classification.order_type == "AUTO" and not has_entry_range:
+        return ValidationResult("REJECTED", classification, None, None, "AUTO memerlukan zona entry")
     if classification.order_type in {"LIMIT", "STOP"} and classification.entry is None:
         return ValidationResult("REJECTED", classification, None, None, "Pending order wajib memiliki harga entry")
+    if has_entry_range and classification.entry is not None:
+        return ValidationResult("REJECTED", classification, None, None, "Gunakan entry tunggal atau zona entry, jangan keduanya")
 
     action = classification.action
     entry = classification.entry
+    entry_low = classification.entry_low
+    entry_high = classification.entry_high
+    if entry_low is not None and entry_high is not None:
+        entry_low, entry_high = sorted((entry_low, entry_high))
     stop_loss = classification.sl
     take_profits = classification.tp or []
-    if any(price <= 0 for price in take_profits) or (stop_loss is not None and stop_loss <= 0) or (entry is not None and entry <= 0):
+    prices = take_profits + [price for price in (stop_loss, entry, entry_low, entry_high) if price is not None]
+    if any(not math.isfinite(price) or price <= 0 for price in prices):
         return ValidationResult("REJECTED", classification, None, None, "Harga harus lebih besar dari nol")
+    if entry_low is not None and entry_high is not None:
+        if action == "BUY" and ((stop_loss is not None and stop_loss >= entry_low) or any(tp <= entry_high for tp in take_profits)):
+            return ValidationResult("REJECTED", classification, None, None, "Zona BUY mensyaratkan SL di bawah batas bawah dan setiap TP di atas batas atas")
+        if action == "SELL" and ((stop_loss is not None and stop_loss <= entry_high) or any(tp >= entry_low for tp in take_profits)):
+            return ValidationResult("REJECTED", classification, None, None, "Zona SELL mensyaratkan SL di atas batas atas dan setiap TP di bawah batas bawah")
 
     if entry is not None:
         if action == "BUY" and ((stop_loss is not None and stop_loss >= entry) or any(tp <= entry for tp in take_profits)):
@@ -109,7 +127,9 @@ def validate_classification(
 
     symbol = normalize_symbol(classification.symbol, symbol_mapping, default_symbol)
     levels = []
-    if entry is not None:
+    if entry_low is not None and entry_high is not None:
+        levels.append(f"ENTRY ZONE : {entry_low:g}–{entry_high:g}")
+    elif entry is not None:
         levels.append(f"{entry:g}")
     elif classification.order_type == "MARKET":
         levels.append("MARKET")

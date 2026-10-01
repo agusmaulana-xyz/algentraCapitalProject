@@ -1,41 +1,33 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tes Parser · Telegram Signal</title>
-  <style>
-    body { font: 16px system-ui, sans-serif; background: #f2f5f9; color: #172033; margin: 0; padding: 32px 16px; }
-    main { max-width: 760px; margin: auto; background: white; padding: 24px; border-radius: 14px; box-shadow: 0 12px 36px #10204018; }
-    label { display: block; margin: 16px 0 6px; font-weight: 600; }
-    textarea, button { width: 100%; box-sizing: border-box; font: inherit; padding: 11px; border: 1px solid #cbd3df; border-radius: 8px; }
-    textarea { min-height: 100px; }
-    button { margin-top: 18px; color: white; background: #2458d3; border: 0; cursor: pointer; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fb; padding: 14px; border-radius: 8px; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Tes Parser Signal</h1>
+{% extends "base.html" %}
+{% block title %}Parser Test | Telegram Signal{% endblock %}
+{% block extra_head %}
+
+{% endblock %}
+{% block content %}
+<main class="page-shell">
+    <div class="page-heading"><div><span class="eyebrow">Signal lab</span><h1>Tes Parser Signal</h1><p class="page-description">Uji format pesan sebelum mengaktifkan whitelist. Hasil ini hanya validasi parser dan tidak mengirim order ke MT5.</p></div></div>
     <form id="parser-form">
-      <label for="message">Pesan baru</label>
-      <textarea id="message" required placeholder="Contoh: BUY XAUUSD, entry 2400, TP 2420, SL 2380"></textarea>
-      <label for="context">Konteks pesan sebelumnya (opsional)</label>
+      <label for="message">Pesan baru<small class="field-help">Tempel pesan signal asli; format rentang seperti 4100:::4093 atau 4000-4010 menjadi zona; zona mengesampingkan kata BUY NOW/SELL NOW.</small></label>
+      <textarea id="message" required placeholder="Contoh: XAUUSD BUY 4100:::4093, TP 4120, SL 4085"></textarea>
+      <label for="context">Konteks pesan sebelumnya (opsional)<small class="field-help">Isi hanya jika pesan terbaru melanjutkan arah/simbol dari pesan sebelumnya.</small></label>
       <textarea id="context" placeholder="Contoh: BUY NOW"></textarea>
       <button type="submit">Parse pesan</button>
     </form>
-    <h2>Hasil</h2>
+    <h2>Hasil parsing</h2>
+    <p class="section-help">Periksa action, order type, zona entry, SL/TP, status validasi, dan alasan sebelum memakai sumber ini.</p>
     <pre id="result" aria-live="polite">Masukkan pesan untuk menguji parser.</pre>
   </main>
-  <script>
-    document.querySelector("#parser-form").addEventListener("submit", async (event) => {
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelector("#parser-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const output = document.querySelector("#result");
       output.textContent = "Memproses…";
       try {
         const response = await fetch("/api/parser/test", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
           body: JSON.stringify({
             message: document.querySelector("#message").value,
             context: document.querySelector("#context").value || null
@@ -47,6 +39,5 @@
         output.textContent = "Parser tidak dapat dihubungi.";
       }
     });
-  </script>
-</body>
-</html>
+</script>
+{% endblock %}

@@ -1,61 +1,52 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Telegram Setup · Telegram Signal</title>
-  <style>
-    body { font: 16px system-ui, sans-serif; background: #f2f5f9; color: #172033; margin: 0; padding: 32px 16px; }
-    main { max-width: 800px; margin: auto; background: white; padding: 24px; border-radius: 14px; box-shadow: 0 12px 36px #10204018; }
-    label { display: block; margin: 12px 0 6px; font-weight: 600; }
-    input, button { font: inherit; padding: 10px; border: 1px solid #cbd3df; border-radius: 8px; }
-    input { box-sizing: border-box; }
-    button { color: white; background: #2458d3; border: 0; cursor: pointer; margin: 8px 6px 8px 0; }
-    button.secondary { color: #172033; background: #e7ebf2; }
-    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-    .row input[type=checkbox] { width: auto; }
-    .row .alias { margin-left: auto; width: min(250px, 45%); }
-    #notice { min-height: 1.5em; color: #334a70; }
-    #groups { margin-top: 12px; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Telegram Setup</h1>
-    <p id="status">Status: memeriksa…</p>
+{% extends "base.html" %}
+{% block title %}Telegram Sources | Telegram Signal{% endblock %}
+{% block extra_head %}
+
+{% endblock %}
+{% block content %}
+<main class="page-shell">
+    <div class="page-heading"><div><span class="eyebrow">Signal sources</span><h1>Telegram Setup</h1><p class="page-description">Hubungkan akun sumber, pilih grup yang boleh dibaca, dan beri alias agar sinyal mudah dilacak.</p></div><p id="status" class="heading-aside">Status: memeriksa...</p></div>
     <section id="login">
-      <label for="phone">Nomor telepon (format internasional)</label>
+      <h2>Hubungkan akun</h2>
+      <p class="section-help">Masuk dengan nomor Telegram dalam format internasional. Kode login dan 2FA hanya dipakai untuk menghubungkan session lokal.</p>
+      <label for="phone">Nomor telepon (format internasional)<small class="field-help">Kode login Telegram akan dikirim ke aplikasi Telegram akun ini.</small></label>
       <input id="phone" autocomplete="tel" placeholder="+628123456789" style="width: min(320px,100%)">
       <button id="send-code">Kirim kode Telegram</button>
       <div id="code-step" hidden>
-        <label for="code">Kode Telegram</label>
+        <label for="code">Kode Telegram<small class="field-help">Masukkan kode yang diterima untuk menyelesaikan login.</small></label>
         <input id="code" autocomplete="one-time-code" inputmode="numeric">
         <button id="verify-code">Verifikasi kode</button>
       </div>
       <div id="password-step" hidden>
-        <label for="password">Password 2FA</label>
+        <label for="password">Password 2FA<small class="field-help">Isi hanya jika verifikasi dua langkah aktif pada akun.</small></label>
         <input id="password" type="password" autocomplete="current-password">
         <button id="verify-password">Verifikasi 2FA</button>
       </div>
     </section>
     <section>
+      <p class="section-help">Reconnect memulihkan koneksi; Logout Telegram mencabut session lokal; Muat grup mengambil daftar grup terbaru.</p>
       <button id="reconnect" class="secondary">Reconnect</button>
-      <button id="logout" class="secondary">Logout Telegram</button>
+      <button id="telegram-logout" class="secondary">Logout Telegram</button>
       <button id="refresh-groups" class="secondary">Muat grup</button>
     </section>
     <p id="notice" role="status"></p>
     <section>
       <h2>Grup dan channel</h2>
+      <p class="section-help">Centang sumber sinyal yang dipercaya. Alias hanya mengubah nama tampilan, bukan ID grup Telegram.</p>
       <div id="groups">Login untuk memuat daftar grup.</div>
       <button id="save-groups">Simpan whitelist</button>
     </section>
   </main>
-  <script>
-    const notice = document.querySelector("#notice");
+{% endblock %}
+{% block scripts %}
+<script>
+const notice = document.querySelector("#notice");
     async function request(path, options = {}) {
+      const headers = new Headers(options.headers || {});
+      if (!["GET", "HEAD", "OPTIONS"].includes((options.method || "GET").toUpperCase())) headers.set("X-CSRF-Token", document.querySelector('meta[name="csrf-token"]').content);
       const response = await fetch(path, {
         ...options,
-        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+        headers: { "Content-Type": "application/json", ...Object.fromEntries(headers.entries()) }
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail || `Request gagal (${response.status})`);
@@ -111,12 +102,16 @@
       try { await request("/api/tg/reconnect", { method: "POST" }); await refreshStatus(); }
       catch (error) { notice.textContent = error.message; }
     });
-    document.querySelector("#logout").addEventListener("click", async () => {
+    document.querySelector("#telegram-logout").addEventListener("click", async () => {
       try { await request("/api/tg/logout", { method: "POST" }); await refreshStatus(); notice.textContent = "Telegram logout."; }
       catch (error) { notice.textContent = error.message; }
     });
     document.querySelector("#refresh-groups").addEventListener("click", loadGroups);
-    document.querySelector("#save-groups").addEventListener("click", async () => {
+    document.querySelector("#save-groups").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      button.disabled = true;
+      button.textContent = "Menyimpan...";
       try {
         const rows = [...document.querySelectorAll("#groups input[type=checkbox]")].map((checkbox) => ({
           chat_id: checkbox.dataset.chatId,
@@ -126,8 +121,8 @@
         await request("/api/tg/groups/select", { method: "POST", body: JSON.stringify({ groups: rows }) });
         notice.textContent = "Whitelist grup tersimpan.";
       } catch (error) { notice.textContent = error.message; }
+      finally { button.disabled = false; button.textContent = "Simpan whitelist"; }
     });
     refreshStatus();
-  </script>
-</body>
-</html>
+</script>
+{% endblock %}

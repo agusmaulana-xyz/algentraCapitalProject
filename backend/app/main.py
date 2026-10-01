@@ -2,10 +2,12 @@ from contextlib import asynccontextmanager
 import asyncio
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
+from urllib.parse import urlsplit
 
 from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
@@ -13,6 +15,7 @@ from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting, Signal
 from .routers import auth, dashboard, ea, parser as parser_router, settings, tg as tg_router
 from .signal_service import SignalService
+from .security import RateLimitMiddleware, csrf_token, require_csrf
 from .stats_service import get_dashboard_stats
 
 
@@ -23,7 +26,20 @@ async def lifespan(_: FastAPI):
     config = get_settings()
     with SessionLocal() as db:
         seed_admin(db, config)
-        defaults = (("demo_mode", "true"), ("confidence_threshold", "0.75"), ("default_symbol", '"XAUUSD"'))
+        defaults = (
+            ("demo_mode", "true"),
+            ("confidence_threshold", "0.75"),
+            ("default_symbol", '"XAUUSD"'),
+            ("kill_switch", "false"),
+            ("max_daily_loss_money", "100.0"),
+            ("max_lot", "5.0"),
+            ("max_open_trades", "3"),
+            ("max_signal_age_seconds", "120"),
+            ("max_market_deviation_pct", "5.0"),
+            ("allowed_symbols", "[]"),
+            ("allow_updates", "false"),
+            ("symbol_mapping", '{"GOLD":"XAUUSD","XAU":"XAUUSD","EMAS":"XAUUSD"}'),
+        )
         for key, value in defaults:
             if db.get(AppSetting, key) is None:
                 db.add(AppSetting(key=key, value=value))
@@ -45,6 +61,17 @@ app.add_middleware(
     same_site="lax",
     https_only=config.cookie_secure,
 )
+app.add_middleware(RateLimitMiddleware)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_response(_: Request, exc: RequestValidationError) -> JSONResponse:
+    # Do not echo submitted passwords, API keys, Telegram OTPs, or 2FA values.
+    errors = [
+        {"loc": error.get("loc", ()), "msg": error.get("msg", "Input tidak valid"), "type": error.get("type", "value_error")}
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": errors})
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "backend" / "app" / "templates"))
 signal_service = SignalService()
 telegram_manager = tg_router.telegram_manager
@@ -55,6 +82,10 @@ def require_admin(request: Request) -> str:
     username = request.session.get("admin_username")
     if not username:
         raise HTTPException(status_code=401, detail="Login admin diperlukan")
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        require_csrf(request)
+    else:
+        csrf_token(request)
     return username
 
 
@@ -78,17 +109,17 @@ def login_page(request: Request) -> HTMLResponse:
 
 @app.get("/parser-test", response_class=HTMLResponse)
 def parser_test_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="parser_test.html", context={})
+    return templates.TemplateResponse(request=request, name="parser_test.html", context={"csrf_token": request.session["csrf_token"]})
 
 
 @app.get("/telegram-setup", response_class=HTMLResponse)
 def telegram_setup_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="telegram_setup.html", context={})
+    return templates.TemplateResponse(request=request, name="telegram_setup.html", context={"csrf_token": request.session["csrf_token"]})
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={})
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"csrf_token": request.session["csrf_token"]})
 
 
 @app.get("/")
@@ -99,6 +130,11 @@ def root(_: str = Depends(require_admin)) -> RedirectResponse:
 @app.websocket("/ws")
 async def dashboard_websocket(websocket: WebSocket) -> None:
     if not websocket.scope.get("session", {}).get("admin_username"):
+        await websocket.close(code=1008)
+        return
+    origin = websocket.headers.get("origin")
+    host = websocket.headers.get("host")
+    if origin and host and urlsplit(origin).netloc.casefold() != host.casefold():
         await websocket.close(code=1008)
         return
     await websocket.accept()

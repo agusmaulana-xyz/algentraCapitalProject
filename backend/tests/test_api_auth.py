@@ -7,6 +7,7 @@ from app.auth import seed_admin, verify_password
 from app.config import Settings
 from app.database import Base, SessionLocal
 from app.models import AdminUser, Signal, Trade
+from app.routers.dashboard import _csv_text
 from app.main import app
 
 
@@ -20,24 +21,72 @@ def test_admin_login_protects_and_unlocks_dashboard_routes():
         )
         assert response.status_code == 200
         assert response.json()["status"] == "authenticated"
+        csrf = response.json()["csrf_token"]
         assert client.get("/parser-test").status_code == 200
         assert client.get("/api/stats").json()["winrate"] == 0.0
 
-        assert client.post("/api/auth/logout").status_code == 200
+        assert client.post("/api/auth/logout").status_code == 403
+        assert client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 200
         assert client.get("/api/stats").status_code == 401
 
 
 def test_settings_endpoint_reads_and_updates_values_after_login():
     with TestClient(app) as client:
-        assert client.post(
+        login = client.post(
             "/api/auth/login",
             json={"username": "admin", "password": "M1-Testing-Password-123"},
-        ).status_code == 200
+        )
+        assert login.status_code == 200
 
         assert client.get("/api/settings").json()["demo_mode"] is True
-        update = client.put("/api/settings", json={"values": {"confidence_threshold": 0.8}})
+        update = client.put("/api/settings", headers={"X-CSRF-Token": login.json()["csrf_token"]}, json={"values": {"confidence_threshold": 0.8}})
         assert update.status_code == 200
         assert client.get("/api/settings").json()["confidence_threshold"] == 0.8
+
+
+def test_dashboard_mutations_require_csrf_and_validate_risk_settings():
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "M1-Testing-Password-123"},
+        )
+        assert login.status_code == 200
+        csrf = login.json()["csrf_token"]
+        payload = {"values": {"demo_mode": False, "max_daily_loss_money": 50, "max_lot": 0.5, "max_open_trades": 2, "allowed_symbols": ["XAUUSD", "EURUSDm"]}}
+        assert client.put("/api/settings", json=payload).status_code == 403
+        response = client.put("/api/settings", headers={"X-CSRF-Token": csrf}, json=payload)
+        assert response.status_code == 200
+        assert response.json()["max_daily_loss_money"] == 50.0
+        invalid = client.put("/api/settings", headers={"X-CSRF-Token": csrf}, json={"values": {"max_lot": 0}})
+        assert invalid.status_code == 422
+        restored = client.put(
+            "/api/settings",
+            headers={"X-CSRF-Token": csrf},
+            json={"values": {"demo_mode": True, "kill_switch": False, "max_daily_loss_money": 100, "max_lot": 5, "max_open_trades": 3, "max_signal_age_seconds": 120, "max_market_deviation_pct": 5, "allowed_symbols": []}},
+        )
+        assert restored.status_code == 200
+
+
+def test_request_validation_never_echoes_submitted_api_key():
+    key_value = "private-invalid-key"
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "M1-Testing-Password-123"},
+        )
+        response = client.put(
+            "/api/settings/gemini-config",
+            headers={"X-CSRF-Token": login.json()["csrf_token"]},
+            json={"api_key": key_value},
+        )
+        assert response.status_code == 422
+        assert key_value not in response.text
+
+
+def test_csv_export_cells_neutralize_spreadsheet_formulas():
+    assert _csv_text("=1+1") == "'=1+1"
+    assert _csv_text("  @SUM(A1:A2)") == "'  @SUM(A1:A2)"
+    assert _csv_text("ordinary text") == "ordinary text"
 
 
 def test_startup_syncs_changed_admin_password_from_environment():
@@ -71,10 +120,11 @@ def test_startup_syncs_changed_admin_password_from_environment():
 def test_dashboard_endpoints_csv_and_websocket_after_login():
     with TestClient(app) as client:
         assert client.get("/dashboard").status_code == 401
-        assert client.post(
+        login = client.post(
             "/api/auth/login",
             json={"username": "admin", "password": "M1-Testing-Password-123"},
-        ).status_code == 200
+        )
+        assert login.status_code == 200
         assert client.get("/dashboard").status_code == 200
 
         stats = client.get("/api/stats")
@@ -109,10 +159,11 @@ def test_signal_endpoint_includes_execution_ticket_and_profit():
 
     try:
         with TestClient(app) as client:
-            assert client.post(
+            login = client.post(
                 "/api/auth/login",
                 json={"username": "admin", "password": "M1-Testing-Password-123"},
-            ).status_code == 200
+            )
+            assert login.status_code == 200
             response = client.get(f"/api/signals?group_id=dashboard-route-test")
             assert response.status_code == 200
             [item] = response.json()
