@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import EAStatus, Signal, Trade
+from .models import ClientUser, EAStatus, Signal, Trade
 
 
 def calculate_trade_stats(trades: Iterable[Any]) -> dict[str, int | float]:
@@ -37,6 +37,7 @@ def get_dashboard_stats(db: Session) -> dict[str, int | float]:
     signal_rows = db.execute(select(Signal.status)).scalars().all()
     status_counts = Counter(status.upper() for status in signal_rows)
     trade_stats = calculate_trade_stats(db.execute(select(Trade)).scalars())
+    active_clients = db.execute(select(func.count(ClientUser.id))).scalar_one()
     ea = db.get(EAStatus, 1)
     heartbeat = ea.last_heartbeat if ea else None
     if heartbeat is not None:
@@ -52,6 +53,7 @@ def get_dashboard_stats(db: Session) -> dict[str, int | float]:
         "signals_pending": status_counts["PENDING"] + status_counts["CLAIMED"],
         "signals_rejected": status_counts["REJECTED"] + status_counts["FAILED"],
         "signals_ignored": status_counts["IGNORED"],
+        "active_clients": active_clients,
         "ea_online": ea_online,
         "ea_last_heartbeat": heartbeat.isoformat() if heartbeat else None,
         **trade_stats,

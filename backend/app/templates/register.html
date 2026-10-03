@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Buat akun klien | Algentra Capital{% endblock %}
+{% block content %}
+<main class="page-shell login-shell">
+  <section class="login-card">
+    <span class="eyebrow">REGISTRASI KLIEN / VERIFIKASI EMAIL</span>
+    <h1>Buat akun klien</h1>
+    <p class="page-description">Buat akun untuk mendaftarkan akun MT5 follower. Kode verifikasi akan dikirim ke email Anda.</p>
+    <form id="register-form">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <label for="password">Kata sandi<small class="field-help">Minimal 12 karakter; maksimal 72 byte.</small></label>
+      <input id="password" type="password" autocomplete="new-password" minlength="12" maxlength="72" required>
+      <button type="submit">Kirim kode</button>
+    </form>
+    <form id="verify-form" hidden>
+      <label for="code">Kode verifikasi<small class="field-help">Masukkan enam digit yang dikirim ke email. Kode berlaku 10 menit.</small></label>
+      <input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+      <button type="submit">Verifikasi email</button>
+      <button id="resend" class="secondary" type="button">Kirim ulang kode</button>
+    </form>
+    <p id="message" class="status" role="status"></p>
+    <p class="muted">Sudah punya akun? <a href="/login">Masuk ke portal klien</a>.</p>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+const registerForm = document.querySelector("#register-form");
+const verifyForm = document.querySelector("#verify-form");
+const message = document.querySelector("#message");
+let pendingEmail = "";
+let pendingPassword = "";
+
+async function post(path, body) {
+  const response = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Permintaan gagal. Coba lagi.");
+  return result;
+}
+
+registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  pendingEmail = document.querySelector("#email").value.trim();
+  pendingPassword = document.querySelector("#password").value;
+  try {
+    await post("/api/auth/register", {email:pendingEmail, password:pendingPassword});
+    registerForm.hidden = true;
+    verifyForm.hidden = false;
+    message.textContent = "Jika email memenuhi syarat, kode verifikasi sudah dikirim. Periksa kotak masuk dan folder spam.";
+  } catch (error) { message.textContent = error.message; }
+});
+
+verifyForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await post("/api/auth/verify-email", {email:pendingEmail, code:document.querySelector("#code").value});
+    location.assign("/account");
+  } catch (error) { message.textContent = error.message; }
+});
+
+document.querySelector("#resend").addEventListener("click", async () => {
+  try {
+    await post("/api/auth/resend-code", {email:pendingEmail, password:pendingPassword});
+    message.textContent = "Jika email memenuhi syarat, kode verifikasi baru sudah dikirim. Tunggu satu menit sebelum meminta kode lagi.";
+  } catch (error) { message.textContent = error.message; }
+});
+</script>
+{% endblock %}

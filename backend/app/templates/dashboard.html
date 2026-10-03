@@ -13,6 +13,7 @@
       <div class="card"><span>Pending</span><b id="signals-pending">&mdash;</b><small>Menunggu diklaim oleh EA.</small></div>
       <div class="card"><span>Ditolak / gagal</span><b id="signals-rejected">&mdash;</b><small>Periksa alasan pada log sistem.</small></div>
       <div class="card"><span>Diabaikan</span><b id="signals-ignored">&mdash;</b><small>Bukan sinyal atau tidak lolos aturan.</small></div>
+      <div class="card"><span>Total registrasi</span><b id="active-clients">&mdash;</b><small>Akun klien yang sudah verifikasi email.</small></div>
       <div class="card"><span>Win / Loss</span><b id="wins-losses">&mdash;</b><small>Hasil trade yang sudah ditutup.</small></div>
       <div class="card"><span>Winrate</span><b id="winrate">&mdash;</b><small>Persentase hasil trade positif.</small></div>
       <div class="card"><span>Total profit</span><b id="total-profit">&mdash;</b><small>Profit terealisasi semua trade.</small></div>
@@ -108,7 +109,7 @@ const $ = (selector) => document.querySelector(selector);
     }
     async function loadStatsAndSignals() {
       const [stats, signals] = await Promise.all([api("/api/stats"), api("/api/signals?limit=5")]);
-      for (const key of ["signals_total","signals_executed","signals_simulated","signals_pending","signals_rejected","signals_ignored","winrate","total_profit"]) {
+      for (const key of ["signals_total","signals_executed","signals_simulated","signals_pending","signals_rejected","signals_ignored","active_clients","winrate","total_profit"]) {
         const el = $(`#${key.replaceAll("_", "-")}`); if (el) el.textContent = key === "winrate" ? `${stats[key]}%` : key === "total_profit" ? Number(stats[key]).toFixed(2) : stats[key];
       }
       $("#wins-losses").textContent = `${stats.wins} / ${stats.losses}`;

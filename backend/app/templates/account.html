@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Akun MT5 | Algentra Capital{% endblock %}
+{% block content %}
+<main class="page-shell">
+  <div class="page-heading">
+    <div><span class="eyebrow">PORTAL KLIEN / AKUN MT5</span><h1>Akun MetaTrader 5</h1>
+      <p class="page-description">Hubungkan akun MT5 follower untuk menyalin posisi yang dibuka oleh EA Algentra.</p>
+    </div>
+    <p class="heading-aside">Token EA hanya terlihat saat dibuat atau dirotasi.</p>
+  </div>
+
+  <section>
+    <h2>Hubungkan akun follower</h2>
+    <p class="section-help">Masukkan nama server broker dan nomor login MT5. Kami tidak meminta atau menyimpan kata sandi broker.</p>
+    <form id="account-form" class="form-grid">
+      <label>Nama akun<input name="label" maxlength="80" placeholder="Follower 1" required></label>
+      <label>Broker server<input name="server" maxlength="128" placeholder="BrokerName-Live" required></label>
+      <label>Nomor login MT5<input name="login" maxlength="32" inputmode="numeric" required></label>
+      <div><button type="submit">Tambahkan akun</button></div>
+    </form>
+    <p id="account-message" class="status" role="status"></p>
+    <div id="new-token" hidden></div>
+  </section>
+
+  <section>
+    <h2>Akun yang terhubung</h2>
+    <p class="section-help">Hubungkan hingga 10 akun follower. Setiap akun memiliki token akses tersendiri.</p>
+    <div id="accounts" class="grid"></div>
+  </section>
+
+  <section>
+    <h2>Pasang EA follower</h2>
+    <p class="section-help">EA utama Algentra menjalankan sinyal dan mengirim posisi terbuka. EA follower menyinkronkan posisi tersebut ke akun MT5 yang Anda hubungkan.</p>
+    <div class="toolbar">
+      <a class="workspace-tag" href="/downloads/MT5FollowerCopyEA.mq5">Unduh EA follower</a>
+    </div>
+    <ol>
+      <li>Hubungkan akun MT5 di atas. Salin token yang muncul; token hanya terlihat saat dibuat atau dirotasi.</li>
+      <li>Unduh EA follower. Di MT5, pilih <strong>File → Open Data Folder</strong>, buka folder <code>MQL5/Experts</code>, lalu salin file EA ke sana. Buka file di MetaEditor dan tekan <strong>F7</strong> untuk compile.</li>
+      <li>Di MT5, pilih <strong>Tools → Options → Expert Advisors</strong>, aktifkan <em>Allow WebRequest for listed URL</em>, lalu tambahkan <code>https://algentracapital.my.id</code>.</li>
+      <li>Dari <strong>Navigator → Expert Advisors</strong>, pasang EA di chart. Isi <code>AccountToken</code> dengan token akun tersebut, pastikan <code>ServerURL</code> benar, lalu aktifkan <strong>Algo Trading</strong>.</li>
+      <li>Pastikan EA utama Algentra aktif dan uji EA follower di akun demo. <code>AllowLiveTrading</code> nonaktif secara default. Atur <code>VolumeMultiplier</code> sesuai kebutuhan sebelum mengaktifkan trading live.</li>
+    </ol>
+    <p class="notice-box">Akun follower harus memakai mode <strong>hedging</strong>. Volume salinan mengikuti volume sumber dikalikan <code>VolumeMultiplier</code>; nilainya tidak menyesuaikan ekuitas secara otomatis. Jika pembaruan dari akun utama terhenti lebih dari 20 detik, sinkronisasi berhenti. Posisi yang sudah terbuka tetap berada di MT5 jika EA berhenti.</p>
+    <p class="section-help">Jangan bagikan token EA. Jika token hilang atau terekspos, pilih <strong>Rotasi token</strong> dan perbarui token di EA follower. Hanya posisi yang dibuat oleh EA utama Algentra yang disalin; posisi manual dan EA lain tidak ikut disinkronkan.</p>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+const accountsBox = document.querySelector("#accounts");
+const statusBox = document.querySelector("#account-message");
+const tokenBox = document.querySelector("#new-token");
+
+async function api(path, options = {}) {
+  const headers = {...(options.headers || {})};
+  if (options.method && options.method !== "GET") headers["X-CSRF-Token"] = csrfToken;
+  if (options.body) headers["Content-Type"] = "application/json";
+  const response = await fetch(path, {...options, headers});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Permintaan gagal.");
+  return result;
+}
+
+function showToken(title, token, accountId) {
+  tokenBox.hidden = false;
+  tokenBox.dataset.accountId = String(accountId);
+  tokenBox.replaceChildren();
+  const heading = document.createElement("h3"); heading.textContent = title;
+  const text = document.createElement("p"); text.textContent = "Salin token ini sekarang, lalu tempel ke input AccountToken pada EA MT5. Token tidak ditampilkan lagi setelah panel ditutup.";
+  const value = document.createElement("pre"); value.textContent = token;
+  const copy = document.createElement("button"); copy.type = "button"; copy.textContent = "Salin token";
+  copy.addEventListener("click", async () => { await navigator.clipboard.writeText(token); copy.textContent = "Tersalin"; });
+  tokenBox.append(heading, text, value, copy);
+}
+
+function addAccountCard(account) {
+  const card = document.createElement("article"); card.className = "card";
+  const title = document.createElement("h3"); title.textContent = account.label;
+  const detail = document.createElement("p"); detail.textContent = `Follower · ${account.login} · ${account.server}`;
+  const state = document.createElement("p"); state.className = "muted";
+  state.textContent = `${account.active ? "Aktif" : "Nonaktif"} · Terakhir terhubung: ${account.last_seen_at ? new Date(account.last_seen_at).toLocaleString() : "belum ada koneksi"}`;
+  const controls = document.createElement("div"); controls.className = "toolbar";
+  const edit = document.createElement("button"); edit.className = "secondary"; edit.textContent = "Edit akun";
+  edit.addEventListener("click", async () => {
+    const label = prompt("Nama akun", account.label); if (label === null) return;
+    const server = prompt("Broker server", account.server); if (server === null) return;
+    const login = prompt("Nomor login MT5", account.login); if (login === null) return;
+    try { await api(`/api/mt5/accounts/${account.id}`, {method:"PUT", body:JSON.stringify({label, server, login})}); await loadAccounts(); }
+    catch (error) { statusBox.textContent = error.message; }
+  });
+  const active = document.createElement("button"); active.className = account.active ? "secondary" : "";
+  active.textContent = account.active ? "Nonaktifkan" : "Aktifkan";
+  active.addEventListener("click", async () => {
+    try { await api(`/api/mt5/accounts/${account.id}/active`, {method:"PUT", body:JSON.stringify({active:!account.active})}); await loadAccounts(); }
+    catch (error) { statusBox.textContent = error.message; }
+  });
+  const rotate = document.createElement("button"); rotate.className = "secondary"; rotate.textContent = "Rotasi token";
+  rotate.addEventListener("click", async () => {
+    try { const result = await api(`/api/mt5/accounts/${account.id}/rotate-token`, {method:"POST"}); showToken(`Token baru: ${account.label}`, result.token, account.id); }
+    catch (error) { statusBox.textContent = error.message; }
+  });
+  const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger icon-button";
+  remove.title = `Hapus akun ${account.label}`;
+  remove.setAttribute("aria-label", `Hapus akun ${account.label}`);
+  remove.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>';
+  remove.addEventListener("click", async () => {
+    if (!confirm(`Hapus akun follower ${account.label} (${account.login})? Token terminal ini tidak akan bisa digunakan lagi.`)) return;
+    statusBox.textContent = "";
+    try {
+      await api(`/api/mt5/accounts/${account.id}`, {method:"DELETE"});
+      if (tokenBox.dataset.accountId === String(account.id)) tokenBox.hidden = true;
+      statusBox.textContent = `Akun ${account.label} berhasil dihapus.`;
+      await loadAccounts();
+    } catch (error) { statusBox.textContent = error.message; }
+  });
+  controls.append(edit, active, rotate, remove); card.append(title, detail, state, controls); accountsBox.append(card);
+}
+
+async function loadAccounts() {
+  try {
+    const accounts = await api("/api/mt5/accounts");
+    accountsBox.replaceChildren();
+    if (!accounts.length) { accountsBox.textContent = "Belum ada akun MT5."; return; }
+    accounts.forEach(addAccountCard);
+  } catch (error) { statusBox.textContent = error.message; }
+}
+
+document.querySelector("#account-form").addEventListener("submit", async (event) => {
+  event.preventDefault(); statusBox.textContent = "";
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  payload.role = "follower";
+  try {
+    const result = await api("/api/mt5/accounts", {method:"POST", body:JSON.stringify(payload)});
+    showToken(`Token baru: ${result.account.label}`, result.token, result.account.id);
+    event.currentTarget.reset();
+    await loadAccounts();
+  } catch (error) { statusBox.textContent = error.message; }
+});
+
+loadAccounts();
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7,6 +7,55 @@ from pydantic import BaseModel, ConfigDict, Field
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=1, max_length=1024)
+
+
+class ClientLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=72)
+    remember_me: bool = False
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=12, max_length=72)
+
+
+class VerifyEmailRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class MT5AccountCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    server: str = Field(min_length=1, max_length=128)
+    login: str = Field(min_length=1, max_length=32)
+    role: Literal["follower"] = "follower"
+
+
+class MT5AccountUpdate(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    server: str = Field(min_length=1, max_length=128)
+    login: str = Field(min_length=1, max_length=32)
+
+
+class MT5AccountActive(BaseModel):
+    active: bool
+
+
+class CopyPositionInput(BaseModel):
+    ticket: str = Field(min_length=1, max_length=64)
+    symbol: str = Field(min_length=1, max_length=64)
+    action: Literal["BUY", "SELL"]
+    lots: float = Field(gt=0, le=1000, allow_inf_nan=False)
+    entry_price: float = Field(gt=0, allow_inf_nan=False)
+    sl: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    tp: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+
+class CopySnapshotInput(BaseModel):
+    terminal_login: str = Field(min_length=1, max_length=32)
+    terminal_server: str = Field(min_length=1, max_length=128)
+    positions: list[CopyPositionInput] = Field(max_length=500)
 
 
 class SignalResponse(BaseModel):

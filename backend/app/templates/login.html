@@ -1,36 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Admin Login | Algentra Capital{% endblock %}
-{% block extra_head %}
-
-{% endblock %}
+{% block title %}Masuk | Algentra Capital{% endblock %}
 {% block content %}
 <main class="page-shell login-shell">
-    <section class="login-card">
-    <span class="eyebrow">ALGENTRA CAPITAL / SECURE ACCESS</span>
-    <h1>Operations login</h1>
-    <p class="page-description">Akses privat untuk mengelola sumber sinyal, konfigurasi, dan kontrol trading.</p>
-    <form id="login-form">
-      <label for="username">Username<small class="field-help">Nama pengguna admin yang disiapkan pada konfigurasi aplikasi.</small></label>
-      <input id="username" autocomplete="username" required>
-      <label for="password">Password<small class="field-help">Password admin lokal.</small></label>
+  <section class="login-card">
+    <span class="eyebrow">PORTAL KLIEN / MASUK</span>
+    <h1>Masuk ke akun</h1>
+    <p class="page-description">Kelola akun MT5 follower dan pantau koneksi copy trading Anda.</p>
+    <form id="client-login-form">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <label for="password">Kata sandi</label>
       <input id="password" type="password" autocomplete="current-password" required>
+      <div class="toolbar"><label><input id="remember-me" type="checkbox"> Biarkan saya tetap masuk selama 30 hari</label></div>
       <button type="submit">Masuk</button>
-      <p id="message" role="status"></p>
+      <p id="client-message" class="status" role="status"></p>
     </form>
-    </section>
-  </main>
+    <p class="muted">Belum punya akun? <a href="/register">Buat akun dengan verifikasi email</a>.</p>
+  </section>
+</main>
 {% endblock %}
 {% block scripts %}
 <script>
-document.querySelector("#login-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: document.querySelector("#username").value, password: document.querySelector("#password").value })
-      });
-      if (response.ok) window.location.assign("/dashboard");
-      else document.querySelector("#message").textContent = "Login gagal. Periksa username dan password.";
+async function submitLogin(event, endpoint, payload, messageId, destination) {
+  event.preventDefault();
+  const message = document.querySelector(messageId);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload)
     });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Gagal masuk. Periksa kembali email dan kata sandi Anda.");
+    location.assign(destination);
+  } catch (error) { message.textContent = error.message; }
+}
+document.querySelector("#client-login-form").addEventListener("submit", (event) => submitLogin(
+  event, "/api/auth/client-login",
+  {
+    email: document.querySelector("#email").value,
+    password: document.querySelector("#password").value,
+    remember_me: document.querySelector("#remember-me").checked
+  },
+  "#client-message", "/account"
+));
 </script>
 {% endblock %}

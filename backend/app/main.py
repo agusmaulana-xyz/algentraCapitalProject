@@ -3,7 +3,7 @@ import asyncio
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
@@ -13,9 +13,18 @@ from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting, Signal
-from .routers import auth, dashboard, ea, parser as parser_router, public as public_router, settings, tg as tg_router
+from .routers import auth, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
+from .routers.mt5 import require_client_id
 from .signal_service import SignalService
-from .security import RateLimitMiddleware, csrf_token, require_csrf
+from .security import (
+    SESSION_COOKIE_NAME,
+    SESSION_SIGNER_MAX_AGE,
+    RateLimitMiddleware,
+    SessionCookiePolicyMiddleware,
+    SessionExpiryMiddleware,
+    csrf_token,
+    require_csrf,
+)
 from .stats_service import get_dashboard_stats
 
 
@@ -51,16 +60,18 @@ async def lifespan(_: FastAPI):
         await telegram_manager.shutdown()
 
 
-app = FastAPI(title="Algentra Capital", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Algentra Capital", version="0.3.0", lifespan=lifespan)
 config = get_settings()
+app.add_middleware(SessionExpiryMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=config.app_secret_key.get_secret_value(),
-    session_cookie="copytrade_admin_session",
-    max_age=60 * 60 * 12,
+    session_cookie=SESSION_COOKIE_NAME,
+    max_age=SESSION_SIGNER_MAX_AGE,
     same_site="lax",
     https_only=config.cookie_secure,
 )
+app.add_middleware(SessionCookiePolicyMiddleware, session_cookie=SESSION_COOKIE_NAME)
 app.add_middleware(RateLimitMiddleware)
 
 
@@ -96,6 +107,7 @@ app.include_router(settings.router, dependencies=[Depends(require_admin)])
 app.include_router(parser_router.router, dependencies=[Depends(require_admin)])
 app.include_router(tg_router.router, dependencies=[Depends(require_admin)])
 app.include_router(ea.router)
+app.include_router(mt5_router.router)
 
 
 @app.get("/health")
@@ -104,8 +116,42 @@ def health() -> dict[str, str]:
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request) -> HTMLResponse:
+def login_page(request: Request):
+    if isinstance(request.session.get("client_user_id"), int):
+        return RedirectResponse("/account", status_code=303)
+    if request.session.get("admin_username"):
+        return RedirectResponse("/dashboard", status_code=303)
     return templates.TemplateResponse(request=request, name="login.html", context={})
+
+
+@app.get("/loginAdmin", response_class=HTMLResponse, include_in_schema=False)
+def admin_login_page(request: Request):
+    if request.session.get("admin_username"):
+        return RedirectResponse("/dashboard", status_code=303)
+    return templates.TemplateResponse(request=request, name="admin_login.html", context={})
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="register.html", context={})
+
+
+@app.get("/account", response_class=HTMLResponse)
+def client_account_page(request: Request, _: int = Depends(require_client_id)) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="account.html",
+        context={"csrf_token": request.session["csrf_token"]},
+    )
+
+
+@app.get("/downloads/MT5FollowerCopyEA.mq5", response_class=FileResponse)
+def download_mt5_follower_copy_ea(_: int = Depends(require_client_id)) -> FileResponse:
+    return FileResponse(
+        path=PROJECT_ROOT / "mt5" / "MT5FollowerCopyEA.mq5",
+        filename="MT5FollowerCopyEA.mq5",
+        media_type="application/octet-stream",
+    )
 
 
 @app.get("/parser-test", response_class=HTMLResponse)

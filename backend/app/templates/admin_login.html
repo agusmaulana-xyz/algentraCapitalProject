@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Admin Login | Algentra Capital{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main class="page-shell login-shell">
+  <section class="login-card">
+    <span class="eyebrow">ALGENTRA CAPITAL / PRIVATE ACCESS</span>
+    <h1>Admin Login</h1>
+    <p class="page-description">Masuk ke workspace operasional.</p>
+    <form id="admin-login-form">
+      <label for="username">Username</label>
+      <input id="username" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Login</button>
+      <p id="admin-message" class="status" role="status"></p>
+    </form>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelector("#admin-login-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = document.querySelector("#admin-message");
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        username: document.querySelector("#username").value,
+        password: document.querySelector("#password").value
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Login gagal.");
+    location.assign("/dashboard");
+  } catch (error) {
+    message.textContent = error.message;
+  }
+});
+</script>
+{% endblock %}

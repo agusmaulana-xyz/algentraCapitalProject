@@ -1,6 +1,6 @@
 #property strict
-#property version   "0.7.0"
-#property description "Telegram signal polling EA with backend reporting and safe demo default"
+#property version   "0.8.0"
+#property description "Executes Telegram signals and publishes its open positions to Algentra followers"
 
 #define MAX_SIGNAL_TARGETS 20
 
@@ -45,6 +45,7 @@ string g_last_signal = "none";
 int g_signal_count = 0;
 int g_wins = 0;
 int g_losses = 0;
+ulong g_last_master_snapshot_ms = 0;
 
 string TrimTrailingSlash(string value)
   {
@@ -97,6 +98,56 @@ bool HttpRequest(const string method, const string path, const string payload, s
    response_body = CharArrayToString(result, 0, -1, CP_UTF8);
    g_connection_status = "online";
    return true;
+  }
+
+bool PublishMasterSnapshot()
+  {
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED) || AccountInfoInteger(ACCOUNT_LOGIN) <= 0)
+      return false;
+
+   string positions = "[";
+   int count = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0 || PositionGetInteger(POSITION_MAGIC) != MagicNumber)
+         continue;
+
+      string symbol = PositionGetString(POSITION_SYMBOL);
+      ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+      double lots = PositionGetDouble(POSITION_VOLUME);
+      double entry = PositionGetDouble(POSITION_PRICE_OPEN);
+      double sl = PositionGetDouble(POSITION_SL);
+      double tp = PositionGetDouble(POSITION_TP);
+      string action = type == POSITION_TYPE_BUY ? "BUY" : "SELL";
+      if(count > 0)
+         positions += ",";
+      positions += StringFormat(
+         "{\"ticket\":\"%I64u\",\"symbol\":\"%s\",\"action\":\"%s\",\"lots\":%s,\"entry_price\":%s,\"sl\":%s,\"tp\":%s}",
+         ticket, JsonEscape(symbol), action,
+         DoubleToString(lots, 8),
+         DoubleToString(entry, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)),
+         sl > 0.0 ? DoubleToString(sl, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)) : "null",
+         tp > 0.0 ? DoubleToString(tp, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)) : "null");
+      count++;
+     }
+   positions += "]";
+
+   if(count > 500)
+     {
+      g_connection_status = "too many positions for copy snapshot";
+      return false;
+     }
+
+   string terminal_login = IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN));
+   string terminal_server = AccountInfoString(ACCOUNT_SERVER);
+   string payload = StringFormat(
+      "{\"terminal_login\":\"%s\",\"terminal_server\":\"%s\",\"positions\":%s}",
+      terminal_login, JsonEscape(terminal_server), positions);
+   string response;
+   bool published = HttpRequest("POST", "/api/ea/master/snapshot", payload, response);
+   g_last_master_snapshot_ms = GetTickCount64();
+   return published;
   }
 
 int JsonValueStart(const string json, const string key)
@@ -1042,6 +1093,7 @@ int OnInit()
       Print("[TelegramSignalEA] AutoTrading is off; signals will be rejected unless DemoMode is active.");
    EventSetMillisecondTimer(PollIntervalMs);
    SendHeartbeat();
+   PublishMasterSnapshot();
    UpdatePanel();
    Print("[TelegramSignalEA] initialized; add ServerURL to MT5 WebRequest allow-list");
    return INIT_SUCCEEDED;
@@ -1059,6 +1111,9 @@ void OnTimer()
    ExpirePendingOrders();
    ReportExpiredOrdersFromHistory();
    PollSignals();
+   ulong now_ms = GetTickCount64();
+   if(now_ms - g_last_master_snapshot_ms >= 1000)
+      PublishMasterSnapshot();
    if(TimeCurrent() - g_last_heartbeat >= 30)
       SendHeartbeat();
    UpdatePanel();

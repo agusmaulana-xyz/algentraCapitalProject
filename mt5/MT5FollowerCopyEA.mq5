@@ -1,0 +1,429 @@
+#property strict
+#property version   "1.0.0"
+#property description "Copies open positions published by the Algentra Telegram EA"
+
+#include <Trade/Trade.mqh>
+
+input string ServerURL = "https://algentracapital.my.id";
+input string AccountToken = "";
+input int PollIntervalMs = 1000;
+input long MagicNumber = 26100301;
+input double VolumeMultiplier = 1.0;
+input double MaxEntryDeviationPercent = 2.0;
+input int MaxSlippagePoints = 20;
+input int MaxPositions = 20;
+input string SymbolSuffix = "";
+input bool AllowLiveTrading = false;
+
+CTrade g_trade;
+string g_connection_status = "starting";
+datetime g_last_log = 0;
+
+string TrimTrailingSlash(string value)
+  {
+   while(StringLen(value) > 0 && StringSubstr(value, StringLen(value) - 1, 1) == "/")
+      value = StringSubstr(value, 0, StringLen(value) - 1);
+   return value;
+  }
+
+int JsonValueStart(const string json, const string key)
+  {
+   string needle = "\"" + key + "\"";
+   int key_pos = StringFind(json, needle);
+   if(key_pos < 0) return -1;
+   int colon = StringFind(json, ":", key_pos + StringLen(needle));
+   if(colon < 0) return -1;
+   int pos = colon + 1;
+   while(pos < StringLen(json))
+     {
+      ushort c = StringGetCharacter(json, pos);
+      if(c != 32 && c != 9 && c != 10 && c != 13) break;
+      pos++;
+     }
+   return pos;
+  }
+
+string JsonStringValue(const string json, const string key)
+  {
+   int start = JsonValueStart(json, key);
+   if(start < 0 || StringGetCharacter(json, start) != '"') return "";
+   int end = StringFind(json, "\"", start + 1);
+   if(end < 0) return "";
+   return StringSubstr(json, start + 1, end - start - 1);
+  }
+
+double JsonNumberValue(const string json, const string key)
+  {
+   int start = JsonValueStart(json, key);
+   if(start < 0 || StringSubstr(json, start, 4) == "null") return 0.0;
+   int end = start;
+   while(end < StringLen(json))
+     {
+      ushort c = StringGetCharacter(json, end);
+      if((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E') end++;
+      else break;
+     }
+   if(end == start) return 0.0;
+   return StringToDouble(StringSubstr(json, start, end - start));
+  }
+
+bool JsonBoolValue(const string json, const string key)
+  {
+   int start = JsonValueStart(json, key);
+   return start >= 0 && StringSubstr(json, start, 4) == "true";
+  }
+
+bool JsonObjects(const string json, string &objects[])
+  {
+   ArrayResize(objects, 0);
+   int key_pos = StringFind(json, "\"positions\"");
+   if(key_pos < 0) return false;
+   int array_start = StringFind(json, "[", key_pos);
+   if(array_start < 0) return false;
+   int i = array_start + 1;
+   while(i < StringLen(json))
+     {
+      ushort c = StringGetCharacter(json, i);
+      if(c == ']') return true;
+      if(c == ',' || c == 32 || c == 9 || c == 10 || c == 13) { i++; continue; }
+      if(c != '{') return false;
+      int object_start = i;
+      int depth = 0;
+      bool in_string = false;
+      bool escaped = false;
+      for(; i < StringLen(json); i++)
+        {
+         ushort ch = StringGetCharacter(json, i);
+         if(in_string)
+           {
+            if(ch == '\\' && !escaped) escaped = true;
+            else
+              {
+               if(ch == '"' && !escaped) in_string = false;
+               escaped = false;
+              }
+            continue;
+           }
+         if(ch == '"') { in_string = true; continue; }
+         if(ch == '{') depth++;
+         if(ch == '}') depth--;
+         if(depth == 0)
+           {
+            int size = ArraySize(objects);
+            ArrayResize(objects, size + 1);
+            objects[size] = StringSubstr(json, object_start, i - object_start + 1);
+            i++;
+            break;
+           }
+        }
+      if(depth != 0) return false;
+     }
+   return false;
+  }
+
+bool HttpGet(string &response_body)
+  {
+   if(StringLen(AccountToken) < 32)
+     {
+      g_connection_status = "account token missing/short";
+      return false;
+     }
+   string terminal_login = IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN));
+   string terminal_server = AccountInfoString(ACCOUNT_SERVER);
+   string headers = "X-Account-Token: " + AccountToken + "\r\n" +
+                    "X-MT5-Login: " + terminal_login + "\r\nX-MT5-Server: " + terminal_server + "\r\n";
+   char data[];
+   char result[];
+   string result_headers;
+   ArrayResize(data, 0);
+   ResetLastError();
+   int code = WebRequest("GET", TrimTrailingSlash(ServerURL) + "/api/mt5/follower/positions",
+                         headers, 5000, data, result, result_headers);
+   response_body = CharArrayToString(result, 0, -1, CP_UTF8);
+   if(code < 200 || code >= 300)
+     {
+      g_connection_status = StringFormat("HTTP %d / error %d", code, GetLastError());
+      return false;
+     }
+   g_connection_status = "online";
+   return true;
+  }
+
+string Marker(const string source_ticket)
+  {
+   return "ACM:" + source_ticket;
+  }
+
+bool FindCopiedPositions(const string source_ticket, ulong &tickets[], double &volume)
+  {
+   ArrayResize(tickets, 0);
+   volume = 0.0;
+   string marker = Marker(source_ticket);
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      if(PositionGetInteger(POSITION_MAGIC) != MagicNumber) continue;
+      if(PositionGetString(POSITION_COMMENT) != marker) continue;
+      int size = ArraySize(tickets);
+      ArrayResize(tickets, size + 1);
+      tickets[size] = ticket;
+      volume += PositionGetDouble(POSITION_VOLUME);
+     }
+   return ArraySize(tickets) > 0;
+  }
+
+int VolumePrecision(const double step)
+  {
+   for(int digits = 0; digits <= 8; digits++)
+      if(MathAbs(step - NormalizeDouble(step, digits)) < 0.000000001) return digits;
+   return 8;
+  }
+
+double NormalizeLots(const string symbol, const double requested)
+  {
+   double minimum = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+   double maximum = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
+   double step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+   if(minimum <= 0.0 || maximum <= 0.0 || step <= 0.0 || requested < minimum || requested > maximum)
+      return 0.0;
+   double lots = minimum + MathFloor((requested - minimum + step * 0.000001) / step) * step;
+   return NormalizeDouble(lots, VolumePrecision(step));
+  }
+
+bool IsSourceTicket(const string ticket, string &source_tickets[])
+  {
+   for(int i = 0; i < ArraySize(source_tickets); i++)
+      if(source_tickets[i] == ticket) return true;
+   return false;
+  }
+
+void CloseMissingCopies(string &source_tickets[])
+  {
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong local_ticket = PositionGetTicket(i);
+      if(local_ticket == 0 || PositionGetInteger(POSITION_MAGIC) != MagicNumber) continue;
+      string comment = PositionGetString(POSITION_COMMENT);
+      if(StringFind(comment, "ACM:") != 0) continue;
+      string source_ticket = StringSubstr(comment, 4);
+      if(IsSourceTicket(source_ticket, source_tickets)) continue;
+      if(g_trade.PositionClose(local_ticket, MaxSlippagePoints))
+         Print("[MT5FollowerCopyEA] source position ", source_ticket, " closed; follower position ", local_ticket, " closed");
+      else
+         Print("[MT5FollowerCopyEA] failed to close follower position ", local_ticket, ": ", g_trade.ResultRetcodeDescription());
+     }
+  }
+
+bool OpenCopy(const string source_ticket, const string symbol, const string action,
+              const double lots, const double sl, const double tp)
+  {
+   MqlTick quote;
+   if(!SymbolSelect(symbol, true) || !SymbolInfoTick(symbol, quote)) return false;
+   g_trade.SetTypeFillingBySymbol(symbol);
+   bool sent = action == "BUY"
+               ? g_trade.Buy(lots, symbol, 0.0, sl, tp, Marker(source_ticket))
+               : g_trade.Sell(lots, symbol, 0.0, sl, tp, Marker(source_ticket));
+   if(!sent || (g_trade.ResultRetcode() != TRADE_RETCODE_DONE && g_trade.ResultRetcode() != TRADE_RETCODE_DONE_PARTIAL))
+     {
+      Print("[MT5FollowerCopyEA] copy open failed for source ", source_ticket, ": ", g_trade.ResultRetcodeDescription());
+      return false;
+     }
+   Print("[MT5FollowerCopyEA] copied ", action, " ", DoubleToString(lots, 2), " ", symbol,
+         " from source ", source_ticket);
+   return true;
+  }
+
+void ReconcileVolumeAndStops(const string source_ticket, const string symbol, const string action,
+                             const double requested_lots, const double sl, const double tp)
+  {
+   ulong local_tickets[];
+   double current_volume = 0.0;
+   FindCopiedPositions(source_ticket, local_tickets, current_volume);
+   double target_volume = NormalizeLots(symbol, requested_lots * VolumeMultiplier);
+   if(target_volume <= 0.0)
+     {
+      Print("[MT5FollowerCopyEA] source ", source_ticket, " skipped: follower lot is outside broker limits");
+      for(int i = 0; i < ArraySize(local_tickets); i++)
+         if(g_trade.PositionClose(local_tickets[i], MaxSlippagePoints))
+            Print("[MT5FollowerCopyEA] closed follower position because target lot is below broker minimum");
+      return;
+     }
+   double step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+   double tolerance = step * 0.51;
+
+   if(ArraySize(local_tickets) == 0)
+     {
+      OpenCopy(source_ticket, symbol, action, target_volume, sl, tp);
+      return;
+     }
+
+   for(int i = 0; i < ArraySize(local_tickets); i++)
+     {
+      ulong ticket = local_tickets[i];
+      if(!PositionSelectByTicket(ticket)) continue;
+      double old_sl = PositionGetDouble(POSITION_SL);
+      double old_tp = PositionGetDouble(POSITION_TP);
+      double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+      bool sl_changed = MathAbs(old_sl - sl) > point * 0.5;
+      bool tp_changed = MathAbs(old_tp - tp) > point * 0.5;
+      if((sl_changed || tp_changed) && !g_trade.PositionModify(ticket, sl, tp))
+         Print("[MT5FollowerCopyEA] stop update failed for follower position ", ticket, ": ", g_trade.ResultRetcodeDescription());
+     }
+
+   current_volume = 0.0;
+   for(int i = 0; i < ArraySize(local_tickets); i++)
+      if(PositionSelectByTicket(local_tickets[i])) current_volume += PositionGetDouble(POSITION_VOLUME);
+
+   if(target_volume + tolerance < current_volume)
+     {
+      double to_reduce = current_volume - target_volume;
+      for(int i = 0; i < ArraySize(local_tickets) && to_reduce > tolerance; i++)
+        {
+         ulong ticket = local_tickets[i];
+         if(!PositionSelectByTicket(ticket)) continue;
+         double position_volume = PositionGetDouble(POSITION_VOLUME);
+         double minimum = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+         double reduction = MathMin(to_reduce, position_volume);
+         if(reduction >= position_volume - tolerance)
+           {
+            if(g_trade.PositionClose(ticket, MaxSlippagePoints)) to_reduce -= position_volume;
+           }
+         else
+           {
+            reduction = NormalizeLots(symbol, reduction);
+            if(reduction >= minimum && g_trade.PositionClosePartial(ticket, reduction, MaxSlippagePoints))
+               to_reduce -= reduction;
+           }
+        }
+     }
+   else if(target_volume > current_volume + tolerance)
+     {
+      double extra = NormalizeLots(symbol, target_volume - current_volume);
+      if(extra > 0.0) OpenCopy(source_ticket, symbol, action, extra, sl, tp);
+     }
+  }
+
+void PollAndCopy()
+  {
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED) || AccountInfoInteger(ACCOUNT_LOGIN) <= 0)
+     {
+      g_connection_status = "trading terminal disconnected";
+      return;
+     }
+   string response;
+   if(!HttpGet(response))
+     {
+      if(TimeCurrent() - g_last_log >= 15)
+        {
+         Print("[MT5FollowerCopyEA] backend request failed: ", g_connection_status);
+         g_last_log = TimeCurrent();
+        }
+      return;
+     }
+   if(!JsonBoolValue(response, "active"))
+     {
+      g_connection_status = "waiting for fresh master snapshot";
+      return;
+     }
+
+   string objects[];
+   if(!JsonObjects(response, objects))
+     {
+      g_connection_status = "invalid master snapshot";
+      return;
+     }
+   string source_tickets[];
+   int total = ArraySize(objects);
+   ArrayResize(source_tickets, total);
+   for(int i = 0; i < total; i++)
+      source_tickets[i] = JsonStringValue(objects[i], "ticket");
+
+   if(!AllowLiveTrading)
+     {
+      g_connection_status = "connected / live copying disabled";
+      return;
+     }
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
+     {
+      g_connection_status = "connected / trading not allowed by terminal";
+      return;
+     }
+   if(AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
+     {
+      g_connection_status = "follower account must use hedging mode";
+      return;
+     }
+   g_trade.SetExpertMagicNumber(MagicNumber);
+   g_trade.SetDeviationInPoints(MaxSlippagePoints);
+
+   for(int i = 0; i < total; i++)
+     {
+      string object = objects[i];
+      string source_ticket = JsonStringValue(object, "ticket");
+      string source_symbol = JsonStringValue(object, "symbol");
+      string symbol = source_symbol + SymbolSuffix;
+      string action = JsonStringValue(object, "action");
+      double lots = JsonNumberValue(object, "lots");
+      double entry = JsonNumberValue(object, "entry_price");
+      double sl = JsonNumberValue(object, "sl");
+      double tp = JsonNumberValue(object, "tp");
+      if(source_ticket == "" || source_symbol == "" || (action != "BUY" && action != "SELL") || lots <= 0.0)
+         continue;
+
+      ulong local_tickets[];
+      double local_volume = 0.0;
+      bool already_copied = FindCopiedPositions(source_ticket, local_tickets, local_volume);
+      if(!already_copied && PositionsTotal() >= MaxPositions)
+        {
+         if(TimeCurrent() - g_last_log >= 15)
+           {
+            Print("[MT5FollowerCopyEA] copy skipped: MaxPositions reached");
+            g_last_log = TimeCurrent();
+           }
+         continue;
+        }
+      MqlTick quote;
+      if(!SymbolSelect(symbol, true) || !SymbolInfoTick(symbol, quote)) continue;
+      double current_price = action == "BUY" ? quote.ask : quote.bid;
+      if(!already_copied && MaxEntryDeviationPercent > 0.0 && entry > 0.0 &&
+         MathAbs(current_price - entry) / entry * 100.0 > MaxEntryDeviationPercent)
+        {
+         if(TimeCurrent() - g_last_log >= 15)
+           {
+            Print("[MT5FollowerCopyEA] source ", source_ticket, " skipped: entry price deviation exceeded");
+            g_last_log = TimeCurrent();
+           }
+         continue;
+        }
+      ReconcileVolumeAndStops(source_ticket, symbol, action, lots, sl, tp);
+     }
+   CloseMissingCopies(source_tickets);
+   g_connection_status = "copying / live";
+  }
+
+int OnInit()
+  {
+   if(PollIntervalMs < 500 || StringLen(AccountToken) < 32 || VolumeMultiplier <= 0.0 ||
+      MaxEntryDeviationPercent < 0.0 || MaxPositions < 1)
+      return INIT_PARAMETERS_INCORRECT;
+   EventSetMillisecondTimer(PollIntervalMs);
+   PollAndCopy();
+   Print("[MT5FollowerCopyEA] initialized; live copying defaults to disabled. Allow ServerURL in MT5 WebRequest options.");
+   return INIT_SUCCEEDED;
+  }
+
+void OnDeinit(const int reason)
+  {
+   EventKillTimer();
+   Comment("");
+   Print("[MT5FollowerCopyEA] stopped, reason ", reason);
+  }
+
+void OnTimer()
+  {
+   PollAndCopy();
+   Comment("Algentra MT5 Follower Copy\nBackend: ", g_connection_status,
+           "\nPositions: ", PositionsTotal(), " / ", MaxPositions,
+           "\nLive copying: ", AllowLiveTrading ? "ON" : "OFF");
+  }

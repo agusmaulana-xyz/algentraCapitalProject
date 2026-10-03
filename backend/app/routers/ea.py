@@ -6,13 +6,24 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..database import get_db
 from ..gemini_parser import SignalClassification
-from ..models import AppSetting, EAExecution, EAStatus, Signal, SystemLog, Trade, utc_now
+from ..models import (
+    AppSetting,
+    EAExecution,
+    EAStatus,
+    MasterCopyPosition,
+    MasterCopyState,
+    Signal,
+    SystemLog,
+    Trade,
+    utc_now,
+)
+from ..schemas import CopySnapshotInput
 from ..risk_controls import risk_state
 
 
@@ -28,6 +39,36 @@ def require_ea_key(x_api_key: str | None = Header(default=None, alias="X-API-Key
         raise HTTPException(status_code=503, detail="EA_API_KEY belum dikonfigurasi")
     if not x_api_key or not hmac.compare_digest(x_api_key, configured.get_secret_value()):
         raise HTTPException(status_code=401, detail="API key EA tidak valid")
+
+
+@router.post("/master/snapshot", dependencies=[Depends(require_ea_key)])
+def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(get_db)) -> dict[str, object]:
+    ticket_values = [position.ticket for position in payload.positions]
+    if len(ticket_values) != len(set(ticket_values)):
+        raise HTTPException(status_code=422, detail="Ticket posisi harus unik")
+
+    now = utc_now()
+    db.execute(delete(MasterCopyPosition))
+    for position in payload.positions:
+        db.add(MasterCopyPosition(
+            source_ticket=position.ticket,
+            symbol=position.symbol,
+            action=position.action,
+            lots=position.lots,
+            entry_price=position.entry_price,
+            sl=position.sl,
+            tp=position.tp,
+            is_open=True,
+            updated_at=now,
+        ))
+
+    state = db.get(MasterCopyState, 1)
+    if state is None:
+        state = MasterCopyState(id=1)
+        db.add(state)
+    state.last_snapshot_at = now
+    db.commit()
+    return {"status": "ok", "positions": len(payload.positions), "last_snapshot_at": now.isoformat()}
 
 
 class ExecutionReport(BaseModel):
@@ -337,6 +378,7 @@ def result(payload: TradeResultReport, db: Session = Depends(get_db)) -> dict[st
     trade.profit = payload.profit
     trade.result = payload.result
     trade.closed_at = payload.closed_at or utc_now()
+    db.flush()
     if trade.signal_id is not None:
         signal = db.get(Signal, trade.signal_id)
         if signal is not None:

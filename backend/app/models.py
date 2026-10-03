@@ -104,6 +104,75 @@ class AdminUser(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
+class ClientUser(Base):
+    __tablename__ = "client_users"
+    __table_args__ = (Index("ux_client_users_email", "email", unique=True),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+
+    email: Mapped[str] = mapped_column(String(320), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resend_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class MT5Account(Base):
+    __tablename__ = "mt5_accounts"
+    __table_args__ = (
+        Index("ux_mt5_accounts_token_hash", "token_hash", unique=True),
+        Index("ix_mt5_accounts_owner_role", "owner_id", "role"),
+        UniqueConstraint("owner_id", "server", "login", name="ux_mt5_owner_server_login"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("client_users.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    server: Mapped[str] = mapped_column(String(128), nullable=False)
+    login: Mapped[str] = mapped_column(String(32), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class MasterCopyState(Base):
+    __tablename__ = "mt5_master_copy_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    last_snapshot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MasterCopyPosition(Base):
+    __tablename__ = "mt5_master_copy_positions"
+    __table_args__ = (
+        UniqueConstraint("source_ticket", name="ux_mt5_master_copy_source_ticket"),
+        Index("ix_mt5_master_copy_open", "is_open"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_ticket: Mapped[str] = mapped_column(String(64), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), nullable=False)
+    lots: Mapped[float] = mapped_column(Float, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    sl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class EAStatus(Base):
     __tablename__ = "ea_status"
 

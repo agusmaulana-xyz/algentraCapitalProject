@@ -28,6 +28,22 @@ class Settings(BaseSettings):
     telegram_api_id: int | None = Field(default=None, validation_alias="TELEGRAM_API_ID", gt=0)
     telegram_api_hash: SecretStr | None = Field(default=None, validation_alias="TELEGRAM_API_HASH")
     ea_api_key: SecretStr | None = Field(default=None, validation_alias="EA_API_KEY")
+    email_smtp_host: str | None = Field(default=None, validation_alias="EMAIL_SMTP_HOST")
+    email_smtp_port: int = Field(default=587, validation_alias="EMAIL_SMTP_PORT", ge=1, le=65535)
+    email_smtp_username: str | None = Field(default=None, validation_alias="EMAIL_SMTP_USERNAME")
+    email_smtp_password: SecretStr | None = Field(default=None, validation_alias="EMAIL_SMTP_PASSWORD")
+    email_from: str | None = Field(default=None, validation_alias="EMAIL_FROM")
+    email_smtp_starttls: bool = Field(default=True, validation_alias="EMAIL_SMTP_STARTTLS")
+    contact_person_name: str | None = Field(default=None, validation_alias="CONTACT_PERSON_NAME")
+    contact_whatsapp: str | None = Field(default=None, validation_alias="CONTACT_WHATSAPP")
+    contact_email: str | None = Field(default=None, validation_alias="CONTACT_EMAIL")
+    contact_instagram: str | None = Field(default=None, validation_alias="CONTACT_INSTAGRAM")
+    contact_telegram: str | None = Field(default=None, validation_alias="CONTACT_TELEGRAM")
+    contact_facebook: str | None = Field(default=None, validation_alias="CONTACT_FACEBOOK")
+    contact_linkedin: str | None = Field(default=None, validation_alias="CONTACT_LINKEDIN")
+    contact_x: str | None = Field(default=None, validation_alias="CONTACT_X")
+    contact_youtube: str | None = Field(default=None, validation_alias="CONTACT_YOUTUBE")
+    contact_tiktok: str | None = Field(default=None, validation_alias="CONTACT_TIKTOK")
     database_url: str = Field(
         default="sqlite:///backend/data/app.db",
         validation_alias="DATABASE_URL",
@@ -57,7 +73,14 @@ class Settings(BaseSettings):
                 raise ValueError("EA_API_KEY must contain at least 24 characters")
             if any(marker in ea_key.casefold() for marker in ("replace-with", "change-this", "changethis", "your-api-key")):
                 raise ValueError("EA_API_KEY masih memakai placeholder; ganti sebelum menjalankan EA")
+        smtp_values = (self.email_smtp_host, self.email_smtp_username, self.email_smtp_password, self.email_from)
+        if any(smtp_values) and not all(smtp_values):
+            raise ValueError("EMAIL_SMTP_HOST, EMAIL_SMTP_USERNAME, EMAIL_SMTP_PASSWORD, dan EMAIL_FROM harus diisi bersama")
         return self
+
+    @property
+    def email_configured(self) -> bool:
+        return all((self.email_smtp_host, self.email_smtp_username, self.email_smtp_password, self.email_from))
 
 
 @lru_cache

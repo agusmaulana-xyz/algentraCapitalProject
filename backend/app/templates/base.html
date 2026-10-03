@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token|default('') }}">
-  <meta name="description" content="Algentra Capital menyediakan layanan copy trading XAUUSD dengan sistematisasi berbasis AI, transparansi, dan kontrol risiko.">
+  <meta name="description" content="{% if request.session.get('admin_username') %}Algentra Capital menyediakan layanan copy trading XAUUSD dengan sistematisasi berbasis AI, transparansi, dan kontrol risiko.{% else %}Algentra Capital membantu membaca sinyal XAUUSD dengan AI, menjalankan instruksi melalui EA MetaTrader, dan menyalin posisi ke akun follower.{% endif %}">
   <meta name="theme-color" content="#0b1117">
   <title>{% block title %}Algentra Capital | AI Copy Trading{% endblock %}</title>
   <style>
@@ -95,6 +95,8 @@
     button:disabled { cursor: wait; opacity: .65; transform: none; }
     button.secondary { border-color: #394944; color: #d2dfd6; background: #1b2927; }
     button.danger { border-color: #805357; color: #f2dadd; background: #38282b; }
+    button.icon-button { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; padding: 8px; }
+    button.icon-button svg { display: block; }
     label { display: block; color: #d2deea; font-size: 12px; font-weight: 700; }
     .field-help { display: block; margin: 4px 0 7px; color: #9aa7a1; font-size: 11px; font-weight: 400; line-height: 1.4; }
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
@@ -118,6 +120,17 @@
     .login-card form label { margin: 13px 0; }
     .login-card button { width: 100%; margin-top: 10px; }
     #message { min-height: 1.4em; color: var(--danger); }
+    .music-toggle { position:fixed; right:20px; bottom:18px; z-index:20; display:flex; min-height:46px; align-items:center; gap:10px; padding:0 15px; border:1px solid #8da99588; border-radius:999px; color:#d6e4d9; background:linear-gradient(140deg,#1e3029ed,#111b20f2); box-shadow:0 10px 30px #0008,inset 0 0 20px #a8c6ad0b; backdrop-filter:blur(14px); font-size:11px; font-weight:750; letter-spacing:.02em; }
+    .music-toggle:hover { border-color:#bdd6c0; color:#eff8f0; }
+    .music-toggle[aria-pressed="true"] { border-color:#b0cdb388; background:linear-gradient(140deg,#2a4033ed,#14221ff2); }
+    .music-toggle svg { width:18px; height:18px; flex:none; }
+    .music-bars { display:flex; height:15px; align-items:center; gap:2px; }
+    .music-bars i { display:block; width:2px; height:4px; border-radius:2px; background:#c7ddc8; }
+    .music-toggle[aria-pressed="true"] .music-bars i { animation:music-wave .72s ease-in-out infinite alternate; }
+    .music-toggle[aria-pressed="true"] .music-bars i:nth-child(2) { animation-delay:-.42s; }
+    .music-toggle[aria-pressed="true"] .music-bars i:nth-child(3) { animation-delay:-.2s; }
+    @keyframes music-wave { from { height:4px; opacity:.7; } to { height:14px; opacity:1; } }
+    @media (prefers-reduced-motion: reduce) { .music-toggle[aria-pressed="true"] .music-bars i { animation:none; height:9px; } }
     footer { position: relative; z-index: 1; padding: 0 24px 24px; color: #86928c; text-align: center; font-size: 10px; }
     @media (max-width: 940px) {
       .topbar { flex-wrap: wrap; gap: 10px; padding: 11px 18px; }
@@ -143,7 +156,7 @@
   <header class="topbar">
     <a class="brand" href="{% if request.session.get('admin_username') %}/dashboard{% else %}/{% endif %}">
       <span class="brand-mark">AC</span>
-      <span class="brand-copy"><strong>Algentra Capital</strong><small>AI-driven copy trading</small></span>
+      <span class="brand-copy"><strong>Algentra Capital</strong>{% if request.session.get('admin_username') %}<small>AI-driven copy trading</small>{% else %}<small>Copy trading otomatis berbasis AI</small>{% endif %}</span>
     </a>
     <nav class="site-nav" aria-label="Navigasi utama">
       {% if request.session.get('admin_username') %}
@@ -151,25 +164,40 @@
       <a class="nav-link {% if request.url.path == '/parser-test' %}active{% endif %}" href="/parser-test"><span>Parser test</span><small>Review signal format</small></a>
       <a class="nav-link {% if request.url.path == '/telegram-setup' %}active{% endif %}" href="/telegram-setup"><span>Telegram</span><small>Connect & whitelist</small></a>
       <a class="nav-link {% if request.url.path == '/dashboard' and request.url.fragment == 'settings' %}active{% endif %}" href="/dashboard#settings"><span>Controls</span><small>Risk & configuration</small></a>
+      {% elif request.session.get('client_user_id') %}
+      <a class="nav-link {% if request.url.path == '/account' %}active{% endif %}" href="/account"><span>Akun MT5</span><small>Master & follower</small></a>
+      <a class="nav-link" href="/#performance"><span>Performa</span><small>Data agregat</small></a>
       {% elif request.url.path == '/login' %}
-      <a class="nav-link" href="/"><span>Algentra Capital</span><small>Public overview</small></a>
-      <a class="nav-link active" href="/login"><span>Admin login</span><small>Akses workspace</small></a>
+      <a class="nav-link" href="/"><span>Algentra Capital</span><small>Beranda</small></a>
+      <a class="nav-link active" href="/login"><span>Masuk</span><small>Portal klien</small></a>
+      <a class="nav-link" href="/register"><span>Daftar</span><small>Akun klien</small></a>
       {% else %}
       <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/"><span>Beranda</span><small>Algentra Capital</small></a>
       <a class="nav-link" href="/#performance"><span>Performa</span><small>Data agregat</small></a>
-      <a class="nav-link" href="/#approach"><span>Pendekatan</span><small>AI & risk control</small></a>
+      <a class="nav-link" href="/#approach"><span>Cara kerja</span><small>AI & kontrol risiko</small></a>
+      <a class="nav-link" href="/#contact"><span>Kontak</span><small>Hubungi kami</small></a>
       {% endif %}
     </nav>
     <div class="topbar-side">
       {% if request.session.get('admin_username') %}
       <span class="workspace-tag">Private workspace</span><button class="secondary" id="logout" type="button">Logout</button>
+      {% elif request.session.get('client_user_id') %}
+      <span class="workspace-tag">Portal klien</span><button class="secondary" id="logout" type="button">Keluar</button>
       {% elif request.url.path != '/login' %}
-      <a class="workspace-tag" href="/login">Admin access</a>
+      <a class="workspace-tag" href="/login">Portal klien</a>
       {% endif %}
     </div>
   </header>
   {% block content %}{% endblock %}
   <footer>{% if request.session.get('admin_username') %}Algentra Capital Workspace <span aria-hidden="true">·</span> Review risk controls before enabling live orders{% else %}Algentra Capital <span aria-hidden="true">·</span> Trading memiliki risiko; hasil historis bukan jaminan kinerja mendatang.{% endif %}</footer>
+  <audio id="site-music" preload="auto" loop>
+    <source src="/musik.mp3" type="audio/mpeg">
+  </audio>
+  <button class="music-toggle" id="music-toggle" type="button" aria-pressed="false" aria-label="Putar musik latar" title="Putar musik latar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4z"></path><path d="M17 9a5 5 0 0 1 0 6"></path><path d="M19.5 6.5a9 9 0 0 1 0 11"></path></svg>
+    <span id="music-label">Putar musik</span>
+    <span class="music-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+  </button>
   {% block scripts %}{% endblock %}
   <script>
     const syncWorkspaceNav = () => {
@@ -189,6 +217,50 @@
         });
       } finally { location.assign("/login"); }
     });
+  </script>
+  <script>
+    (() => {
+      const audio = document.querySelector("#site-music");
+      const button = document.querySelector("#music-toggle");
+      const label = document.querySelector("#music-label");
+      if (!audio || !button || !label) return;
+
+      const setPlaying = (playing) => {
+        button.setAttribute("aria-pressed", String(playing));
+        button.setAttribute("aria-label", playing ? "Matikan musik latar" : "Putar musik latar");
+        button.title = playing ? "Matikan musik latar" : "Putar musik latar";
+        label.textContent = playing ? "Musik aktif" : "Putar musik";
+      };
+      audio.addEventListener("play", () => setPlaying(true));
+      audio.addEventListener("pause", () => setPlaying(false));
+      audio.addEventListener("error", () => {
+        label.textContent = "Musik tidak tersedia";
+        button.title = "Berkas musik tidak dapat dimuat";
+      });
+      const savePreference = (value) => {
+        try { localStorage.setItem("algentra-music", value); } catch { /* Storage may be disabled. */ }
+      };
+
+      button.addEventListener("click", async () => {
+        if (!audio.paused) {
+          audio.pause();
+          savePreference("off");
+          return;
+        }
+        savePreference("on");
+        try { await audio.play(); }
+        catch { label.textContent = "Coba putar lagi"; }
+      });
+
+      let preference = null;
+      try { preference = localStorage.getItem("algentra-music"); } catch { /* Autoplay remains available. */ }
+      if (preference !== "off") {
+        audio.play().catch(() => {
+          setPlaying(false);
+          button.title = "Autoplay diblokir browser. Klik untuk memutar musik.";
+        });
+      }
+    })();
   </script>
 </body>
 </html>
