@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Admin Login | Telegram Signal{% endblock %}
+{% block title %}Admin Login | Algentra Capital{% endblock %}
 {% block extra_head %}
 
 {% endblock %}
 {% block content %}
 <main class="page-shell login-shell">
     <section class="login-card">
-    <span class="eyebrow">SECURE ACCESS</span>
-    <h1>Login Admin</h1>
-    <p class="page-description">Masuk untuk mengelola sumber Telegram, memeriksa parsing, dan mengatur guard trading.</p>
+    <span class="eyebrow">ALGENTRA CAPITAL / SECURE ACCESS</span>
+    <h1>Operations login</h1>
+    <p class="page-description">Akses privat untuk mengelola sumber sinyal, konfigurasi, dan kontrol trading.</p>
     <form id="login-form">
       <label for="username">Username<small class="field-help">Nama pengguna admin yang disiapkan pada konfigurasi aplikasi.</small></label>
       <input id="username" autocomplete="username" required>
@@ -29,7 +29,7 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: document.querySelector("#username").value, password: document.querySelector("#password").value })
       });
-      if (response.ok) window.location.assign("/");
+      if (response.ok) window.location.assign("/dashboard");
       else document.querySelector("#message").textContent = "Login gagal. Periksa username dan password.";
     });
 </script>

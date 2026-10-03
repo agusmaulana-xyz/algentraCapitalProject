@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Algentra Capital | AI Copy Trading{% endblock %}
+{% block extra_head %}
+<style>
+  .public-shell { position:relative; z-index:1; width:min(1240px,100%); margin:0 auto; padding:34px 26px 80px; }
+  .hero { position:relative; display:grid; grid-template-columns:1.08fr .92fr; align-items:center; min-height:510px; gap:34px; overflow:hidden; margin:10px 0 26px; padding:clamp(26px,5vw,62px); border:1px solid #34413d; border-radius:26px; background:linear-gradient(115deg,#121c20f2 0%,#141e25eF 54%,#18221eeb 100%); box-shadow:0 30px 80px #00000030; }
+  .hero::after { position:absolute; right:-150px; top:-190px; width:490px; height:490px; border:1px solid #a6c3ad18; border-radius:50%; content:""; box-shadow:0 0 0 45px #9eb9a208,0 0 0 100px #9eb9a205; pointer-events:none; }
+  .hero-copy { position:relative; z-index:1; max-width:650px; }
+  .hero h1 { max-width:640px; margin:13px 0 17px; font-size:clamp(38px,6vw,68px); font-weight:580; line-height:1.02; letter-spacing:-.055em; }
+  .hero h1 em { color:#b7cbbd; font-style:normal; }
+  .hero-text { max-width:570px; color:#aab5af; font-size:16px; line-height:1.75; }
+  .hero-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:26px; }
+  .public-button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 18px; border:1px solid #a8c2ae66; border-radius:9px; color:#101a15; background:linear-gradient(135deg,#c3d2c4,#92ac98); font-size:12px; font-weight:750; letter-spacing:.02em; }
+  .public-button.secondary { border-color:#47544d; color:#d5ddd6; background:#18221f; }
+  .public-button:hover { color:#101a15; filter:brightness(1.06); }
+  .hero-note { margin-top:19px; color:#84918a; font-size:11px; }
+  .hero-visual { position:relative; z-index:1; display:grid; min-height:340px; place-items:center; }
+  .signal-orbit { position:relative; display:grid; width:min(330px,70vw); aspect-ratio:1; place-items:center; border:1px solid #9bb69e30; border-radius:50%; background:radial-gradient(circle,#a4c0a50b 0 25%,transparent 25% 48%,#a4c0a509 49% 50%,transparent 51%); box-shadow:0 0 75px #92b39a0a,inset 0 0 70px #9cb29c08; }
+  .signal-orbit::before,.signal-orbit::after { position:absolute; inset:12%; border:1px solid #9bb69e20; border-radius:50%; content:""; }
+  .signal-orbit::after { inset:26%; border-color:#9bb69e28; }
+  .orbit-line { position:absolute; width:130%; height:1px; background:linear-gradient(90deg,transparent,#a8c4ad66,transparent); transform:rotate(-32deg); }
+  .orbit-core { z-index:1; display:grid; width:112px; height:112px; place-content:center; border:1px solid #b2c9b366; border-radius:29px; color:#dce8dc; background:linear-gradient(145deg,#293a31,#17232b); text-align:center; box-shadow:0 0 45px #a2c3a716,inset 0 0 28px #bacfb20c; }
+  .orbit-core b { font-size:26px; letter-spacing:.08em; }
+  .orbit-core small { color:#a0b1a4; font-size:8px; letter-spacing:.17em; }
+  .orbit-node { position:absolute; z-index:2; width:9px; height:9px; border:2px solid #0d1519; border-radius:50%; background:#bfd0b5; box-shadow:0 0 18px #b5cdb477; }
+  .orbit-node.one { top:17%; left:29%; }.orbit-node.two { right:13%; top:43%; }.orbit-node.three { bottom:16%; left:34%; }
+  .visual-caption { position:absolute; bottom:1%; color:#83928a; font-size:9px; letter-spacing:.14em; text-transform:uppercase; }
+  .public-section { margin:24px 0; padding:clamp(20px,3vw,34px); border:1px solid #2c3a39; border-radius:19px; background:linear-gradient(145deg,#121b21f2,#10181df2); }
+  #performance,#approach { scroll-margin-top:100px; }
+  .section-heading { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px; }
+  .section-heading h2 { margin:0 0 5px; font-size:clamp(22px,3vw,30px); font-weight:560; letter-spacing:-.035em; }
+  .section-heading p { max-width:650px; margin:0; color:#98a6a0; font-size:12px; }
+  .section-kicker { color:#a9c3af; font-size:9px; font-weight:750; letter-spacing:.18em; text-transform:uppercase; }
+  .perf-grid { display:grid; grid-template-columns:.82fr 1.18fr; gap:15px; }
+  .perf-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .perf-metric { min-height:120px; padding:17px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
+  .perf-metric.primary { grid-column:1/-1; min-height:148px; background:radial-gradient(ellipse at 90% 0%,#a2bd9d14,transparent 60%),linear-gradient(145deg,#1a2820,#141d23); }
+  .perf-metric span { display:block; color:#98a69f; font-size:10px; }
+  .perf-metric strong { display:block; margin-top:9px; color:#dce6dc; font-size:clamp(23px,3vw,34px); font-variant-numeric:tabular-nums; font-weight:570; letter-spacing:-.045em; }
+  .perf-metric.primary strong { font-size:clamp(32px,4vw,48px); }
+  .perf-metric small { display:block; margin-top:6px; color:#7f8e87; font-size:10px; }
+  .pnl-positive { color:#b9d5bd!important; }.pnl-negative { color:#e0a4a1!important; }
+  .chart-card { min-height:300px; padding:18px 18px 12px; border:1px solid #2e3d39; border-radius:13px; background:#111a20; }
+  .chart-title { display:flex; justify-content:space-between; color:#a4b1aa; font-size:10px; }
+  .chart-title b { color:#d9e2da; font-weight:600; }
+  #pnl-chart { display:block; width:100%; height:235px; margin-top:16px; overflow:visible; }
+  #chart-empty[hidden],#pnl-chart[hidden] { display:none; }
+  .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.chart-area { fill:url(#chartFill); }.chart-line { fill:none; stroke:#a9c5ac; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }.chart-point { fill:#d5e3d2; stroke:#16211c; stroke-width:4; }
+  .chart-empty { display:grid; height:235px; place-items:center; color:#82918a; font-size:12px; text-align:center; }
+  .data-note { margin:15px 0 0; padding:12px 14px; border:1px solid #3b463b; border-left:2px solid #a5b693; border-radius:8px; color:#aab4aa; background:#191f1a; font-size:11px; line-height:1.65; }
+  .approach-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .approach-card { min-height:155px; padding:18px; border:1px solid #2e3b38; border-radius:12px; background:#141e23; }
+  .approach-card .index { color:#b5c6ad; font-size:10px; letter-spacing:.12em; }
+  .approach-card h3 { margin:15px 0 7px; color:#e1e8e2; font-size:15px; font-weight:590; }
+  .approach-card p { margin:0; color:#93a19a; font-size:11px; line-height:1.7; }
+  .closing { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:22px; padding:28px 30px; border:1px solid #38443c; border-radius:15px; background:linear-gradient(100deg,#19241f,#121d23); }
+  .closing h2 { margin:0 0 5px; font-size:21px; font-weight:560; }.closing p { margin:0; color:#9eaaa3; font-size:12px; }
+  .risk-copy { max-width:880px; margin:14px auto 0; color:#75837e; font-size:10px; line-height:1.7; text-align:center; }
+  @media(max-width:850px) { .hero { grid-template-columns:1fr; min-height:auto; }.hero-visual { min-height:285px; }.perf-grid { grid-template-columns:1fr; }.approach-grid { grid-template-columns:1fr; } }
+  @media(max-width:600px) { .public-shell { padding:20px 13px 48px; }.hero { gap:8px; padding:24px 20px; border-radius:18px; }.hero-visual { min-height:245px; }.signal-orbit { width:225px; }.orbit-core { width:88px; height:88px; border-radius:22px; }.perf-summary { gap:7px; }.perf-metric { padding:13px; }.public-section { padding:19px 14px; }.closing { padding:20px; } }
+</style>
+{% endblock %}
+{% block content %}
+<main class="public-shell">
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="section-kicker">Algoritma • Inteligensi • Disiplin</span>
+      <h1>Copy trading yang lebih <em>terukur.</em></h1>
+      <p class="hero-text">Algentra Capital memadukan analisis sinyal berbasis AI dengan otomasi eksekusi dan kontrol risiko. Dibangun untuk menghadirkan layanan copy trading XAUUSD yang transparan, disiplin, dan terjangkau.</p>
+      <div class="hero-actions"><a class="public-button" href="#performance">Lihat data performa</a><a class="public-button secondary" href="#approach">Kenali pendekatan kami</a></div>
+      <p class="hero-note">AI-assisted signal analysis <span aria-hidden="true">·</span> Automated execution <span aria-hidden="true">·</span> Risk-aware workflow</p>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="signal-orbit"><span class="orbit-line"></span><span class="orbit-node one"></span><span class="orbit-node two"></span><span class="orbit-node three"></span><div class="orbit-core"><b>AC</b><small>INTELLIGENCE</small></div></div>
+      <span class="visual-caption">Human oversight · machine precision</span>
+    </div>
+  </section>
+
+  <section class="public-section" id="performance">
+    <div class="section-heading"><div><span class="section-kicker">Transparansi performa</span><h2>Hasil yang tercatat, apa adanya.</h2><p>Ringkasan P&L dan trade tertutup yang benar-benar tersimpan di sistem Algentra Capital.</p></div><span id="pnl-updated" class="section-kicker">Mengambil data</span></div>
+    <div class="perf-grid">
+      <div class="perf-summary">
+        <article class="perf-metric primary"><span>P&L terealisasi</span><strong id="pnl-total">—</strong><small>Agregat trade tertutup yang tercatat</small></article>
+        <article class="perf-metric"><span>Trade tertutup</span><strong id="trade-count">—</strong><small id="win-loss-count">Menunggu data</small></article>
+        <article class="perf-metric"><span>Win rate</span><strong id="win-rate">—</strong><small>Dari hasil WIN / LOSS</small></article>
+      </div>
+      <div class="chart-card"><div class="chart-title"><span>P&L kumulatif</span><b id="chart-period">Seluruh histori</b></div><div id="chart-empty" class="chart-empty">Memuat histori performa…</div><svg id="pnl-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik P&L kumulatif" hidden><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a9c5ac" stop-opacity=".22"/><stop offset="100%" stop-color="#a9c5ac" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><path id="chart-area" class="chart-area"/><path id="chart-line" class="chart-line"/><circle id="chart-point" class="chart-point" r="5"/></svg></div>
+    </div>
+    <p class="data-note" id="performance-note">Data performa ditampilkan secara agregat. Sistem saat ini belum memisahkan hasil per akun klien, sehingga halaman ini tidak mengatribusikan angka kepada akun tertentu.</p>
+  </section>
+
+  <section class="public-section" id="approach">
+    <div class="section-heading"><div><span class="section-kicker">Cara Algentra bekerja</span><h2>Teknologi dengan kendali yang jelas.</h2><p>AI membantu membaca format dan konteks sinyal; aturan eksekusi serta batas risiko tetap menjadi bagian inti sistem.</p></div></div>
+    <div class="approach-grid">
+      <article class="approach-card"><span class="index">01 / ANALISIS</span><h3>Signal intelligence</h3><p>Penyaringan pesan berfokus pada kandidat sinyal XAUUSD sebelum analisis AI dijalankan.</p></article>
+      <article class="approach-card"><span class="index">02 / EKSEKUSI</span><h3>Eksekusi sistematis</h3><p>Entry, target, dan level risiko diproses dengan aturan yang konsisten serta dapat ditinjau.</p></article>
+      <article class="approach-card"><span class="index">03 / PELAPORAN</span><h3>Performa transparan</h3><p>Ringkasan publik hanya mengambil hasil trade yang sudah ditutup dan tercatat di backend.</p></article>
+    </div>
+  </section>
+
+  <section class="closing"><div><h2>Algentra Capital</h2><p>AI-assisted copy trading dengan pendekatan yang tenang, terukur, dan transparan.</p></div><a class="public-button secondary" href="#performance">Lihat performa</a></section>
+  <p class="risk-copy">Trading memiliki risiko kerugian dan tidak menjamin keuntungan. Kinerja historis bukan jaminan hasil di masa depan. P&L pada halaman ini merupakan agregat data tertutup yang tersedia di sistem, bukan hasil per akun klien atau proyeksi hasil investasi.</p>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const money = (value) => Number(value).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const showChart = (curve) => {
+    const svg = document.querySelector("#pnl-chart");
+    const empty = document.querySelector("#chart-empty");
+    if (!curve.length) { empty.textContent = "Belum ada trade tertutup untuk ditampilkan."; return; }
+    const values = curve.map((point) => Number(point.pnl));
+    const min = Math.min(0, ...values), max = Math.max(0, ...values);
+    const spread = max - min || 1;
+    const coords = values.map((value, index) => ({
+      x: 24 + (curve.length === 1 ? 676 : index * 676 / (curve.length - 1)),
+      y: 24 + (max - value) * 162 / spread
+    }));
+    const line = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+    document.querySelector("#chart-line").setAttribute("d", line);
+    document.querySelector("#chart-area").setAttribute("d", `${line} L${coords.at(-1).x.toFixed(1)} 210 L${coords[0].x.toFixed(1)} 210 Z`);
+    document.querySelector("#chart-point").setAttribute("cx", coords.at(-1).x);
+    document.querySelector("#chart-point").setAttribute("cy", coords.at(-1).y);
+    empty.hidden = true; svg.hidden = false;
+  };
+  fetch("/api/public/performance").then((response) => {
+    if (!response.ok) throw new Error("Data performa belum tersedia");
+    return response.json();
+  }).then((data) => {
+    const pnl = document.querySelector("#pnl-total");
+    if (!data.available) {
+      pnl.textContent = "Belum tersedia";
+      document.querySelector("#trade-count").textContent = "0";
+      document.querySelector("#win-loss-count").textContent = "Belum ada hasil trade";
+      document.querySelector("#win-rate").textContent = "—";
+      document.querySelector("#pnl-updated").textContent = "BELUM ADA DATA";
+      document.querySelector("#chart-period").textContent = "Belum tersedia";
+      showChart([]);
+      return;
+    }
+    pnl.textContent = money(data.realized_pnl);
+    pnl.classList.toggle("pnl-positive", data.realized_pnl > 0);
+    pnl.classList.toggle("pnl-negative", data.realized_pnl < 0);
+    document.querySelector("#trade-count").textContent = data.closed_trades;
+    document.querySelector("#win-loss-count").textContent = `${data.wins} win · ${data.losses} loss`;
+    document.querySelector("#win-rate").textContent = data.wins + data.losses ? `${money(data.win_rate)}%` : "—";
+    document.querySelector("#pnl-updated").textContent = data.last_updated ? `PEMBARUAN ${new Date(data.last_updated).toLocaleDateString("id-ID")}` : "BELUM ADA DATA";
+    document.querySelector("#chart-period").textContent = `${data.curve.length} hari aktif`;
+    showChart(data.curve || []);
+  }).catch(() => {
+    document.querySelector("#chart-empty").textContent = "Data performa belum dapat dimuat.";
+    document.querySelector("#pnl-updated").textContent = "DATA TIDAK TERSEDIA";
+  });
+})();
+</script>
+{% endblock %}

@@ -1,6 +1,8 @@
 #property strict
-#property version   "0.5.0"
+#property version   "0.7.0"
 #property description "Telegram signal polling EA with backend reporting and safe demo default"
+
+#define MAX_SIGNAL_TARGETS 20
 
 #include <Trade/Trade.mqh>
 
@@ -10,16 +12,16 @@ enum ENUM_LOT_MODE
    LOT_RISK_PERCENT = 1
   };
 
-input string ServerURL = "http://127.0.0.1:8000";
+input string ServerURL = "https://algentracapital.my.id";
 input string ApiKey = "";
 input int PollIntervalMs = 1000;
 input long MagicNumber = 26093001;
-input ENUM_LOT_MODE LotMode = LOT_FIXED;
+input ENUM_LOT_MODE LotMode = LOT_RISK_PERCENT;
 input double FixedLot = 0.01;
-input double RiskPercent = 1.0;
+input double RiskPercent = 1.0; // Total risk budget per signal, split across its entries
 input int MaxSlippage = 20;
 input int MaxSpreadPoints = 80;
-input int MaxOpenTrades = 3;
+input int MaxOpenTrades = 20;
 input bool AllowBuy = true;
 input bool AllowSell = true;
 input bool UseDefaultSLTP = true;
@@ -228,36 +230,56 @@ long JsonLong(const string json, const string key)
    return (long)StringToInteger(value);
   }
 
-double FirstArrayNumber(const string array_json)
+int ArrayNumberCount(const string array_json)
   {
    if(StringLen(array_json) < 3)
-      return 0.0;
-   string values = StringSubstr(array_json, 1, StringLen(array_json) - 2);
-   int comma = StringFind(values, ",");
-   if(comma >= 0)
-      values = StringSubstr(values, 0, comma);
-   return StringToDouble(values);
-  }
-
-double FinalArrayNumber(const string array_json, const string action)
-  {
-   if(StringLen(array_json) < 3)
-      return 0.0;
+      return 0;
    string values = StringSubstr(array_json, 1, StringLen(array_json) - 2);
    int start = 0;
-   double final_value = 0.0;
+   int count = 0;
    while(start < StringLen(values))
      {
       int comma = StringFind(values, ",", start);
       string token = comma < 0 ? StringSubstr(values, start) : StringSubstr(values, start, comma - start);
       double value = StringToDouble(token);
-      if(value > 0.0 && (final_value <= 0.0 || (action == "BUY" && value > final_value) || (action == "SELL" && value < final_value)))
-         final_value = value;
+      if(value > 0.0)
+        {
+         count++;
+         if(count >= MAX_SIGNAL_TARGETS)
+            return count;
+        }
       if(comma < 0)
          break;
       start = comma + 1;
      }
-   return final_value;
+   return count;
+  }
+
+double ArrayNumberAt(const string array_json, const int target_index)
+  {
+   if(target_index < 0 || StringLen(array_json) < 3)
+      return 0.0;
+   string values = StringSubstr(array_json, 1, StringLen(array_json) - 2);
+   int start = 0;
+   int index = 0;
+   while(start < StringLen(values))
+     {
+      int comma = StringFind(values, ",", start);
+      string token = comma < 0 ? StringSubstr(values, start) : StringSubstr(values, start, comma - start);
+      double value = StringToDouble(token);
+      if(value > 0.0)
+        {
+         if(index == target_index)
+            return value;
+         index++;
+         if(index >= MAX_SIGNAL_TARGETS)
+            return 0.0;
+        }
+      if(comma < 0)
+         break;
+      start = comma + 1;
+     }
+   return 0.0;
   }
 
 string SignalMarker(const long signal_id, const int leg=0)
@@ -411,6 +433,28 @@ double NormalizePrice(const string symbol, const double price)
    return NormalizeDouble(MathRound(price / tick) * tick, digits);
   }
 
+double NormalizePriceInRange(const string symbol, const double price, const double lower, const double upper)
+  {
+   double tick = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   if(tick <= 0.0)
+      tick = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   if(tick <= 0.0 || lower <= 0.0 || upper < lower)
+      return 0.0;
+
+   double min_tick = MathCeil(lower / tick - 1e-8);
+   double max_tick = MathFloor(upper / tick + 1e-8);
+   if(min_tick > max_tick)
+      return 0.0;
+
+   double price_tick = MathRound(price / tick);
+   price_tick = MathMax(min_tick, MathMin(max_tick, price_tick));
+   double normalized = NormalizeDouble(price_tick * tick, digits);
+   if(normalized < lower - tick * 1e-8 || normalized > upper + tick * 1e-8)
+      return 0.0;
+   return normalized;
+  }
+
 double NormalizeLots(const string symbol, double lots)
   {
    double min_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
@@ -429,20 +473,18 @@ double NormalizeLots(const string symbol, double lots)
    return lots;
   }
 
-double CalculateLots(const string symbol, const double price, const double stop_loss)
+double CalculateLots(const string symbol, const string action, const double price,
+                     const double stop_loss, const double risk_money)
   {
    if(LotMode == LOT_FIXED)
       return NormalizeLots(symbol, FixedLot);
-   if(stop_loss <= 0.0 || price <= 0.0)
+   if(stop_loss <= 0.0 || price <= 0.0 || risk_money <= 0.0)
       return 0.0;
-   double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
-   double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
-   if(tick_value <= 0.0)
-      tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-   if(tick_size <= 0.0 || tick_value <= 0.0)
+   ENUM_ORDER_TYPE order_type = action == "BUY" ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   double profit_at_stop = 0.0;
+   if(!OrderCalcProfit(order_type, symbol, 1.0, price, stop_loss, profit_at_stop))
       return 0.0;
-   double risk_money = AccountInfoDouble(ACCOUNT_BALANCE) * RiskPercent / 100.0;
-   double risk_per_lot = MathAbs(price - stop_loss) / tick_size * tick_value;
+   double risk_per_lot = MathAbs(profit_at_stop);
    if(risk_money <= 0.0 || risk_per_lot <= 0.0)
       return 0.0;
    return NormalizeLots(symbol, risk_money / risk_per_lot);
@@ -624,7 +666,7 @@ string ZoneOrderType(const string action, const double entry, const double bid, 
 
 bool ProcessOrderLeg(const long signal_id, const string symbol, const string action,
                      const string requested_type, const bool zone_order, const double requested_entry,
-                     const double sl_input, const double tp_input, const int leg,
+                     const double sl_input, const double tp_input, const int leg, const double risk_money,
                      const double bid, const double ask)
   {
    int saved_state = SavedState(signal_id, leg);
@@ -686,7 +728,7 @@ bool ProcessOrderLeg(const long signal_id, const string symbol, const string act
       return false;
      }
 
-   double lots = CalculateLots(symbol, reference, sl);
+   double lots = CalculateLots(symbol, action, reference, sl, risk_money);
    if(lots <= 0.0)
      {
       ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Lot size invalid or risk sizing requires SL");
@@ -815,19 +857,27 @@ void ProcessSignal(const string item)
    double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
    double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
    double sl = JsonNumber(item, "sl");
-   double tp = zone_order ? FinalArrayNumber(JsonValue(item, "tp"), action) : FirstArrayNumber(JsonValue(item, "tp"));
-   int order_count = zone_order ? 2 : 1;
-
-   if(zone_order && AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
+   string tp_array = JsonValue(item, "tp");
+   int tp_count = ArrayNumberCount(tp_array);
+   int order_count = tp_count > 0 ? tp_count : (zone_order ? 2 : 1);
+   double risk_money_per_leg = 0.0;
+   if(LotMode == LOT_RISK_PERCENT && RiskPercent > 0.0)
      {
-      RejectSignal(signal_id, symbol, action, "Two-entry zone requires an MT5 hedging account");
+      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+      if(equity > 0.0)
+         risk_money_per_leg = equity * RiskPercent / 100.0 / MathMax(1, order_count);
+     }
+
+   if(order_count > 1 && AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
+     {
+      RejectSignal(signal_id, symbol, action, "Multiple TP entries require an MT5 hedging account");
       return;
      }
 
    int needed_orders = 0;
    for(int i = 0; i < order_count; i++)
      {
-      int leg = zone_order ? i + 1 : 0;
+      int leg = order_count > 1 ? i + 1 : 0;
       if(SavedState(signal_id, leg) == 0)
         {
          long existing_ticket = 0;
@@ -843,14 +893,27 @@ void ProcessSignal(const string item)
       return;
      }
 
-   if(zone_order)
+   for(int i = 0; i < order_count; i++)
      {
-      ProcessOrderLeg(signal_id, symbol, action, "AUTO", true, entry_low, sl, tp, 1, bid, ask);
-      ProcessOrderLeg(signal_id, symbol, action, "AUTO", true, entry_high, sl, tp, 2, bid, ask);
-     }
-   else
-     {
-      ProcessOrderLeg(signal_id, symbol, action, order_type, false, JsonNumber(item, "entry"), sl, tp, 0, bid, ask);
+      int leg = order_count > 1 ? i + 1 : 0;
+      double tp = tp_count > 0 ? ArrayNumberAt(tp_array, i) : 0.0;
+      if(zone_order)
+        {
+         double leg_entry = 0.0;
+         if(tp_count == 0)
+            leg_entry = i == 0 ? entry_low : entry_high;
+         else if(order_count == 1)
+            leg_entry = (entry_low + entry_high) / 2.0;
+         else if(action == "BUY")
+            leg_entry = entry_low + (entry_high - entry_low) * (double)i / (order_count - 1);
+         else
+            leg_entry = entry_high - (entry_high - entry_low) * (double)i / (order_count - 1);
+         leg_entry = NormalizePriceInRange(symbol, leg_entry, entry_low, entry_high);
+         ProcessOrderLeg(signal_id, symbol, action, "AUTO", true, leg_entry, sl, tp, leg, risk_money_per_leg, bid, ask);
+        }
+      else
+         ProcessOrderLeg(signal_id, symbol, action, order_type, false, JsonNumber(item, "entry"), sl, tp,
+                         leg, risk_money_per_leg, bid, ask);
      }
    g_signal_count++;
   }
@@ -870,7 +933,7 @@ void SendHeartbeat()
   {
    string symbol = JsonEscape(_Symbol);
    string body = StringFormat(
-      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"0.5.0\",\"symbol\":\"%s\"}",
+      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"0.7.0\",\"symbol\":\"%s\"}",
       JsonEscape(TerminalInfoString(TERMINAL_NAME)), symbol);
    string response;
    HttpRequest("POST", "/api/ea/heartbeat", body, response);
@@ -955,7 +1018,7 @@ void UpdatePanel()
   {
    int closed = g_wins + g_losses;
    double winrate = closed > 0 ? (double)g_wins / closed * 100.0 : 0.0;
-   Comment("TelegramSignalEA 0.5.0\n",
+    Comment("TelegramSignalEA 0.7.0\n",
            "Backend: ", g_connection_status, "\n",
            "Mode: ", DemoMode ? "DEMO / DRY RUN" : "LIVE", "\n",
            "Signals this session: ", g_signal_count, "\n",

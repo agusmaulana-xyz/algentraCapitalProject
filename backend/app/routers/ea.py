@@ -19,6 +19,7 @@ from ..risk_controls import risk_state
 router = APIRouter(prefix="/api/ea", tags=["ea"])
 FINAL_SIGNAL_STATES = {"EXECUTED", "REJECTED", "FAILED", "DRY_RUN", "EXPIRED"}
 CLAIM_LEASE_SECONDS = 90
+MAX_SIGNAL_TARGETS = 20
 
 
 def require_ea_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
@@ -38,7 +39,7 @@ class ExecutionReport(BaseModel):
     lots: float | None = Field(default=None, ge=0, le=1000)
     exec_price: float | None = Field(default=None, ge=0)
     reason: str | None = Field(default=None, max_length=1000)
-    leg: int | None = Field(default=None, ge=0, le=2)
+    leg: int | None = Field(default=None, ge=0, le=MAX_SIGNAL_TARGETS)
 
     @model_validator(mode="after")
     def validate_execution_fields(self):
@@ -95,11 +96,32 @@ def _demo_mode(db: Session) -> bool:
         return True
 
 
+def _take_profit_prices(parsed: dict) -> list[float]:
+    raw_targets = parsed.get("tp")
+    if not isinstance(raw_targets, list):
+        return []
+    targets = [
+        float(value)
+        for value in raw_targets
+        if isinstance(value, (int, float)) and math.isfinite(value) and value > 0
+    ]
+    return targets[:MAX_SIGNAL_TARGETS]
+
+
+def _expected_signal_legs(parsed: dict) -> int:
+    targets = _take_profit_prices(parsed)
+    if targets:
+        return len(targets)
+    if parsed.get("entry_low") is not None and parsed.get("entry_high") is not None:
+        return 2
+    return 1
+
+
 def _sync_signal_execution_status(db: Session, signal: Signal, expected_legs: int) -> None:
     executions = list(db.execute(
         select(EAExecution).where(EAExecution.signal_id == signal.id)
     ).scalars())
-    expected = {0} if expected_legs == 1 else {1, 2}
+    expected = {0} if expected_legs == 1 else set(range(1, expected_legs + 1))
     by_leg = {execution.leg: execution for execution in executions}
     if not expected.issubset(by_leg):
         signal.status = "CLAIMED"
@@ -225,11 +247,13 @@ def report(payload: ExecutionReport, db: Session = Depends(get_db)) -> dict[str,
         parsed = json.loads(signal.parsed_json or "{}")
     except json.JSONDecodeError:
         pass
-    expected_legs = 2 if parsed.get("entry_low") is not None and parsed.get("entry_high") is not None else 1
+    expected_legs = _expected_signal_legs(parsed)
     leg = payload.leg if payload.leg is not None else 0
-    zone_leg_report = expected_legs == 2 and leg in {1, 2}
-    if expected_legs == 2 and payload.status == "EXECUTED" and not zone_leg_report:
-        raise HTTPException(status_code=422, detail="Signal zona wajib melaporkan ticket entry 1 atau 2")
+    multi_leg_report = expected_legs > 1 and 1 <= leg <= expected_legs
+    if payload.status == "EXECUTED" and (
+        (expected_legs > 1 and not multi_leg_report) or (expected_legs == 1 and leg != 0)
+    ):
+        raise HTTPException(status_code=422, detail="Nomor entry tidak sesuai jumlah TP pada signal")
 
     execution = db.execute(
         select(EAExecution).where(EAExecution.signal_id == signal.id, EAExecution.leg == leg)
@@ -270,16 +294,15 @@ def report(payload: ExecutionReport, db: Session = Depends(get_db)) -> dict[str,
         trade.action = payload.action or parsed.get("action")
         trade.entry = parsed.get("entry") if parsed.get("entry") is not None else payload.exec_price
         trade.sl = parsed.get("sl")
-        take_profits = parsed.get("tp") or []
-        if parsed.get("entry_low") is not None and parsed.get("entry_high") is not None and take_profits:
-            final_tp = max(take_profits) if trade.action == "BUY" else min(take_profits)
-            take_profits = [final_tp]
+        take_profits = _take_profit_prices(parsed)
+        if expected_legs > 1:
+            take_profits = [take_profits[leg - 1]] if leg <= len(take_profits) else []
         trade.tp = json.dumps(take_profits)
         trade.lots = payload.lots
         trade.exec_price = payload.exec_price
         db.flush()
         _sync_signal_execution_status(db, signal, expected_legs)
-    elif zone_leg_report:
+    elif multi_leg_report:
         if execution is None:
             execution = EAExecution(signal_id=signal.id, leg=leg, status=payload.status)
             db.add(execution)
@@ -322,7 +345,7 @@ def result(payload: TradeResultReport, db: Session = Depends(get_db)) -> dict[st
                 parsed = json.loads(signal.parsed_json or "{}")
             except json.JSONDecodeError:
                 pass
-            expected_legs = 2 if parsed.get("entry_low") is not None and parsed.get("entry_high") is not None else 1
+            expected_legs = _expected_signal_legs(parsed)
             execution_count = db.execute(
                 select(EAExecution.id).where(EAExecution.signal_id == signal.id).limit(1)
             ).scalar_one_or_none()

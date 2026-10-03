@@ -3,7 +3,7 @@ import asyncio
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
@@ -13,7 +13,7 @@ from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting, Signal
-from .routers import auth, dashboard, ea, parser as parser_router, settings, tg as tg_router
+from .routers import auth, dashboard, ea, parser as parser_router, public as public_router, settings, tg as tg_router
 from .signal_service import SignalService
 from .security import RateLimitMiddleware, csrf_token, require_csrf
 from .stats_service import get_dashboard_stats
@@ -51,7 +51,7 @@ async def lifespan(_: FastAPI):
         await telegram_manager.shutdown()
 
 
-app = FastAPI(title="Telegram Copy Trading Backend", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Algentra Capital", version="0.2.0", lifespan=lifespan)
 config = get_settings()
 app.add_middleware(
     SessionMiddleware,
@@ -90,6 +90,7 @@ def require_admin(request: Request) -> str:
 
 
 app.include_router(auth.router)
+app.include_router(public_router.router)
 app.include_router(dashboard.router, dependencies=[Depends(require_admin)])
 app.include_router(settings.router, dependencies=[Depends(require_admin)])
 app.include_router(parser_router.router, dependencies=[Depends(require_admin)])
@@ -99,7 +100,7 @@ app.include_router(ea.router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "telegram-copy-trading"}
+    return {"status": "ok", "service": "algentra-capital"}
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -120,11 +121,6 @@ def telegram_setup_page(request: Request, _: str = Depends(require_admin)) -> HT
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="dashboard.html", context={"csrf_token": request.session["csrf_token"]})
-
-
-@app.get("/")
-def root(_: str = Depends(require_admin)) -> RedirectResponse:
-    return RedirectResponse(url="/dashboard", status_code=303)
 
 
 @app.websocket("/ws")

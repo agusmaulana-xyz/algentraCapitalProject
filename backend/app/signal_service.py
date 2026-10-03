@@ -9,11 +9,60 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .gemini_parser import GeminiParser, SignalClassification
+from .gemini_parser import GeminiParser, SignalClassification, not_signal
 from .models import AppSetting, Signal, SystemLog, utc_now
 
 
 DEFAULT_SYMBOL_MAPPING = {"XAUUSD": "XAUUSD", "GOLD": "XAUUSD", "XAU": "XAUUSD", "EMAS": "XAUUSD"}
+_TRADE_ACTION_RE = re.compile(r"\b(?:BUY|SELL|LONG|SHORT|BELI|JUAL)\b", re.IGNORECASE)
+_SIGNAL_MARKER_RE = re.compile(
+    r"\b(?:TP\s*\d*|TAKE[\s_-]*PROFIT|TARGET\s*\d*|SL|STOP[\s_-]*LOSS|ENTRY|ZONE|NOW|MARKET|LIMIT|STOP)\b",
+    re.IGNORECASE,
+)
+_PRICE_RE = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?")
+_XAU_MENTION_RE = re.compile(r"\b(?:XAUUSD|XAU|GOLD|EMAS)(?:[._-]?[A-Z0-9]+)?\b", re.IGNORECASE)
+_FX_AND_METAL_PAIR_RE = re.compile(
+    r"\b(?:EUR|USD|GBP|JPY|AUD|NZD|CHF|CAD|SGD|HKD|NOK|SEK|CNH|TRY|ZAR|MXN|PLN|CZK|HUF|BTC|ETH|XAG)"
+    r"(?:EUR|USD|GBP|JPY|AUD|NZD|CHF|CAD|SGD|HKD|NOK|SEK|CNH|TRY|ZAR|MXN|PLN|CZK|HUF|XAU|XAG)\b",
+    re.IGNORECASE,
+)
+_OTHER_INSTRUMENT_RE = re.compile(
+    r"\b(?:US30|NAS100|US100|US500|SPX500|GER40|DE40|UK100|USOIL|WTI|BRENT|DOW|DJI|NASDAQ|"
+    r"BTC|BITCOIN|ETH|ETHEREUM|XAG|SILVER|DOGE|SOLANA|BNB|XRP)\b",
+    re.IGNORECASE,
+)
+_TRADE_RESULT_RE = re.compile(
+    r"\b(?:TP\s*\d*|SL|STOP\s*LOSS)\s*(?:HIT|KEN[A]?|REACHED|TERCAPAI)\b|"
+    r"\b(?:CLOSED|CLOSE|PROFIT|LOSS)\s+(?:TRADE|POSITION|POSISI)\b|"
+    r"\b(?:CLOSE|TUTUP)\s+(?:NOW|ALL|POSITION|POSISI|SEKARANG|SEMUA)\b|"
+    r"\b(?:MOVE|ADJUST|GESER|PINDAH|UBAH)\b.{0,30}\b(?:SL|STOP\s*LOSS|BE|BREAKEVEN)\b",
+    re.IGNORECASE,
+)
+
+
+def _xau_signal_candidate(raw_text: str, context: str | None, default_symbol: str) -> tuple[bool, str]:
+    """Keep obvious XAUUSD signal candidates on the Gemini path only."""
+    text = raw_text.strip()
+    if not text:
+        return False, "Pesan kosong"
+    if _TRADE_RESULT_RE.search(text):
+        return False, "Laporan hasil trade, bukan sinyal baru"
+    if not _TRADE_ACTION_RE.search(text) and not (context and _TRADE_ACTION_RE.search(context)):
+        return False, "Tidak ada arah BUY/SELL"
+    if not _PRICE_RE.search(text):
+        return False, "Tidak ada harga sinyal"
+    mentions_xau = bool(_XAU_MENTION_RE.search(text))
+    mentions_other = bool(_FX_AND_METAL_PAIR_RE.search(text) or _OTHER_INSTRUMENT_RE.search(text))
+    if not _SIGNAL_MARKER_RE.search(text) and not (mentions_xau and _TRADE_ACTION_RE.search(text)):
+        return False, "Tidak ada format harga/level sinyal"
+    if mentions_xau and mentions_other:
+        return False, "Pesan menyebut beberapa instrumen"
+    if mentions_other:
+        return False, "Instrumen bukan XAUUSD"
+    normalized_default = normalize_symbol(default_symbol).upper()
+    if not mentions_xau and not normalized_default.startswith("XAUUSD"):
+        return False, "Instrumen tidak disebut dan simbol default bukan XAUUSD"
+    return True, "Kandidat sinyal XAUUSD"
 
 
 @dataclass
@@ -174,25 +223,30 @@ class SignalService:
         if duplicate:
             return ProcessResult(duplicate.status, duplicate.id, None, duplicate.normalized_text, "Signal identik dalam jendela waktu yang sama", True)
 
-        try:
-            classification = await self.parser.parse(raw_text, context)
-        except Exception as exc:
-            row = Signal(
-                group_id=str(group_id),
-                group_name=group_name,
-                message_id=str(message_id),
-                sender_id=str(sender_id) if sender_id is not None else None,
-                sender_name=sender_name,
-                raw_text=raw_text[:12000],
-                content_hash=content_hash,
-                status="FAILED",
-                created_at=stamp,
-            )
-            db.add(row)
-            db.add(SystemLog(level="ERROR", source="Gemini", message=f"Parser gagal: {exc}"[:2000], created_at=utc_now()))
-            db.commit()
-            db.refresh(row)
-            return ProcessResult("FAILED", row.id, None, None, "Parser tidak tersedia")
+        default_symbol_hint = str(_setting(db, "default_symbol", "XAUUSD"))
+        should_parse, filter_reason = _xau_signal_candidate(raw_text, context, default_symbol_hint)
+        if not should_parse:
+            classification = not_signal(f"Gemini dilewati: {filter_reason}")
+        else:
+            try:
+                classification = await self.parser.parse(raw_text, context)
+            except Exception as exc:
+                row = Signal(
+                    group_id=str(group_id),
+                    group_name=group_name,
+                    message_id=str(message_id),
+                    sender_id=str(sender_id) if sender_id is not None else None,
+                    sender_name=sender_name,
+                    raw_text=raw_text[:12000],
+                    content_hash=content_hash,
+                    status="FAILED",
+                    created_at=stamp,
+                )
+                db.add(row)
+                db.add(SystemLog(level="ERROR", source="Gemini", message=f"Parser gagal: {exc}"[:2000], created_at=utc_now()))
+                db.commit()
+                db.refresh(row)
+                return ProcessResult("FAILED", row.id, None, None, "Parser tidak tersedia")
 
         mapping = _setting(db, "symbol_mapping", {})
         if not isinstance(mapping, dict):

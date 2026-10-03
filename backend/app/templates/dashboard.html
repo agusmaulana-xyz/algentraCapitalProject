@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | Telegram Signal{% endblock %}
+{% block title %}Operations Workspace | Algentra Capital{% endblock %}
 {% block extra_head %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 {% block content %}
 <main class="page-shell dashboard-page">
-    <div class="page-heading"><div><span class="eyebrow">Market overview</span><h1>Dashboard</h1><p class="page-description">Pantau alur sinyal dari Telegram, hasil EA, performa trade, dan batas risiko dalam satu tampilan.</p></div><div class="heading-aside">Workspace status, signals, and risk controls</div></div>
+    <div class="page-heading"><div><span class="eyebrow">Algentra Capital / Operations</span><h1>Operations workspace</h1><p class="page-description">Pantau sinyal, hasil eksekusi, performa trade, dan batas risiko dalam satu tampilan.</p></div><div class="heading-aside">Internal workspace · access controlled</div></div>
     <div class="cards">
       <div class="card"><span>Total signal</span><b id="signals-total">&mdash;</b><small>Semua sinyal yang tercatat.</small></div>
       <div class="card"><span>Tereksekusi</span><b id="signals-executed">&mdash;</b><small>Order yang diterima terminal MT5.</small></div>
@@ -25,7 +25,7 @@
 
     <section>
       <h2>Signal terbaru</h2>
-      <p class="section-help">Pesan sumber, hasil ekstraksi parser, confidence, status pemrosesan, dan ticket order terbaru.</p>
+      <p class="section-help">Lima pesan terbaru beserta hasil parsing, confidence, status pemrosesan, dan ticket order.</p>
       <div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Grup</th><th>Pesan</th><th>Parsing</th><th>Confidence</th><th>Status</th><th>Ticket</th><th>Profit</th></tr></thead><tbody id="signals-table"></tbody></table></div>
     </section>
 
@@ -36,7 +36,7 @@
 
     <section>
       <h2>Log sistem</h2>
-      <p class="section-help">Cari pesan parser, koneksi Telegram, dan laporan eksekusi EA untuk memahami status atau kegagalan sinyal.</p>
+      <p class="section-help">Lima log terbaru. Gunakan filter untuk mempersempit level atau kata kunci.</p>
       <div class="toolbar"><select id="log-level" title="Batasi log ke level tertentu"><option value="">Semua level</option><option>INFO</option><option>WARN</option><option>ERROR</option></select><input id="log-search" placeholder="Cari log" title="Cari kata di sumber atau pesan log"><button id="filter-logs">Filter log</button><a id="logs-export" href="/api/logs/export.csv">Export CSV</a><label title="Muat ulang ringkasan saat ada pembaruan"><input type="checkbox" id="auto-refresh" checked> Auto refresh</label></div>
       <div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Level</th><th>Sumber</th><th>Pesan</th></tr></thead><tbody id="logs-table"></tbody></table></div>
     </section>
@@ -107,7 +107,7 @@ const $ = (selector) => document.querySelector(selector);
       return params.size ? `${base}?${params}` : base;
     }
     async function loadStatsAndSignals() {
-      const [stats, signals] = await Promise.all([api("/api/stats"), api("/api/signals?limit=100")]);
+      const [stats, signals] = await Promise.all([api("/api/stats"), api("/api/signals?limit=5")]);
       for (const key of ["signals_total","signals_executed","signals_simulated","signals_pending","signals_rejected","signals_ignored","winrate","total_profit"]) {
         const el = $(`#${key.replaceAll("_", "-")}`); if (el) el.textContent = key === "winrate" ? `${stats[key]}%` : key === "total_profit" ? Number(stats[key]).toFixed(2) : stats[key];
       }
@@ -139,7 +139,7 @@ const $ = (selector) => document.querySelector(selector);
     }
     async function loadLogs() {
       const values = {level:$("#log-level").value,search:$("#log-search").value};
-      const logs = await api(queryWithFilters("/api/logs", {...values,limit:100}));
+      const logs = await api(queryWithFilters("/api/logs", {...values,limit:5}));
       draw("#logs-table", ["time","level","source","message"], logs.map((log)=>({...log,time:displayTime(log.created_at)})));
       $("#logs-export").href = queryWithFilters("/api/logs/export.csv", values);
     }
