@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Halaman tidak ditemukan | Algentra Capital{% endblock %}
+{% block extra_head %}
+<style>
+  .not-found-shell { display: grid; min-height: min(720px, calc(100vh - 150px)); align-items: center; }
+  .not-found-card {
+    display: grid; width: min(100%, 980px); grid-template-columns: 1fr 1fr; align-items: center; gap: clamp(20px, 5vw, 58px);
+    margin: 0 auto; padding: clamp(22px, 5vw, 52px); overflow: hidden;
+    border: 1px solid #34463f; border-radius: 24px;
+    background: radial-gradient(ellipse at 78% 45%, #29403677, transparent 48%), linear-gradient(145deg, #14201ff5, #101820f5);
+    box-shadow: 0 28px 80px #0005;
+  }
+  .not-found-copy { position: relative; z-index: 1; }
+  .not-found-code { display: inline-flex; margin: 0 0 14px; padding: 5px 10px; border: 1px solid #a9c8b147; border-radius: 999px; color: #c5ddcb; background: #91b19b12; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+  .not-found-copy h1 { max-width: 440px; margin: 0 0 13px; font-size: clamp(34px, 5vw, 54px); }
+  .not-found-copy p { max-width: 430px; margin-bottom: 18px; color: var(--muted); }
+  .not-found-path { display: inline-block; max-width: 100%; margin: 0 0 23px; padding: 7px 10px; overflow-wrap: anywhere; border: 1px solid #2e3b3d; border-radius: 8px; color: #c6d5cc; background: #0b1318; font-size: 12px; }
+  .not-found-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .not-found-actions a, .not-found-actions button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border-radius: 9px; font-size: 13px; font-weight: 750; }
+  .not-found-actions a { border: 1px solid #a5c6b566; color: #101b17; background: linear-gradient(135deg, #b4cabb, #8eae9b); }
+  .not-found-actions a:hover { color: #101b17; filter: brightness(1.07); }
+  .not-found-actions button { margin: 0; }
+  .not-found-art { width: 100%; max-width: 420px; justify-self: center; overflow: visible; }
+  .chart-grid { opacity: .72; }
+  .chart-trace { stroke-dasharray: 430; stroke-dashoffset: 430; animation: chart-draw 3.2s ease-out forwards; }
+  .candle { transform-box: fill-box; transform-origin: center bottom; animation: candle-tick 2.2s ease-in-out infinite alternate; }
+  .candle:nth-of-type(2n) { animation-delay: -.7s; }
+  .candle:nth-of-type(3n) { animation-delay: -1.3s; }
+  .chart-price { animation: price-drift 2.7s ease-in-out infinite; }
+  .trader { transform-box: fill-box; transform-origin: center bottom; animation: trader-bob 3.8s ease-in-out infinite; }
+  .trader-shadow { transform-box: fill-box; transform-origin: center; animation: shadow-breathe 3.8s ease-in-out infinite; }
+  .speech-bubble { transform-box: fill-box; transform-origin: 75% 100%; animation: bubble-pop 3s ease-in-out infinite; }
+  .sweat-drop { transform-box: fill-box; transform-origin: center; animation: sweat-bob 1.8s ease-in-out infinite; }
+  .coffee-steam { stroke-dasharray: 18; stroke-dashoffset: 18; animation: steam-rise 2s ease-in-out infinite; }
+  @keyframes chart-draw { to { stroke-dashoffset: 0; } }
+  @keyframes candle-tick { from { transform: translateY(1px); } to { transform: translateY(-3px); } }
+  @keyframes price-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+  @keyframes trader-bob { 0%, 100% { transform: translateY(2px) rotate(-1deg); } 50% { transform: translateY(-4px) rotate(1deg); } }
+  @keyframes shadow-breathe { 0%, 100% { transform: scaleX(1); opacity: .38; } 50% { transform: scaleX(.86); opacity: .22; } }
+  @keyframes bubble-pop { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(2deg) scale(1.035); } }
+  @keyframes sweat-bob { 0%, 100% { transform: translateY(0); opacity: .8; } 50% { transform: translateY(-5px); opacity: 1; } }
+  @keyframes steam-rise { 0% { stroke-dashoffset: 18; opacity: .2; } 55% { stroke-dashoffset: 0; opacity: .8; } 100% { stroke-dashoffset: -18; opacity: 0; } }
+  @media (max-width: 720px) {
+    .not-found-shell { min-height: 0; }
+    .not-found-card { grid-template-columns: 1fr; gap: 8px; padding: 25px 21px 30px; }
+    .not-found-art { grid-row: 1; width: min(75vw, 310px); }
+    .not-found-copy { text-align: center; }
+    .not-found-copy h1, .not-found-copy p { margin-right: auto; margin-left: auto; }
+    .not-found-actions { justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chart-trace, .candle, .chart-price, .trader, .trader-shadow, .speech-bubble, .sweat-drop, .coffee-steam { animation: none; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<main class="page-shell not-found-shell">
+  <section class="not-found-card" aria-labelledby="not-found-title">
+    <div class="not-found-copy">
+      <span class="eyebrow">ALGENTRA CAPITAL / 404</span>
+      <span class="not-found-code">HALAMAN TIDAK DITEMUKAN</span>
+      <h1 id="not-found-title">Sinyalnya nyasar?</h1>
+      <p>Chart-nya jalan, halamannya nggak ketemu. Tenang, ini cuma floating loss satu halaman—yuk balik ke area aman.</p>
+      <code class="not-found-path">{{ requested_path }}</code>
+      <div class="not-found-actions">
+        <a href="/" aria-label="Kembali ke beranda">
+          Kembali ke beranda
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+        <button class="secondary" type="button" onclick="history.back()">Kembali</button>
+      </div>
+    </div>
+
+    <svg class="not-found-art" viewBox="0 0 420 330" role="img" aria-labelledby="mascot-title mascot-description">
+      <title id="mascot-title">Trader kecil kebingungan melihat chart yang bergerak</title>
+      <desc id="mascot-description">Chart candlestick XAUUSD bergerak sementara trader bertelinga bulat menatap layar dengan kopi dan ekspresi salah entry.</desc>
+      <defs>
+        <linearGradient id="chart-panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1c2b30"/><stop offset="1" stop-color="#111b20"/></linearGradient>
+        <linearGradient id="trader-fur" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e7c99a"/><stop offset="1" stop-color="#bc9669"/></linearGradient>
+        <linearGradient id="trader-hoodie" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#93b7a0"/><stop offset="1" stop-color="#587966"/></linearGradient>
+      </defs>
+      <rect x="25" y="24" width="370" height="246" rx="19" fill="url(#chart-panel)" stroke="#3b5149" stroke-width="2"/>
+      <path d="M26 62h368" stroke="#354640"/>
+      <rect x="43" y="36" width="18" height="14" rx="4" fill="#a5c6b522" stroke="#9db8a5"/>
+      <path d="M47 46v-4m4 4v-7m4 7v-5" stroke="#a5c6b5" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="69" y="48" fill="#e3ece5" font-size="11" font-weight="800" font-family="system-ui, sans-serif">XAUUSD</text>
+      <text x="125" y="48" fill="#82948d" font-size="9" font-family="system-ui, sans-serif">· M1</text>
+      <circle cx="345" cy="43" r="3" fill="#8fc5a0"/>
+      <text x="353" y="47" fill="#9fc3a8" font-size="8" font-weight="700" font-family="system-ui, sans-serif">LIVE</text>
+      <g class="chart-grid" stroke="#9ab3a012" stroke-width="1">
+        <path d="M49 88h326M49 119h326M49 150h326M49 181h326M49 212h326"/>
+        <path d="M80 78v144m48-144v144m48-144v144m48-144v144m48-144v144m48-144v144"/>
+      </g>
+      <g fill="#71837b" font-size="7" font-family="system-ui, sans-serif">
+        <text x="31" y="91">2352</text><text x="31" y="122">2350</text><text x="31" y="153">2348</text><text x="31" y="184">2346</text>
+      </g>
+      <path class="chart-trace" d="M54 184l20-15 18 9 20-37 19 15 19-25 18 29 20-12 17 18 20-39 19 10 18-19 20 32 19-16 18 21 18-38" fill="none" stroke="#a8cdb3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".72"/>
+      <g fill="none" stroke-width="2" stroke-linecap="round">
+        <g class="candle" stroke="#8fc5a0"><path d="M77 142v34"/><rect x="72" y="151" width="10" height="16" rx="1" fill="#8fc5a0"/></g>
+        <g class="candle" stroke="#da8e88"><path d="M98 126v39"/><rect x="93" y="136" width="10" height="18" rx="1" fill="#da8e88"/></g>
+        <g class="candle" stroke="#8fc5a0"><path d="M119 137v34"/><rect x="114" y="145" width="10" height="16" rx="1" fill="#8fc5a0"/></g>
+        <g class="candle" stroke="#8fc5a0"><path d="M140 111v48"/><rect x="135" y="122" width="10" height="25" rx="1" fill="#8fc5a0"/></g>
+        <g class="candle" stroke="#da8e88"><path d="M161 101v43"/><rect x="156" y="112" width="10" height="19" rx="1" fill="#da8e88"/></g>
+        <g class="candle" stroke="#8fc5a0"><path d="M182 119v43"/><rect x="177" y="127" width="10" height="20" rx="1" fill="#8fc5a0"/></g>
+        <g class="candle" stroke="#da8e88"><path d="M203 109v47"/><rect x="198" y="119" width="10" height="22" rx="1" fill="#da8e88"/></g>
+        <g class="candle" stroke="#8fc5a0"><path d="M224 131v40"/><rect x="219" y="138" width="10" height="19" rx="1" fill="#8fc5a0"/></g>
+        <g class="candle" stroke="#da8e88"><path d="M245 98v45"/><rect x="240" y="108" width="10" height="20" rx="1" fill="#da8e88"/></g>
+        <g class="candle" stroke="#8fc5a0"><path d="M266 105v38"/><rect x="261" y="113" width="10" height="19" rx="1" fill="#8fc5a0"/></g>
+        <g class="candle" stroke="#da8e88"><path d="M287 122v46"/><rect x="282" y="130" width="10" height="23" rx="1" fill="#da8e88"/></g>
+      </g>
+      <g class="chart-price">
+        <path d="M300 171h74" stroke="#d9a27e" stroke-width="1" stroke-dasharray="3 3"/>
+        <rect x="339" y="163" width="40" height="16" rx="4" fill="#49352d" stroke="#986d52"/>
+        <text x="345" y="174" fill="#f0c5a5" font-size="8" font-weight="700" font-family="system-ui, sans-serif">2347.8</text>
+      </g>
+      <g class="speech-bubble">
+        <path d="M262 70q0-7 8-7h101q8 0 8 8v25q0 8-8 8h-34l-11 11 2-11h-58q-8 0-8-8z" fill="#e1eadf" stroke="#91b49c" stroke-width="1.5"/>
+        <text x="276" y="83" fill="#24352c" font-size="8" font-weight="800" font-family="system-ui, sans-serif">BUY THE DIP?</text>
+        <text x="278" y="94" fill="#63776b" font-size="7" font-family="system-ui, sans-serif">(katanya sih...)</text>
+      </g>
+      <ellipse class="trader-shadow" cx="286" cy="298" rx="67" ry="10" fill="#000" opacity=".3"/>
+      <g class="trader">
+        <path d="M240 271q4-35 37-43h29q31 8 35 43v18h-101z" fill="url(#trader-hoodie)" stroke="#496757" stroke-width="3"/>
+        <path d="M266 234q20 24 42 0" fill="none" stroke="#c4d7c5" stroke-width="3" opacity=".65"/>
+        <path d="M279 255h14" stroke="#d2c69e" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="284" cy="176" r="39" fill="url(#trader-fur)" stroke="#98764f" stroke-width="3"/>
+        <circle cx="254" cy="154" r="13" fill="#c4a174" stroke="#98764f" stroke-width="3"/>
+        <circle cx="314" cy="154" r="13" fill="#c4a174" stroke="#98764f" stroke-width="3"/>
+        <circle cx="254" cy="154" r="6" fill="#e8c9a0"/><circle cx="314" cy="154" r="6" fill="#e8c9a0"/>
+        <path d="M250 175q2-29 34-34 32 5 34 34" fill="none" stroke="#334b45" stroke-width="6" stroke-linecap="round"/>
+        <rect x="246" y="168" width="9" height="22" rx="4" fill="#334b45"/><rect x="313" y="168" width="9" height="22" rx="4" fill="#334b45"/>
+        <path d="M264 176q7-5 13 0m14 0q7-5 13 0" fill="none" stroke="#634c38" stroke-width="2.5" stroke-linecap="round"/>
+        <ellipse cx="272" cy="185" rx="3.5" ry="5" fill="#26352f"/><ellipse cx="300" cy="185" rx="3.5" ry="5" fill="#26352f"/>
+        <ellipse cx="263" cy="194" rx="6" ry="3" fill="#d99287" opacity=".7"/><ellipse cx="308" cy="194" rx="6" ry="3" fill="#d99287" opacity=".7"/>
+        <path d="M281 198q4-4 8 0" fill="none" stroke="#775742" stroke-width="2.5" stroke-linecap="round"/>
+        <path class="sweat-drop" d="M327 164q-7 9 0 12 7-3 0-12z" fill="#93c6d0"/>
+        <path d="M239 257q-12 2-16-8" fill="none" stroke="#98764f" stroke-width="9" stroke-linecap="round"/>
+        <path d="M329 251q13-1 18 9" fill="none" stroke="#98764f" stroke-width="9" stroke-linecap="round"/>
+        <path d="M342 252h22v22q0 7-7 7h-8q-7 0-7-7z" fill="#eadbbd" stroke="#947f5d" stroke-width="2"/>
+        <path d="M364 257q13-1 9 9-2 5-9 4" fill="none" stroke="#cdb990" stroke-width="4"/>
+        <path class="coffee-steam" d="M349 247q-5-6 0-11t0-10m9 21q5-6 0-11t0-10" fill="none" stroke="#d5d6c6" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </svg>
+  </section>
+</main>
+{% endblock %}

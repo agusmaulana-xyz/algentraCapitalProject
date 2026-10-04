@@ -103,9 +103,13 @@ class RateLimitMiddleware:
     def _limit(path: str) -> tuple[int, int]:
         if path in {"/api/auth/login", "/api/auth/client-login"}:
             return 8, 60
-        if path in {"/api/auth/register", "/api/auth/resend-code"}:
+        if path in {
+            "/api/auth/register",
+            "/api/auth/resend-code",
+            "/api/auth/password-reset/request",
+        }:
             return 4, 60
-        if path == "/api/auth/verify-email":
+        if path in {"/api/auth/verify-email", "/api/auth/password-reset/confirm"}:
             return 10, 60
         if path in {"/api/ea/master/snapshot", "/api/mt5/follower/positions"}:
             return 720, 60

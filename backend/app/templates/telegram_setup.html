@@ -48,7 +48,7 @@ const notice = document.querySelector("#notice");
         ...options,
         headers: { "Content-Type": "application/json", ...Object.fromEntries(headers.entries()) }
       });
-      const body = await response.json();
+      const body = await parseApiResponse(response);
       if (!response.ok) throw new Error(body.detail || `Request gagal (${response.status})`);
       return body;
     }

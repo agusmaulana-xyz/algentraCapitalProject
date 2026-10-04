@@ -69,7 +69,10 @@
   .contact-card p { margin:0 0 13px; color:#93a19a; font-size:11px; line-height:1.7; }
   .contact-person { color:#dce6dc!important; font-size:15px!important; font-weight:650; }
   .contact-links { display:flex; flex-wrap:wrap; gap:9px; }
-  .contact-link { display:inline-flex; min-height:38px; align-items:center; padding:0 13px; border:1px solid #42534a; border-radius:8px; color:#cbdace; background:#19241f; font-size:11px; font-weight:700; }
+  .contact-link { display:inline-flex; min-height:42px; align-items:center; gap:9px; padding:7px 12px; border:1px solid #42534a; border-radius:8px; color:#cbdace; background:#19241f; font-size:11px; font-weight:700; }
+  .contact-link svg { width:17px; height:17px; flex:none; }
+  .contact-link span { display:grid; gap:2px; }
+  .contact-link small { color:#92a39a; font-size:9px; font-weight:500; }
   .contact-link:hover { border-color:#8da995; color:#e4efe7; }
   .closing { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:22px; padding:28px 30px; border:1px solid #38443c; border-radius:15px; background:linear-gradient(100deg,#19241f,#121d23); }
   .closing h2 { margin:0 0 5px; font-size:21px; font-weight:560; }.closing p { margin:0; color:#9eaaa3; font-size:12px; }
@@ -141,7 +144,7 @@
         {% if contact_person %}<p class="contact-person">{{ contact_person }}</p>{% endif %}
         <div class="contact-links">
           {% if contact_whatsapp %}<a class="contact-link" href="https://wa.me/{{ contact_whatsapp }}" target="_blank" rel="noopener noreferrer">WhatsApp · +{{ contact_whatsapp }}</a>{% endif %}
-          {% if contact_email %}<a class="contact-link" href="mailto:{{ contact_email }}">Email</a>{% endif %}
+          {% if contact_email %}<a class="contact-link" href="mailto:{{ contact_email }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>Email<small>{{ contact_email }}</small></span></a>{% endif %}
           {% if not contact_whatsapp and not contact_email %}<a class="contact-link" href="/register">Buat akun klien</a><a class="contact-link" href="/login">Masuk</a>{% endif %}
         </div>
       </article>
@@ -150,7 +153,22 @@
         <p>Ikuti informasi dan pembaruan dari Algentra Capital.</p>
         <div class="contact-links">
           {% for social in contact_socials %}
-            {% if social.url %}<a class="contact-link" href="{{ social.url }}" target="_blank" rel="noopener noreferrer">{{ social.label }}</a>{% endif %}
+            {% if social.url %}
+            <a class="contact-link" href="{{ social.url }}" target="_blank" rel="noopener noreferrer">
+              {% if social.icon == "instagram" %}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="18" cy="6" r="1" fill="currentColor" stroke="none"></circle></svg>
+              {% elif social.icon == "telegram" %}
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.5 4.4 18.2 20c-.25 1.1-.9 1.35-1.82.84l-5.04-3.72-2.43 2.34c-.27.27-.5.5-1.02.5l.37-5.14 9.36-8.46c.4-.36-.09-.56-.62-.2L5.43 13.45.48 11.9c-1.08-.34-1.1-1.08.23-1.58L19.99 2.9c.9-.34 1.69.22 1.51 1.5Z"></path></svg>
+              {% elif social.icon == "tiktok" %}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v11.1a4.1 4.1 0 1 1-3.4-4"></path><path d="M14 3c.5 2.8 2.2 4.5 5 5"></path></svg>
+              {% elif social.icon == "website" %}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>
+              {% else %}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3A5 5 0 0 0 13 2.93l-1.72 1.72"></path><path d="M14 11a5 5 0 0 0-7.07 0l-3 3A5 5 0 0 0 11 21.07l1.72-1.72"></path></svg>
+              {% endif %}
+              <span>{{ social.label }}<small>{{ social.display }}</small></span>
+            </a>
+            {% endif %}
           {% endfor %}
           {% if not contact_socials %}<a class="contact-link" href="/register">Portal klien</a>{% endif %}
         </div>

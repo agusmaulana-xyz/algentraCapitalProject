@@ -40,19 +40,14 @@ class Settings(BaseSettings):
     contact_email: str | None = Field(default=None, validation_alias="CONTACT_EMAIL")
     contact_instagram: str | None = Field(default=None, validation_alias="CONTACT_INSTAGRAM")
     contact_telegram: str | None = Field(default=None, validation_alias="CONTACT_TELEGRAM")
+    contact_telegram_admin: str | None = Field(default=None, validation_alias="CONTACT_TELEGRAM_ADMIN")
+    contact_website: str | None = Field(default=None, validation_alias="CONTACT_WEBSITE")
     contact_facebook: str | None = Field(default=None, validation_alias="CONTACT_FACEBOOK")
     contact_linkedin: str | None = Field(default=None, validation_alias="CONTACT_LINKEDIN")
     contact_x: str | None = Field(default=None, validation_alias="CONTACT_X")
     contact_youtube: str | None = Field(default=None, validation_alias="CONTACT_YOUTUBE")
     contact_tiktok: str | None = Field(default=None, validation_alias="CONTACT_TIKTOK")
-    database_url: str | None = Field(
-        default=None,
-        validation_alias="DATABASE_URL",
-    )
-    local_database_url: str = Field(
-        default="sqlite:///backend/data/app.db",
-        validation_alias="LOCAL_DATABASE_URL",
-    )
+    database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
 
     @model_validator(mode="after")
     def validate_credentials(self) -> "Settings":
@@ -72,14 +67,8 @@ class Settings(BaseSettings):
             raise ValueError("GEMINI_MODEL cannot be empty")
         if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
-        if self.database_url and self.database_url.startswith("postgres://"):
-            self.database_url = "postgresql+psycopg://" + self.database_url.removeprefix("postgres://")
-        elif self.database_url and self.database_url.startswith("postgresql://"):
-            self.database_url = "postgresql+psycopg://" + self.database_url.removeprefix("postgresql://")
-        if os.getenv("VERCEL") == "1" and (
-            not self.database_url or not self.database_url.startswith("postgresql+psycopg://")
-        ):
-            raise ValueError("Vercel memerlukan DATABASE_URL PostgreSQL persisten; SQLite lokal tidak persisten di serverless")
+        if self.database_url and not self.database_url.startswith("sqlite:"):
+            raise ValueError("DATABASE_URL harus memakai SQLite, contoh: sqlite:///backend/data/app.db")
         if self.ea_api_key is not None:
             ea_key = self.ea_api_key.get_secret_value()
             if len(ea_key) < 24:
@@ -97,7 +86,11 @@ class Settings(BaseSettings):
 
     @property
     def resolved_database_url(self) -> str:
-        return self.database_url or self.local_database_url
+        if self.database_url:
+            return self.database_url
+        if os.getenv("VERCEL") == "1":
+            return "sqlite:////tmp/algentra-capital/app.db"
+        return "sqlite:///backend/data/app.db"
 
 
 @lru_cache

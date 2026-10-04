@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from urllib.parse import urlsplit
 
@@ -84,6 +85,24 @@ async def validation_error_response(_: Request, exc: RequestValidationError) -> 
     ]
     return JSONResponse(status_code=422, content={"detail": errors})
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "backend" / "app" / "templates"))
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_response(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404 and not request.url.path.startswith("/api/"):
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html",
+            context={"requested_path": request.url.path},
+            status_code=404,
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+
+
 signal_service = SignalService()
 telegram_manager = tg_router.telegram_manager
 telegram_manager.set_processor(signal_service)
@@ -136,6 +155,11 @@ def register_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="register.html", context={})
 
 
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="forgot_password.html", context={})
+
+
 @app.get("/account", response_class=HTMLResponse)
 def client_account_page(request: Request, _: int = Depends(require_client_id)) -> HTMLResponse:
     return templates.TemplateResponse(
@@ -145,11 +169,20 @@ def client_account_page(request: Request, _: int = Depends(require_client_id)) -
     )
 
 
-@app.get("/downloads/MT5FollowerCopyEA.mq5", response_class=FileResponse)
+@app.get("/downloads/MT5FollowerCopyEA.ex5", response_class=FileResponse, include_in_schema=False)
 def download_mt5_follower_copy_ea(_: int = Depends(require_client_id)) -> FileResponse:
     return FileResponse(
-        path=PROJECT_ROOT / "mt5" / "MT5FollowerCopyEA.mq5",
-        filename="MT5FollowerCopyEA.mq5",
+        path=PROJECT_ROOT / "mt5" / "MT5FollowerCopyEA.ex5",
+        filename="MT5FollowerCopyEA.ex5",
+        media_type="application/octet-stream",
+    )
+
+
+@app.get("/downloads/TelegramSignalEA.ex5", response_class=FileResponse, include_in_schema=False)
+def download_telegram_signal_ea(_: str = Depends(require_admin)) -> FileResponse:
+    return FileResponse(
+        path=PROJECT_ROOT / "mt5" / "TelegramSignalEA.ex5",
+        filename="TelegramSignalEA.ex5",
         media_type="application/octet-stream",
     )
 

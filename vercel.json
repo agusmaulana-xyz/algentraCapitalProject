@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "index.py": {
-      "includeFiles": "{backend/app/templates/**,musik.mp3,mt5/MT5FollowerCopyEA.mq5}"
+      "includeFiles": "{backend/app/templates/**,musik.mp3,mt5/*.ex5}"
     }
   }
 }

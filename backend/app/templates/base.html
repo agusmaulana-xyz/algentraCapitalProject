@@ -198,6 +198,42 @@
     <span id="music-label">Putar musik</span>
     <span class="music-bars" aria-hidden="true"><i></i><i></i><i></i></span>
   </button>
+  <script>
+    function startResendCountdown(button, seconds, label = "Kirim ulang kode") {
+      if (button._resendTimer) clearInterval(button._resendTimer);
+      let remaining = Math.max(0, Math.ceil(Number(seconds) || 0));
+      const update = () => {
+        if (remaining <= 0) {
+          button.disabled = false;
+          button.textContent = label;
+          clearInterval(button._resendTimer);
+          button._resendTimer = null;
+          return;
+        }
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const secondsLeft = remaining % 60;
+        const time = hours
+          ? `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secondsLeft).padStart(2, "0")}`
+          : `${String(minutes).padStart(2, "0")}:${String(secondsLeft).padStart(2, "0")}`;
+        button.disabled = true;
+        button.textContent = `Kirim ulang tersedia dalam ${time}`;
+        remaining -= 1;
+      };
+      update();
+      if (remaining > 0) button._resendTimer = setInterval(update, 1000);
+    }
+
+    async function parseApiResponse(response) {
+      const raw = await response.text();
+      if (!raw.trim()) return {};
+      try { return JSON.parse(raw); }
+      catch {
+        const message = raw.replace(/\s+/g, " ").trim().slice(0, 240);
+        throw new Error(`Server membalas HTTP ${response.status} dengan format non-JSON: ${message}`);
+      }
+    }
+  </script>
   {% block scripts %}{% endblock %}
   <script>
     const syncWorkspaceNav = () => {

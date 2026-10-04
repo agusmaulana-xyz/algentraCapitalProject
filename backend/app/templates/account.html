@@ -32,11 +32,11 @@
     <h2>Pasang EA follower</h2>
     <p class="section-help">EA utama Algentra menjalankan sinyal dan mengirim posisi terbuka. EA follower menyinkronkan posisi tersebut ke akun MT5 yang Anda hubungkan.</p>
     <div class="toolbar">
-      <a class="workspace-tag" href="/downloads/MT5FollowerCopyEA.mq5">Unduh EA follower</a>
+      <a class="workspace-tag" href="/downloads/MT5FollowerCopyEA.ex5">Unduh EA follower</a>
     </div>
     <ol>
       <li>Hubungkan akun MT5 di atas. Salin token yang muncul; token hanya terlihat saat dibuat atau dirotasi.</li>
-      <li>Unduh EA follower. Di MT5, pilih <strong>File → Open Data Folder</strong>, buka folder <code>MQL5/Experts</code>, lalu salin file EA ke sana. Buka file di MetaEditor dan tekan <strong>F7</strong> untuk compile.</li>
+      <li>Unduh EA follower. Di MT5, pilih <strong>File → Open Data Folder</strong>, buka folder <code>MQL5/Experts</code>, lalu salin file <code>.ex5</code> ke sana. File siap dipakai tanpa compile.</li>
       <li>Di MT5, pilih <strong>Tools → Options → Expert Advisors</strong>, aktifkan <em>Allow WebRequest for listed URL</em>, lalu tambahkan <code>https://algentracapital.my.id</code>.</li>
       <li>Dari <strong>Navigator → Expert Advisors</strong>, pasang EA di chart. Isi <code>AccountToken</code> dengan token akun tersebut, pastikan <code>ServerURL</code> benar, lalu aktifkan <strong>Algo Trading</strong>.</li>
       <li>Pastikan EA utama Algentra aktif dan uji EA follower di akun demo. <code>AllowLiveTrading</code> nonaktif secara default. Atur <code>VolumeMultiplier</code> sesuai kebutuhan sebelum mengaktifkan trading live.</li>
@@ -58,7 +58,7 @@ async function api(path, options = {}) {
   if (options.method && options.method !== "GET") headers["X-CSRF-Token"] = csrfToken;
   if (options.body) headers["Content-Type"] = "application/json";
   const response = await fetch(path, {...options, headers});
-  const result = await response.json();
+  const result = await parseApiResponse(response);
   if (!response.ok) throw new Error(result.detail || "Permintaan gagal.");
   return result;
 }

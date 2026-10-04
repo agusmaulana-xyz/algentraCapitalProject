@@ -32,7 +32,7 @@ document.querySelector("#admin-login-form").addEventListener("submit", async (ev
         password: document.querySelector("#password").value
       })
     });
-    const result = await response.json();
+    const result = await parseApiResponse(response);
     if (!response.ok) throw new Error(result.detail || "Login gagal.");
     location.assign("/dashboard");
   } catch (error) {

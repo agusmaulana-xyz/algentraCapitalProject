@@ -5,14 +5,14 @@ Layanan copy trading XAUUSD berbasis AI dengan FastAPI, SQLite, parser Gemini, k
 ## Menjalankan backend
 
 1. Gunakan Python 3.11 atau lebih baru.
-2. Dari folder proyek, salin `.env.example` menjadi `.env`, lalu ganti `APP_SECRET_KEY` dengan nilai acak minimal 32 karakter, `ADMIN_PASSWORD` dengan password minimal 12 karakter, dan `EA_API_KEY` dengan nilai acak. Isi konfigurasi SMTP jika ingin mengaktifkan pendaftaran klien melalui email.
+2. Dari folder proyek, salin `.env.example` menjadi `.env`, lalu ganti `APP_SECRET_KEY` dengan nilai acak minimal 32 karakter, `ADMIN_PASSWORD` dengan password minimal 12 karakter, dan `EA_API_KEY` dengan nilai acak. Isi konfigurasi SMTP untuk mengaktifkan pendaftaran klien dan reset kata sandi melalui email.
 3. Buat virtual environment (`python -m venv .venv` di Windows atau `python3 -m venv .venv` di Linux/macOS), lalu pasang dependensi dengan `.venv\Scripts\python -m pip install -r backend/requirements.txt` di Windows atau `.venv/bin/python -m pip install -r backend/requirements.txt` di Linux/macOS.
 4. Jalankan `run.bat` di Windows atau `./run.sh` di Linux/macOS. Backend bind ke `127.0.0.1:8000` dan otomatis restart ketika file program di `backend` berubah.
-5. Buka `http://127.0.0.1:8000/loginAdmin` untuk masuk sebagai admin. Klien masuk melalui `/login` dan dapat membuat akun dari `/register` setelah SMTP diisi.
+5. Buka `http://127.0.0.1:8000/loginAdmin` untuk masuk sebagai admin. Klien masuk melalui `/login`, mendaftar dari `/register`, dan mereset kata sandi melalui `/forgot-password` setelah SMTP diisi.
 6. Isi `GEMINI_API_KEY` di `.env` untuk mengaktifkan Gemini. Model default `gemini-3.8-flash` dapat diganti lewat `GEMINI_MODEL`; regex fallback mati kecuali `ENABLE_REGEX_FALLBACK=true`.
 7. Untuk Telegram, isi `TELEGRAM_API_ID` dan `TELEGRAM_API_HASH` dari [my.telegram.org](https://my.telegram.org), lalu restart backend dan buka `/telegram-setup` setelah login admin.
 
-Kontak publik pada beranda diatur melalui `CONTACT_PERSON_NAME`, `CONTACT_WHATSAPP` (nomor dengan kode negara), `CONTACT_EMAIL`, dan URL resmi `CONTACT_INSTAGRAM`, `CONTACT_TELEGRAM`, `CONTACT_FACEBOOK`, `CONTACT_LINKEDIN`, `CONTACT_X`, `CONTACT_YOUTUBE`, atau `CONTACT_TIKTOK` di `.env`.
+Kontak publik pada beranda diatur melalui variabel `CONTACT_*` di `.env.example` dan `.env`. Tautan email, Instagram, TikTok, grup/admin Telegram, dan website ditampilkan dengan ikon; alamat sosial harus berupa URL HTTPS.
 
 ## Akses publik melalui Cloudflare Tunnel
 
@@ -28,20 +28,19 @@ Quick Tunnel ditujukan untuk pengembangan. Untuk domain tetap, buat named tunnel
 
 Proyek menyediakan entrypoint FastAPI di index.py, daftar dependency di requirements.txt, dan file pendukung fungsi di vercel.json. Atur root proyek Vercel ke folder Algentra Capital. Vercel dapat dihubungkan ke Git atau dideploy dari folder ini dengan CLI.
 
-Vercel memerlukan PostgreSQL yang persisten. Buat database PostgreSQL terkelola, lalu tambahkan environment variables berikut di pengaturan project Vercel:
+Tambahkan environment variables berikut di pengaturan project Vercel:
 
 - APP_SECRET_KEY: secret acak minimal 32 karakter.
 - ADMIN_USERNAME dan ADMIN_PASSWORD: akun admin, password minimal 12 karakter.
 - EA_API_KEY: secret acak minimal 24 karakter.
-- DATABASE_URL: URL database PostgreSQL, misalnya postgresql://user:password@host:5432/database?sslmode=require.
-- LOCAL_DATABASE_URL: untuk lokal saja, URL SQLite. Di Vercel variabel ini diabaikan.
+- DATABASE_URL: `sqlite:////tmp/algentra-capital/app.db`. Penyimpanan SQLite Vercel bersifat sementara dan tidak dibagi antar instance.
 - COOKIE_SECURE=true.
 
-Tambahkan GEMINI_API_KEY, konfigurasi SMTP, dan CONTACT_* bila diperlukan. Isi rahasia lewat pengaturan Environment Variables Vercel, bukan file .env. Perubahan Gemini dari halaman Settings tidak tersedia di Vercel; atur GEMINI_API_KEY atau GEMINI_MODEL di Vercel lalu deploy ulang.
+Tambahkan GEMINI_API_KEY, konfigurasi SMTP, dan CONTACT_* bila diperlukan. Agar kontak ini tampil pada deployment Vercel, tambahkan CONTACT_PERSON_NAME, CONTACT_EMAIL, CONTACT_INSTAGRAM, CONTACT_TELEGRAM, CONTACT_TELEGRAM_ADMIN, CONTACT_TIKTOK, dan CONTACT_WEBSITE di Environment Variables. Isi rahasia lewat pengaturan Vercel, bukan file .env. Perubahan Gemini dari halaman Settings tidak tersedia di Vercel; atur GEMINI_API_KEY atau GEMINI_MODEL di Vercel lalu deploy ulang.
 
-SQLite hanya dipakai untuk lokal. Jika DATABASE_URL kosong, aplikasi memakai LOCAL_DATABASE_URL; di Vercel DATABASE_URL PostgreSQL wajib diisi. Skema database kosong dibuat otomatis saat aplikasi mulai, tetapi data dari SQLite lokal tidak dipindahkan otomatis. Untuk berbagi data antara Vercel dan host Cloudflare Tunnel, gunakan URL PostgreSQL yang sama pada DATABASE_URL di Vercel dan .env host.
+Untuk lokal atau host Cloudflare Tunnel, gunakan `DATABASE_URL=sqlite:///backend/data/app.db`; berkas database dibuat otomatis di `backend/data/app.db`. Untuk Vercel, aplikasi memakai SQLite di `/tmp`, yang dapat hilang saat function dibuat ulang dan tidak tersinkron dengan database di komputer lokal. Data lama PostgreSQL tidak dipindahkan otomatis.
 
-Vercel menjalankan request HTTP sebagai Functions, sehingga bukan tempat untuk proses listener Telegram yang harus terus hidup. Koneksi Telegram otomatis dinonaktifkan di Vercel. Jalankan aplikasi di mesin yang selalu aktif lewat Cloudflare Tunnel untuk menangani Telegram; pastikan host itu memakai PostgreSQL yang sama agar signal dan status EA terlihat dari Vercel. Dashboard menggunakan polling otomatis bila WebSocket tidak tersedia.
+Vercel menjalankan request HTTP sebagai Functions, sehingga bukan tempat untuk proses listener Telegram yang harus terus hidup. Koneksi Telegram otomatis dinonaktifkan di Vercel. Jalankan aplikasi di mesin yang selalu aktif lewat Cloudflare Tunnel untuk menangani Telegram. Karena SQLite pada host dan Vercel terpisah, data signal dan status EA tidak otomatis tersinkron di antara keduanya. Dashboard menggunakan polling otomatis bila WebSocket tidak tersedia.
 
 Setelah environment variables disimpan, deploy preview dengan **vercel**, lalu deploy production dengan **vercel --prod**, atau hubungkan repository ke Vercel. Python deployment dipatok ke versi 3.12.
 
@@ -64,7 +63,7 @@ Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpa
 
 - `GET /health`
 - Public site: `GET /` dan `/performance`; data performa anonim di `GET /api/public/performance` hanya memakai trade yang sudah ditutup.
-- `POST /api/auth/login` untuk admin, `POST /api/auth/client-login` untuk klien, `POST /api/auth/logout`, serta pendaftaran klien melalui `POST /api/auth/register`, `POST /api/auth/resend-code`, dan `POST /api/auth/verify-email`.
+- `POST /api/auth/login` untuk admin, `POST /api/auth/client-login` untuk klien, `POST /api/auth/logout`, pendaftaran melalui `POST /api/auth/register`, `POST /api/auth/resend-code`, dan `POST /api/auth/verify-email`, serta reset kata sandi melalui `POST /api/auth/password-reset/request` dan `POST /api/auth/password-reset/confirm`. Halaman reset: `GET /forgot-password`.
 - Portal klien: `/account`; pengelolaan terminal melalui `GET/POST /api/mt5/accounts`, `PUT /api/mt5/accounts/{id}`, `PUT /api/mt5/accounts/{id}/active`, dan `POST /api/mt5/accounts/{id}/rotate-token`.
 - Copy posisi MT5: `POST /api/ea/master/snapshot` memakai `X-API-Key` dari EA Telegram; `GET /api/mt5/follower/positions` memakai `X-Account-Token` khusus untuk setiap terminal follower.
 - `GET /api/stats`
@@ -100,17 +99,18 @@ Session Telethon berada di `backend/data/telegram_user.session`, tidak disajikan
 
 ## Memasang EA MT5
 
-1. Buat `EA_API_KEY` acak minimal 24 karakter di `.env`, restart backend, lalu buka `mt5/TelegramSignalEA.mq5` di MetaEditor.
-2. Compile dengan **F7**. Salin file ke `MQL5/Experts` bila MetaEditor tidak membukanya langsung dari folder proyek.
-3. Di MT5, buka **Tools > Options > Expert Advisors**, aktifkan **Allow WebRequest for listed URL**, lalu tambahkan URL yang sama dengan `ServerURL` (default publik: `https://algentracapital.my.id`; untuk server lokal: `http://127.0.0.1:8000`).
-4. Pasang EA ke chart akun demo, isi `ApiKey` dengan nilai `EA_API_KEY`, gunakan `LotMode=LOT_RISK_PERCENT` dan `RiskPercent=1.0`, lalu biarkan `DemoMode=true`. Backend juga memulai `demo_mode=true`.
-5. Periksa tab Experts/Journal untuk heartbeat, status koneksi, dan laporan signal.
+1. Buat `EA_API_KEY` acak minimal 24 karakter di `.env`, lalu restart backend.
+2. Login sebagai admin dan unduh EA utama yang sudah dikompilasi dari `/downloads/TelegramSignalEA.ex5`.
+3. Di MT5, pilih **File > Open Data Folder**, buka `MQL5/Experts`, lalu salin file `.ex5` ke sana. File siap dipakai; tidak perlu compile di MetaEditor.
+4. Di MT5, buka **Tools > Options > Expert Advisors**, aktifkan **Allow WebRequest for listed URL**, lalu tambahkan URL yang sama dengan `ServerURL` (default publik: `https://algentracapital.my.id`; untuk server lokal: `http://127.0.0.1:8000`).
+5. Pasang EA ke chart akun demo, isi `ApiKey` dengan nilai `EA_API_KEY`, gunakan `LotMode=LOT_RISK_PERCENT` dan `RiskPercent=1.0`, lalu biarkan `DemoMode=true`. Backend juga memulai `demo_mode=true`.
+6. Periksa tab Experts/Journal untuk heartbeat, status koneksi, dan laporan signal.
 
 `GET /api/ea/pending` mengklaim signal selama 90 detik. EA menyimpan penanda idempotensi per entry dan mengirim ulang laporan bila perlu agar polling/restart tidak membuat order ganda. Jika sinyal memiliki beberapa TP, EA membuat satu order untuk setiap TP. Semua order memakai SL dari sinyal; bila SL tidak tersedia, EA memakai `DefaultSLPoints`. Dengan `LotMode=LOT_RISK_PERCENT` dan `RiskPercent=1.0`, anggaran risiko seluruh entry dari satu sinyal adalah sekitar 1% ekuitas akun jika semua entry mencapai SL. Anggaran uang itu dibagi rata per entry, lalu lot tiap entry dihitung dari estimasi P/L MT5 antara harga entry dan SL serta dibulatkan ke bawah sesuai langkah lot broker. Batas `MaxOpenTrades` default EA adalah 20; sinyal tetap ditolak bila jumlah posisi/order yang dibutuhkan melampaui batas itu. Beberapa order memerlukan akun MT5 hedging.
 
 ## Copy posisi dari akun utama ke akun follower
 
-Pendaftaran klien memakai email OTP enam digit yang berlaku 10 menit. Gmail bisa dipakai sebagai pengirim: buat akun Gmail khusus, aktifkan 2-Step Verification, lalu buat App Password dari pengaturan Google Account. Isi `.env` seperti di bawah memakai App Password, bukan password Gmail biasa, lalu restart backend. Endpoint daftar dibatasi per alamat IP dan kode verifikasi hanya berlaku sekali.
+Pendaftaran dan reset kata sandi memakai email OTP enam digit yang berlaku 10 menit. Pengiriman kode dibatasi satu kali per menit dan maksimal tiga kali berturut-turut; setelah pengiriman ketiga, pengiriman berikutnya menunggu satu jam. Kode menerima maksimal tiga percobaan. Gmail bisa dipakai sebagai pengirim: buat akun Gmail khusus, aktifkan 2-Step Verification, lalu buat App Password dari pengaturan Google Account. Isi `.env` seperti di bawah memakai App Password, bukan password Gmail biasa, lalu restart backend. Endpoint juga dibatasi per alamat IP.
 
 ```env
 EMAIL_SMTP_HOST=smtp.gmail.com
@@ -127,12 +127,12 @@ EA Telegram yang berjalan pada terminal akun utama Algentra mengeksekusi sinyal 
 
 Unduh EA setelah login ke portal:
 
-- [Unduh EA follower](https://algentracapital.my.id/downloads/MT5FollowerCopyEA.mq5) — pasang pada setiap terminal MT5 akun klien.
+- [Unduh EA follower](https://algentracapital.my.id/downloads/MT5FollowerCopyEA.ex5) — pasang pada setiap terminal MT5 akun klien.
 
 Untuk memasang EA:
 
 1. Di MT5, pilih **File → Open Data Folder**, lalu buka `MQL5/Experts`.
-2. Salin file `.mq5` yang diunduh ke folder tersebut. Buka file di MetaEditor dan tekan **F7** untuk compile.
+2. Salin file `.ex5` yang diunduh ke folder tersebut. EA sudah dikompilasi dan bisa langsung dipasang dari Navigator.
 3. Di MT5, pilih **Tools → Options → Expert Advisors**. Aktifkan **Allow WebRequest for listed URL** dan tambahkan `https://algentracapital.my.id`.
 4. Dari **Navigator → Expert Advisors**, tarik EA follower ke chart. Isi `AccountToken` dengan token akun itu dan pastikan `ServerURL` berisi `https://algentracapital.my.id`.
 5. Aktifkan **Algo Trading**. EA Telegram di terminal utama Algentra harus berjalan agar posisi sumber terus diperbarui. Uji follower di akun demo sebelum menggunakan akun live.
@@ -141,7 +141,7 @@ EA Telegram menerbitkan posisi dengan magic number miliknya setiap detik; posisi
 
 Semua terminal follower klien menerima sumber posisi Algentra yang sama. Akun MT5 klien hanya perlu didaftarkan sebagai follower; terminal sumber tidak perlu didaftarkan lewat portal klien.
 
-Perubahan file `.mq5` tidak mengompilasi EA MT5 otomatis. Kompilasi dan pemasangan ulang EA tetap dilakukan melalui MetaEditor/MT5.
+Kedua EA yang dibagikan berupa file `.ex5` hasil compile. Jika binary diperbarui, unduh file terbaru dan salin ulang ke folder `MQL5/Experts`.
 
 ### Entry berupa rentang harga
 

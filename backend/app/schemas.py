@@ -25,6 +25,16 @@ class VerifyEmailRequest(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class PasswordResetRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    code: str = Field(pattern=r"^\d{6}$")
+    password: str = Field(min_length=12, max_length=72)
+
+
 class MT5AccountCreate(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     server: str = Field(min_length=1, max_length=128)

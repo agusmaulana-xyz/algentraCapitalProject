@@ -34,8 +34,12 @@ let pendingPassword = "";
 
 async function post(path, body) {
   const response = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.detail || "Permintaan gagal. Coba lagi.");
+  const result = await parseApiResponse(response);
+  if (!response.ok) {
+    const error = new Error(result.detail || "Permintaan gagal. Coba lagi.");
+    error.retryAfter = Number(response.headers.get("Retry-After")) || Number(result.retry_after_seconds) || 0;
+    throw error;
+  }
   return result;
 }
 
@@ -43,12 +47,21 @@ registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   pendingEmail = document.querySelector("#email").value.trim();
   pendingPassword = document.querySelector("#password").value;
+  const submitButton = registerForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
   try {
-    await post("/api/auth/register", {email:pendingEmail, password:pendingPassword});
+    const result = await post("/api/auth/register", {email:pendingEmail, password:pendingPassword});
     registerForm.hidden = true;
     verifyForm.hidden = false;
+    startResendCountdown(document.querySelector("#resend"), result.retry_after_seconds, "Kirim ulang kode");
     message.textContent = "Jika email memenuhi syarat, kode verifikasi sudah dikirim. Periksa kotak masuk dan folder spam.";
-  } catch (error) { message.textContent = error.message; }
+  } catch (error) {
+    message.textContent = error.message;
+    if (error.retryAfter) {
+      const targetButton = verifyForm.hidden ? submitButton : document.querySelector("#resend");
+      startResendCountdown(targetButton, error.retryAfter, verifyForm.hidden ? "Kirim kode" : "Kirim ulang kode");
+    }
+  } finally { if (!submitButton._resendTimer) submitButton.disabled = false; }
 });
 
 verifyForm.addEventListener("submit", async (event) => {
@@ -56,14 +69,25 @@ verifyForm.addEventListener("submit", async (event) => {
   try {
     await post("/api/auth/verify-email", {email:pendingEmail, code:document.querySelector("#code").value});
     location.assign("/account");
-  } catch (error) { message.textContent = error.message; }
+  } catch (error) {
+    message.textContent = error.message;
+    if (error.retryAfter) startResendCountdown(document.querySelector("#resend"), error.retryAfter, "Kirim ulang kode");
+  }
 });
 
 document.querySelector("#resend").addEventListener("click", async () => {
+  const resendButton = document.querySelector("#resend");
+  if (resendButton.disabled) return;
+  resendButton.disabled = true;
   try {
-    await post("/api/auth/resend-code", {email:pendingEmail, password:pendingPassword});
-    message.textContent = "Jika email memenuhi syarat, kode verifikasi baru sudah dikirim. Tunggu satu menit sebelum meminta kode lagi.";
-  } catch (error) { message.textContent = error.message; }
+    const result = await post("/api/auth/resend-code", {email:pendingEmail, password:pendingPassword});
+    startResendCountdown(resendButton, result.retry_after_seconds, "Kirim ulang kode");
+    message.textContent = "Jika email memenuhi syarat, kode verifikasi sudah dikirim. Periksa kotak masuk dan folder spam.";
+  } catch (error) {
+    message.textContent = error.message;
+    if (error.retryAfter) startResendCountdown(resendButton, error.retryAfter, "Kirim ulang kode");
+    else resendButton.disabled = false;
+  }
 });
 </script>
 {% endblock %}

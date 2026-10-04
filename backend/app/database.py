@@ -49,6 +49,29 @@ def migrate_schema() -> None:
             with engine.begin() as connection:
                 for name, sql_type in missing.items():
                     connection.execute(text(f"ALTER TABLE signals ADD COLUMN {name} {sql_type}"))
+    if "email_verifications" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("email_verifications")}
+        additions = {
+            "send_count": "INTEGER NOT NULL DEFAULT 1",
+            "send_window_started_at": "DATETIME",
+            "locked_until": "DATETIME",
+        }
+        missing = {name: sql_type for name, sql_type in additions.items() if name not in columns}
+        if missing:
+            with engine.begin() as connection:
+                for name, sql_type in missing.items():
+                    connection.execute(text(f"ALTER TABLE email_verifications ADD COLUMN {name} {sql_type}"))
+    if "password_reset_codes" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("password_reset_codes")}
+        if "last_activity_at" not in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "ALTER TABLE password_reset_codes "
+                        "ADD COLUMN last_activity_at DATETIME NOT NULL "
+                        "DEFAULT '1970-01-01 00:00:00'"
+                    )
+                )
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -26,16 +26,18 @@ def _public_contact_context() -> dict[str, object]:
         email = ""
 
     social_settings = (
-        ("Instagram", settings.contact_instagram, ("instagram.com",)),
-        ("Telegram", settings.contact_telegram, ("t.me", "telegram.me")),
-        ("Facebook", settings.contact_facebook, ("facebook.com", "fb.com")),
-        ("LinkedIn", settings.contact_linkedin, ("linkedin.com",)),
-        ("X", settings.contact_x, ("x.com", "twitter.com")),
-        ("YouTube", settings.contact_youtube, ("youtube.com", "youtu.be")),
-        ("TikTok", settings.contact_tiktok, ("tiktok.com",)),
+        ("Instagram", settings.contact_instagram, ("instagram.com",), "instagram"),
+        ("Grup Telegram", settings.contact_telegram, ("t.me", "telegram.me"), "telegram"),
+        ("Admin Telegram", settings.contact_telegram_admin, ("t.me", "telegram.me"), "telegram"),
+        ("Facebook", settings.contact_facebook, ("facebook.com", "fb.com"), "facebook"),
+        ("LinkedIn", settings.contact_linkedin, ("linkedin.com",), "linkedin"),
+        ("X", settings.contact_x, ("x.com", "twitter.com"), "x"),
+        ("YouTube", settings.contact_youtube, ("youtube.com", "youtu.be"), "youtube"),
+        ("TikTok", settings.contact_tiktok, ("tiktok.com",), "tiktok"),
+        ("Website", settings.contact_website, ("algentracapital.my.id",), "website"),
     )
     socials = []
-    for label, raw_url, allowed_hosts in social_settings:
+    for label, raw_url, allowed_hosts, icon in social_settings:
         url = (raw_url or "").strip()
         safe_url = None
         try:
@@ -52,7 +54,14 @@ def _public_contact_context() -> dict[str, object]:
         ):
             safe_url = url
         if safe_url:
-            socials.append({"label": label, "url": safe_url})
+            path = parsed.path.strip("/")
+            if label in {"Instagram", "TikTok", "Admin Telegram"}:
+                display = f"@{path.lstrip('@')}"
+            elif label == "Website":
+                display = parsed.netloc.casefold()
+            else:
+                display = path
+            socials.append({"label": label, "url": safe_url, "icon": icon, "display": display})
 
     return {
         "contact_person": (settings.contact_person_name or "").strip(),
