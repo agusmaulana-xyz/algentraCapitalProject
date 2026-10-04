@@ -1,6 +1,6 @@
 #property strict
-#property version   "1.000"
-#property description "Executes Telegram signals and publishes all open positions to Algentra copy-trading accounts"
+#property version   "1.002"
+#property description "Executes Telegram signals, reports master MT5 balance, and publishes all open positions"
 
 #define MAX_SIGNAL_TARGETS 20
 
@@ -100,6 +100,53 @@ bool HttpRequest(const string method, const string path, const string payload, s
    return true;
   }
 
+string AccountTradeModeText()
+  {
+   long mode = AccountInfoInteger(ACCOUNT_TRADE_MODE);
+   if(mode == ACCOUNT_TRADE_MODE_REAL) return "real";
+   if(mode == ACCOUNT_TRADE_MODE_CONTEST) return "contest";
+   return "demo";
+  }
+
+bool AppendMasterMarketQuote(const string base_symbol, string &quotes, int &count)
+  {
+   string symbol = base_symbol;
+   if(!SymbolSelect(symbol, true))
+     {
+      if(SymbolSuffix == "")
+         return false;
+      symbol = base_symbol + SymbolSuffix;
+      if(!SymbolSelect(symbol, true))
+         return false;
+     }
+   MqlTick tick;
+   if(!SymbolInfoTick(symbol, tick) || tick.bid <= 0.0 || tick.ask <= 0.0 || tick.time_msc <= 0)
+      return false;
+   if(count > 0)
+      quotes += ",";
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   quotes += StringFormat(
+      "{\"symbol\":\"%s\",\"bid\":%s,\"ask\":%s,\"time_msc\":%I64d}",
+      base_symbol,
+      DoubleToString(tick.bid, digits),
+      DoubleToString(tick.ask, digits),
+      tick.time_msc);
+   count++;
+   return true;
+  }
+
+string MasterMarketQuotesJson()
+  {
+   string quotes = "[";
+   int count = 0;
+   AppendMasterMarketQuote("XAUUSD", quotes, count);
+   AppendMasterMarketQuote("EURUSD", quotes, count);
+   AppendMasterMarketQuote("USDJPY", quotes, count);
+   AppendMasterMarketQuote("GBPUSD", quotes, count);
+   quotes += "]";
+   return quotes;
+  }
+
 bool PublishMasterSnapshot()
   {
    if(!TerminalInfoInteger(TERMINAL_CONNECTED) || AccountInfoInteger(ACCOUNT_LOGIN) <= 0)
@@ -141,9 +188,15 @@ bool PublishMasterSnapshot()
 
    string terminal_login = IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN));
    string terminal_server = AccountInfoString(ACCOUNT_SERVER);
+   string currency = JsonEscape(AccountInfoString(ACCOUNT_CURRENCY));
+   string market_quotes = MasterMarketQuotesJson();
    string payload = StringFormat(
-      "{\"terminal_login\":\"%s\",\"terminal_server\":\"%s\",\"positions\":%s}",
-      terminal_login, JsonEscape(terminal_server), positions);
+      "{\"terminal_login\":\"%s\",\"terminal_server\":\"%s\",\"balance\":%s,\"equity\":%s,\"floating_profit\":%s,\"currency\":\"%s\",\"trade_mode\":\"%s\",\"market_quotes\":%s,\"positions\":%s}",
+      terminal_login, JsonEscape(terminal_server),
+      DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 8),
+      DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 8),
+      DoubleToString(AccountInfoDouble(ACCOUNT_PROFIT), 8),
+      currency, AccountTradeModeText(), market_quotes, positions);
    string response;
    bool published = HttpRequest("POST", "/api/ea/master/snapshot", payload, response);
    g_last_master_snapshot_ms = GetTickCount64();
@@ -1069,7 +1122,7 @@ void UpdatePanel()
   {
    int closed = g_wins + g_losses;
    double winrate = closed > 0 ? (double)g_wins / closed * 100.0 : 0.0;
-    Comment("TelegramSignalEA 0.7.0\n",
+    Comment("TelegramSignalEA 1.002\n",
            "Backend: ", g_connection_status, "\n",
            "Mode: ", DemoMode ? "DEMO / DRY RUN" : "LIVE", "\n",
            "Signals this session: ", g_signal_count, "\n",

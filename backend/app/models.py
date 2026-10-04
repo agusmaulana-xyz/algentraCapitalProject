@@ -218,6 +218,40 @@ class MasterCopyState(Base):
     last_snapshot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class MT5MasterAccountState(Base):
+    __tablename__ = "mt5_master_account_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    balance: Mapped[float] = mapped_column(Float, nullable=False)
+    equity: Mapped[float] = mapped_column(Float, nullable=False)
+    floating_profit: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(16), nullable=False)
+    trade_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class MT5MasterMarketState(Base):
+    __tablename__ = "mt5_master_market_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    quotes_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class MT5MasterEquitySample(Base):
+    __tablename__ = "mt5_master_equity_samples"
+    __table_args__ = (
+        UniqueConstraint("sample_hour", name="ux_mt5_master_equity_hour"),
+        Index("ix_mt5_master_equity_hour", "sample_hour"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sample_hour: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    equity: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(16), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
 class MasterCopyPosition(Base):
     __tablename__ = "mt5_master_copy_positions"
     __table_args__ = (

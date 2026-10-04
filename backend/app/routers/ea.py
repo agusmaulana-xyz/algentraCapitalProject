@@ -16,8 +16,11 @@ from ..models import (
     AppSetting,
     EAExecution,
     EAStatus,
+    MT5MasterEquitySample,
     MasterCopyPosition,
     MasterCopyState,
+    MT5MasterAccountState,
+    MT5MasterMarketState,
     Signal,
     SystemLog,
     Trade,
@@ -68,6 +71,58 @@ def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(ge
         state = MasterCopyState(id=1)
         db.add(state)
     state.last_snapshot_at = now
+    master_report_fields = (
+        payload.balance,
+        payload.equity,
+        payload.floating_profit,
+        payload.currency,
+        payload.trade_mode,
+    )
+    if all(value is not None for value in master_report_fields):
+        account_state = db.get(MT5MasterAccountState, 1)
+        if account_state is None:
+            account_state = MT5MasterAccountState(id=1)
+            db.add(account_state)
+        account_state.balance = payload.balance
+        account_state.equity = payload.equity
+        account_state.floating_profit = payload.floating_profit
+        account_state.currency = payload.currency.upper()
+        account_state.trade_mode = payload.trade_mode
+        account_state.observed_at = now
+
+        sample_hour = now.replace(minute=0, second=0, microsecond=0)
+        equity_sample = db.execute(
+            select(MT5MasterEquitySample).where(MT5MasterEquitySample.sample_hour == sample_hour)
+        ).scalar_one_or_none()
+        if equity_sample is None:
+            db.add(MT5MasterEquitySample(
+                sample_hour=sample_hour,
+                equity=payload.equity,
+                currency=payload.currency.upper(),
+                observed_at=now,
+            ))
+            db.execute(delete(MT5MasterEquitySample).where(
+                MT5MasterEquitySample.sample_hour < now - timedelta(days=45),
+            ))
+        else:
+            observed_at = equity_sample.observed_at
+            if observed_at.tzinfo is None:
+                observed_at = observed_at.replace(tzinfo=now.tzinfo)
+            if (now - observed_at).total_seconds() >= 60:
+                equity_sample.equity = payload.equity
+                equity_sample.currency = payload.currency.upper()
+                equity_sample.observed_at = now
+
+    if payload.market_quotes is not None:
+        market_state = db.get(MT5MasterMarketState, 1)
+        if market_state is None:
+            market_state = MT5MasterMarketState(id=1)
+            db.add(market_state)
+        market_state.quotes_json = json.dumps(
+            [quote.model_dump() for quote in payload.market_quotes],
+            separators=(",", ":"),
+        )
+        market_state.observed_at = now
     db.commit()
     return {"status": "ok", "positions": len(payload.positions), "last_snapshot_at": wib_iso(now)}
 

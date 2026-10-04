@@ -42,27 +42,25 @@
   .community-count { position:relative; z-index:1; display:flex; align-items:baseline; gap:9px; min-width:145px; justify-content:flex-end; }
   .community-count strong { color:#d6e8d2; font-size:clamp(40px,6vw,58px); font-weight:570; line-height:1; letter-spacing:-.06em; font-variant-numeric:tabular-nums; text-shadow:0 0 30px #a8c7a533; }
   .community-count span { color:#a6b7a8; font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
-  .perf-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .perf-metric { min-height:120px; padding:17px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
-  .perf-metric.primary { grid-column:1/-1; min-height:148px; background:radial-gradient(ellipse at 90% 0%,#a2bd9d14,transparent 60%),linear-gradient(145deg,#1a2820,#141d23); }
-  .perf-metric span { display:block; color:#98a69f; font-size:10px; }
-  .perf-metric strong { display:block; margin-top:9px; color:#dce6dc; font-size:clamp(23px,3vw,34px); font-variant-numeric:tabular-nums; font-weight:570; letter-spacing:-.045em; }
-  .perf-metric.primary strong { font-size:clamp(32px,4vw,48px); }
-  .perf-metric small { display:block; margin-top:6px; color:#7f8e87; font-size:10px; }
-  .pnl-positive { color:#b9d5bd!important; }.pnl-negative { color:#e0a4a1!important; }
   .chart-card { min-height:300px; padding:18px 18px 12px; border:1px solid #2e3d39; border-radius:13px; background:#111a20; }
   .chart-title { display:flex; justify-content:space-between; color:#a4b1aa; font-size:10px; }
   .chart-title b { color:#d9e2da; font-weight:600; }
-  #pnl-chart { display:block; width:100%; height:235px; margin-top:16px; overflow:visible; }
-  #chart-empty[hidden],#pnl-chart[hidden] { display:none; }
-  .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.chart-area { fill:url(#chartFill); }.chart-line { fill:none; stroke:#a9c5ac; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }.chart-point { fill:#d5e3d2; stroke:#16211c; stroke-width:4; }
+  #equity-chart { display:block; width:100%; height:235px; margin-top:16px; overflow:visible; }
+  #equity-chart-empty[hidden],#equity-chart[hidden] { display:none; }
+  .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.chart-line { fill:none; stroke:#a9c5ac; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }.chart-point { fill:#d5e3d2; stroke:#16211c; stroke-width:4; }
   .chart-empty { display:grid; height:235px; place-items:center; color:#82918a; font-size:12px; text-align:center; }
   .public-data-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); gap:12px; }
   .public-data-card { min-width:0; padding:17px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
   .public-data-card p { margin:9px 0 0; color:#aab5ae; font-size:11px; }
   .public-data-card small { display:block; margin-top:9px; color:#819089; font-size:10px; line-height:1.55; }
   .public-data-value { display:block; margin-top:10px; color:#dce6dc; font-size:clamp(21px,3vw,31px); font-weight:570; letter-spacing:-.035em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-  .chart-title select { width:auto; max-width:200px; margin-left:auto; padding:5px 8px; border-radius:6px; font-size:10px; }
+  .public-data-card--equity { grid-column:1/-1; padding:clamp(20px,4vw,34px); background:radial-gradient(ellipse at 88% 0%,#a8c7a51c,transparent 45%),linear-gradient(110deg,#17231f,#111b20 65%,#18231f); }
+  .public-data-card--equity .public-data-value { font-size:clamp(36px,7vw,62px); }
+  .quote-card { min-width:0; padding:16px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
+  .quote-card strong { display:block; margin-top:9px; color:#dce6dc; font-size:clamp(20px,3vw,27px); font-variant-numeric:tabular-nums; letter-spacing:-.035em; }
+  .quote-pair { display:flex; justify-content:space-between; gap:8px; margin-top:10px; color:#aab5ae; font-size:10px; }
+  .quote-card small { display:block; margin-top:8px; color:#819089; font-size:10px; }
+  .chart-axis-labels { display:flex; justify-content:space-between; color:#819089; font-size:10px; }
   .data-note { margin:15px 0 0; padding:12px 14px; border:1px solid #3b463b; border-left:2px solid #a5b693; border-radius:8px; color:#aab4aa; background:#191f1a; font-size:11px; line-height:1.65; }
   .approach-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   .approach-card { min-height:155px; padding:18px; border:1px solid #2e3b38; border-radius:12px; background:#141e23; }
@@ -121,13 +119,12 @@
   </section>
 
   <section class="public-section" id="performance">
-    <div class="section-heading"><div><span class="section-kicker">Data performa</span><h2>Saldo dan hasil dari akun client MT5.</h2><p>Saldo dan transaksi berasal dari laporan terminal MT5 akun Copy Trading yang terhubung.</p></div><span id="pnl-updated" class="section-kicker">Memuat data</span></div>
-    <div class="section-heading"><div><span class="section-kicker">Saldo akun</span><p>Saldo, ekuitas, dan floating profit terkini, dikelompokkan menurut mata uang dan jenis akun.</p></div><span id="account-coverage" class="section-kicker"></span></div>
-    <div id="public-balance-groups" class="public-data-grid"><p class="chart-empty">Memuat laporan saldo MT5…</p></div>
-    <div class="section-heading" style="margin-top:28px"><div><span class="section-kicker">Riwayat MT5</span><p>Hasil terealisasi dihitung dari deal MT5 pada posisi yang sudah ditutup.</p></div></div>
-    <div id="public-performance-groups" class="public-data-grid"><p class="chart-empty">Memuat histori MT5…</p></div>
-    <div class="chart-card" style="margin-top:16px"><div class="chart-title"><span>Grafik hasil terealisasi kumulatif</span><label for="performance-group-select">Mata uang/akun</label><select id="performance-group-select" aria-label="Pilih grup grafik"></select></div><div id="chart-empty" class="chart-empty">Belum ada transaksi tertutup untuk ditampilkan.</div><svg id="pnl-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik hasil kumulatif berdasarkan riwayat transaksi MT5" hidden><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a9c5ac" stop-opacity=".22"/><stop offset="100%" stop-color="#a9c5ac" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><path id="chart-area" class="chart-area"/><path id="chart-line" class="chart-line"/><circle id="chart-point" class="chart-point" r="5"/></svg></div>
-    <p class="data-note" id="performance-note">Saldo dijumlahkan hanya dalam mata uang dan jenis akun yang sama; konversi antar mata uang tidak dilakukan. Nilai mengikuti laporan terakhir yang diterima dari MT5. Riwayat performa berasal dari transaksi yang tercatat di MT5, bukan dari sinyal, dan bukan jaminan kinerja mendatang.</p>
+    <div class="section-heading"><div><span class="section-kicker">Indeks Algentra Capital</span><h2>INDEX EQUITY ALGENTRA CAPITAL</h2><p>Equity akun utama MT5 yang menjalankan Telegram Signal EA.</p></div><span id="master-account-status" class="section-kicker">Menunggu laporan EA utama</span></div>
+    <div id="master-account-equity" class="public-data-grid"><p class="chart-empty">Memuat equity akun utama MT5…</p></div>
+    <div class="section-heading" style="margin-top:28px"><div><span class="section-kicker">Watchlist harga</span><p>Harga Bid dan Ask terbaru yang dilaporkan terminal MT5 akun utama.</p></div><span id="market-status" class="section-kicker">Menunggu harga</span></div>
+    <div id="market-prices" class="public-data-grid"></div>
+    <div class="chart-card" style="margin-top:18px"><div class="chart-title"><span>Perubahan equity per jam · 24 jam terakhir</span><b id="equity-chart-currency"></b></div><div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div><svg id="equity-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik equity akun utama per jam" hidden><defs><linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a9c5ac" stop-opacity=".22"/><stop offset="100%" stop-color="#a9c5ac" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><path id="equity-chart-area" fill="url(#equityFill)"/><path id="equity-chart-line" class="chart-line"/><circle id="equity-chart-point" class="chart-point" r="5"/></svg><div class="chart-axis-labels"><span id="equity-chart-first"></span><span id="equity-chart-latest"></span></div></div>
+    <p class="data-note">Equity dan harga berasal dari laporan akun utama MT5. Grafik menyimpan satu titik per jam dan memperbarui titik pada jam berjalan. Watchlist menampilkan XAUUSD, EURUSD, USDJPY, dan GBPUSD jika simbol tersedia pada broker. Jika nama simbol broker memakai suffix, sesuaikan input <code>SymbolSuffix</code> pada EA. Data harga dapat tertunda saat pasar tutup.</p>
   </section>
 
   <section class="public-section" id="approach">
@@ -180,84 +177,100 @@
   </section>
 
   <section class="closing"><div><h2>Copy trading otomatis dengan AI.</h2><p>Analisis sinyal, eksekusi MetaTrader, dan penyalinan posisi dalam satu alur.</p></div><a class="public-button secondary" href="/register">Buat akun klien</a></section>
-  <p class="risk-copy">Trading memiliki risiko kerugian. Kinerja historis bukan jaminan hasil di masa depan. Ringkasan saldo dan riwayat pada halaman ini merupakan agregat laporan akun client MT5 yang terhubung, dikelompokkan menurut mata uang dan jenis akun.</p>
+  <p class="risk-copy">Trading memiliki risiko kerugian. Equity dan perubahan historis bukan jaminan hasil di masa depan. Data publik ini berasal dari akun utama MT5 yang menjalankan Telegram Signal EA.</p>
 </main>
 {% endblock %}
 {% block scripts %}
 <script>
 (() => {
-  const balanceBox = document.querySelector("#public-balance-groups");
-  const performanceBox = document.querySelector("#public-performance-groups");
-  const groupSelect = document.querySelector("#performance-group-select");
-  let performanceGroups = [];
+  const equityBox = document.querySelector("#master-account-equity");
+  const pricesBox = document.querySelector("#market-prices");
+  const watchlist = ["XAUUSD", "EURUSD", "USDJPY", "GBPUSD"];
   const money = (value, currency) => `${Number(value || 0).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2})} ${currency || ""}`.trim();
+  const priceNumber = (value) => Number(value).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:5});
   const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mode] || mode || "MT5");
   const addText = (parent, tag, className, value) => { const el = document.createElement(tag); if (className) el.className = className; el.textContent = value; parent.append(el); return el; };
-  const showChart = (curve) => {
-    const svg = document.querySelector("#pnl-chart");
-    const empty = document.querySelector("#chart-empty");
-    if (!curve.length) { svg.hidden = true; empty.hidden = false; empty.textContent = "Belum ada transaksi tertutup untuk ditampilkan."; return; }
-    const values = curve.map((point) => Number(point.pnl));
-    const min = Math.min(0, ...values), max = Math.max(0, ...values);
-    const spread = max - min || 1;
+  const showEquityChart = (curve) => {
+    const svg = document.querySelector("#equity-chart");
+    const empty = document.querySelector("#equity-chart-empty");
+    if (!curve.length) {
+      svg.hidden = true; empty.hidden = false;
+      document.querySelector("#equity-chart-first").textContent = "";
+      document.querySelector("#equity-chart-latest").textContent = "";
+      return;
+    }
+    const values = curve.map((point) => Number(point.equity));
+    const min = Math.min(...values), max = Math.max(...values);
+    const padding = (max - min) * 0.08 || Math.max(Math.abs(max) * 0.001, 0.01);
+    const lower = min - padding, upper = max + padding, spread = upper - lower;
     const coords = values.map((value, index) => ({
       x: 24 + (curve.length === 1 ? 676 : index * 676 / (curve.length - 1)),
-      y: 24 + (max - value) * 162 / spread
+      y: 28 + (upper - value) * 156 / spread
     }));
     const line = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
-    document.querySelector("#chart-line").setAttribute("d", line);
-    document.querySelector("#chart-area").setAttribute("d", `${line} L${coords.at(-1).x.toFixed(1)} 210 L${coords[0].x.toFixed(1)} 210 Z`);
-    document.querySelector("#chart-point").setAttribute("cx", coords.at(-1).x);
-    document.querySelector("#chart-point").setAttribute("cy", coords.at(-1).y);
+    document.querySelector("#equity-chart-line").setAttribute("d", line);
+    document.querySelector("#equity-chart-area").setAttribute("d", `${line} L${coords.at(-1).x.toFixed(1)} 210 L${coords[0].x.toFixed(1)} 210 Z`);
+    document.querySelector("#equity-chart-point").setAttribute("cx", coords.at(-1).x);
+    document.querySelector("#equity-chart-point").setAttribute("cy", coords.at(-1).y);
+    const hourLabel = (value) => `${new Date(value).toLocaleString("id-ID", {timeZone:"Asia/Jakarta", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"})} WIB`;
+    document.querySelector("#equity-chart-first").textContent = hourLabel(curve[0].hour);
+    document.querySelector("#equity-chart-latest").textContent = hourLabel(curve.at(-1).hour);
+    document.querySelector("#equity-chart-currency").textContent = curve.at(-1).currency || "";
     empty.hidden = true; svg.hidden = false;
   };
-  const renderChartForSelection = () => {
-    const group = performanceGroups[Number(groupSelect.value)];
-    showChart(group ? group.curve || [] : []);
+  const renderQuotes = (quotes, reportOnline) => {
+    const bySymbol = new Map((quotes || []).map((quote) => [quote.symbol, quote]));
+    pricesBox.replaceChildren();
+    let liveCount = 0;
+    for (const symbol of watchlist) {
+      const quote = bySymbol.get(symbol);
+      const card = document.createElement("article"); card.className = "quote-card";
+      addText(card, "span", "section-kicker", symbol);
+      const fresh = quote && reportOnline && quote.updated_at && Date.now() - new Date(quote.updated_at).getTime() <= 120000 && Date.now() - new Date(quote.updated_at).getTime() >= -60000;
+      if (quote) {
+        addText(card, "strong", "", priceNumber(quote.bid));
+        const pair = document.createElement("div"); pair.className = "quote-pair";
+        addText(pair, "span", "", `Bid ${priceNumber(quote.bid)}`);
+        addText(pair, "span", "", `Ask ${priceNumber(quote.ask)}`);
+        card.append(pair);
+        addText(card, "small", "", fresh ? `Tick MT5 ${new Date(quote.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB` : "Harga terakhir · tick sudah lama");
+      } else {
+        addText(card, "strong", "", "Belum tersedia");
+        addText(card, "small", "", "Simbol belum tersedia pada broker akun utama.");
+      }
+      if (fresh) liveCount++;
+      pricesBox.append(card);
+    }
+    document.querySelector("#market-status").textContent = liveCount ? `${liveCount} / 4 HARGA TERBARU` : "MENUNGGU TICK MT5";
   };
-  groupSelect.addEventListener("change", renderChartForSelection);
   async function refresh() {
     try {
       const response = await fetch("/api/public/performance", {cache:"no-store"});
-      if (!response.ok) throw new Error("Data performa belum tersedia");
+      if (!response.ok) throw new Error("Data akun utama belum tersedia");
       const data = await response.json();
       document.querySelector("#registered-client-count").textContent = Number(data.registered_clients || 0).toLocaleString("id-ID");
-      document.querySelector("#pnl-updated").textContent = data.updated_at ? `LAPORAN MT5 ${new Date(data.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB` : "BELUM ADA LAPORAN MT5";
-      document.querySelector("#account-coverage").textContent = `${Number(data.accounts_reporting || 0)} dari ${Number(data.accounts_total || 0)} akun punya laporan`;
-
-      balanceBox.replaceChildren();
-      for (const group of data.balance_groups || []) {
-        const card = document.createElement("article"); card.className = "public-data-card";
-        addText(card, "span", "section-kicker", `SALDO ${modeLabel(group.trade_mode)} · ${group.currency}`);
-        addText(card, "strong", "public-data-value", money(group.balance, group.currency));
-        addText(card, "p", "", `Ekuitas ${money(group.equity, group.currency)}`);
-        addText(card, "p", "", `Floating ${money(group.floating_profit, group.currency)}`);
-        addText(card, "small", "", `${group.online_accounts} dari ${group.reported_accounts} akun melapor aktif · diperbarui ${group.updated_at ? new Date(group.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) + " WIB" : "waktu tidak tersedia"}`);
-        balanceBox.append(card);
+      const master = data.master_account || {};
+      const masterStatus = document.querySelector("#master-account-status");
+      masterStatus.textContent = master.online ? "EA UTAMA ONLINE" : master.available ? "EA UTAMA OFFLINE · EQUITY TERAKHIR" : "MENUNGGU LAPORAN EA UTAMA";
+      equityBox.replaceChildren();
+      if (master.available) {
+        const card = document.createElement("article"); card.className = "public-data-card public-data-card--equity";
+        addText(card, "span", "section-kicker", `EQUITY AKUN UTAMA ${modeLabel(master.trade_mode)} · ${master.currency}`);
+        addText(card, "strong", "public-data-value", money(master.equity, master.currency));
+        addText(card, "p", "", `Floating profit ${money(master.floating_profit, master.currency)}`);
+        addText(card, "small", "", `${master.online ? "Laporan Telegram Signal EA aktif" : "Menampilkan equity terakhir yang dilaporkan EA"} · diperbarui ${master.updated_at ? new Date(master.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) + " WIB" : "waktu tidak tersedia"}`);
+        equityBox.append(card);
+      } else {
+        addText(equityBox, "p", "chart-empty", "Equity utama akan tampil setelah Telegram Signal EA mengirim laporan akun MT5.");
       }
-      if (!balanceBox.childElementCount) addText(balanceBox, "p", "chart-empty", "Saldo akan tampil setelah EA Copy Trading mengirim data dari MT5.");
-
-      performanceGroups = data.performance_groups || [];
-      performanceBox.replaceChildren();
-      groupSelect.replaceChildren();
-      performanceGroups.forEach((group, index) => {
-        const card = document.createElement("article"); card.className = "public-data-card";
-        addText(card, "span", "section-kicker", `PERFORMA ${modeLabel(group.trade_mode)} · ${group.currency}`);
-        const pnl = addText(card, "strong", "public-data-value", money(group.realized_pnl, group.currency));
-        pnl.classList.toggle("pnl-positive", group.realized_pnl > 0);
-        pnl.classList.toggle("pnl-negative", group.realized_pnl < 0);
-        addText(card, "p", "", `Hasil terealisasi · ${group.closed_trades} transaksi ditutup`);
-        addText(card, "small", "", `${group.wins} menang · ${group.losses} kalah · ${group.break_even} impas · tingkat kemenangan ${group.win_rate}%`);
-        performanceBox.append(card);
-        const option = document.createElement("option"); option.value = String(index); option.textContent = `${modeLabel(group.trade_mode)} · ${group.currency}`; groupSelect.append(option);
-      });
-      if (!performanceBox.childElementCount) addText(performanceBox, "p", "chart-empty", "Belum ada transaksi tertutup yang dilaporkan oleh MT5.");
-      renderChartForSelection();
+      renderQuotes(data.market_quotes, data.market_quotes_online);
+      showEquityChart(data.equity_curve || []);
     } catch (_) {
-      document.querySelector("#pnl-updated").textContent = "DATA MT5 TIDAK TERSEDIA";
-      balanceBox.replaceChildren(); addText(balanceBox, "p", "chart-empty", "Data saldo belum dapat dimuat.");
-      performanceBox.replaceChildren(); addText(performanceBox, "p", "chart-empty", "Data riwayat belum dapat dimuat.");
-      showChart([]);
+      document.querySelector("#master-account-status").textContent = "DATA AKUN UTAMA TIDAK TERSEDIA";
+      document.querySelector("#market-status").textContent = "DATA HARGA TIDAK TERSEDIA";
+      equityBox.replaceChildren(); addText(equityBox, "p", "chart-empty", "Data equity belum dapat dimuat.");
+      renderQuotes([], false);
+      showEquityChart([]);
     }
   }
   refresh();
