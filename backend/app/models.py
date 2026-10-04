@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -164,6 +164,51 @@ class MT5Account(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class MT5AccountState(Base):
+    __tablename__ = "mt5_account_state"
+
+    account_id: Mapped[int] = mapped_column(ForeignKey("mt5_accounts.id", ondelete="CASCADE"), primary_key=True)
+    balance: Mapped[float] = mapped_column(Float, nullable=False)
+    equity: Mapped[float] = mapped_column(Float, nullable=False)
+    floating_profit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    margin: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    free_margin: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    currency: Mapped[str] = mapped_column(String(16), nullable=False)
+    trade_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    allow_live_trading: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    terminal_trade_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    expert_trade_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    open_position_ids_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    history_cursor: Mapped[str] = mapped_column(String(64), nullable=False, default="0")
+    history_cursor_msc: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class MT5HistoryDeal(Base):
+    __tablename__ = "mt5_history_deals"
+    __table_args__ = (
+        UniqueConstraint("account_id", "deal_ticket", name="ux_mt5_history_account_ticket"),
+        Index("ix_mt5_history_account_position", "account_id", "position_id"),
+        Index("ix_mt5_history_account_time", "account_id", "deal_time_msc"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("mt5_accounts.id", ondelete="CASCADE"), nullable=False)
+    deal_ticket: Mapped[str] = mapped_column(String(64), nullable=False)
+    position_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    deal_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deal_time_msc: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), nullable=False)
+    entry: Mapped[str] = mapped_column(String(12), nullable=False)
+    volume: Mapped[float] = mapped_column(Float, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    profit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    commission: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    swap: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    fee: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
 
 class MasterCopyState(Base):

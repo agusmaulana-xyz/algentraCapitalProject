@@ -1,11 +1,12 @@
 import json
-from datetime import datetime, time, timezone
+from datetime import datetime, timezone
 import math
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .models import AppSetting, Trade
+from .time_utils import WIB, as_utc, wib_day_start_utc_naive
 
 
 DEFAULT_CONTROLS = {
@@ -33,9 +34,8 @@ def setting_value(db: Session, key: str, default):
 def risk_state(db: Session, now: datetime | None = None) -> dict[str, object]:
     controls = {key: setting_value(db, key, value) for key, value in DEFAULT_CONTROLS.items()}
     now = now or datetime.now(timezone.utc)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
-    start_of_day = datetime.combine(now.astimezone(timezone.utc).date(), time.min, tzinfo=timezone.utc)
+    now = as_utc(now)
+    start_of_day = wib_day_start_utc_naive(now.astimezone(WIB).date())
     daily_profit = float(db.execute(
         select(func.coalesce(func.sum(Trade.profit), 0.0)).where(
             Trade.closed_at.is_not(None),

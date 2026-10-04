@@ -52,6 +52,36 @@ class MT5AccountActive(BaseModel):
     active: bool
 
 
+class MT5HistoryDealInput(BaseModel):
+    deal_ticket: str = Field(min_length=1, max_length=64, pattern=r"^\d+$")
+    position_id: str = Field(min_length=1, max_length=64, pattern=r"^\d+$")
+    time_msc: int = Field(ge=1, le=4102444800000)
+    symbol: str = Field(min_length=1, max_length=64)
+    action: Literal["BUY", "SELL"]
+    entry: Literal["IN", "OUT", "INOUT", "OUT_BY"]
+    volume: float = Field(gt=0, le=1000, allow_inf_nan=False)
+    price: float = Field(gt=0, allow_inf_nan=False)
+    profit: float = Field(allow_inf_nan=False)
+    commission: float = Field(allow_inf_nan=False)
+    swap: float = Field(allow_inf_nan=False)
+    fee: float = Field(allow_inf_nan=False)
+
+
+class FollowerAccountReport(BaseModel):
+    balance: float = Field(ge=0, allow_inf_nan=False)
+    equity: float = Field(allow_inf_nan=False)
+    floating_profit: float = Field(allow_inf_nan=False)
+    margin: float = Field(ge=0, allow_inf_nan=False)
+    free_margin: float = Field(allow_inf_nan=False)
+    currency: str = Field(min_length=3, max_length=16, pattern=r"^[A-Za-z0-9]+$")
+    trade_mode: Literal["real", "demo", "contest"]
+    allow_live_trading: bool
+    terminal_trade_allowed: bool
+    expert_trade_allowed: bool
+    open_position_ids: list[str] = Field(max_length=500)
+    deals: list[MT5HistoryDealInput] = Field(max_length=100)
+
+
 class CopyPositionInput(BaseModel):
     ticket: str = Field(min_length=1, max_length=64)
     symbol: str = Field(min_length=1, max_length=64)

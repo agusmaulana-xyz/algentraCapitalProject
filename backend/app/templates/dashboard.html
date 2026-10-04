@@ -85,7 +85,7 @@
 const $ = (selector) => document.querySelector(selector);
     if (typeof Chart !== "undefined") { Chart.defaults.color = "#9bb0c2"; Chart.defaults.borderColor = "#253c50"; }
     let groupChart = null, profitChart = null;
-    const displayTime = (value) => value ? new Date(value).toLocaleString() : "—";
+    const displayTime = (value) => value ? new Date(value).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) : "—";
     const draw = (selector, columns, rows) => {
       const body = $(selector); body.replaceChildren();
       for (const row of rows) {

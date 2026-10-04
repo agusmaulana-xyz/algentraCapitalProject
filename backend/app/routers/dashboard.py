@@ -14,6 +14,7 @@ from ..routers.tg import telegram_manager
 from ..risk_controls import risk_state
 from ..schemas import LogResponse, SignalResponse
 from ..stats_service import get_dashboard_stats, get_group_stats
+from ..time_utils import wib_datetime_to_utc_naive, wib_iso
 
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -49,14 +50,13 @@ def signals(
     if group_id:
         query = query.where(Signal.group_id == group_id)
     query = query.order_by(Signal.created_at.desc(), Signal.id.desc()).offset(offset).limit(limit)
-    return [
-        {
-            **SignalResponse.model_validate(signal).model_dump(),
-            "ticket": ticket,
-            "profit": profit,
-        }
-        for signal, ticket, profit in db.execute(query).all()
-    ]
+    items = []
+    for signal, ticket, profit in db.execute(query).all():
+        item = SignalResponse.model_validate(signal).model_dump()
+        item["created_at"] = wib_iso(signal.created_at)
+        item.update({"ticket": ticket, "profit": profit})
+        items.append(item)
+    return items
 
 
 def _logs_query(level: str | None, search: str | None):
@@ -82,9 +82,13 @@ def logs(
     level: str | None = Query(default=None, min_length=1, max_length=16),
     search: str | None = Query(default=None, max_length=200),
     db: Session = Depends(get_db),
-) -> list[SystemLog]:
+) -> list[dict[str, object]]:
     query = _logs_query(level, search).order_by(SystemLog.created_at.desc(), SystemLog.id.desc()).offset(offset).limit(limit)
-    return list(db.execute(query).scalars())
+    rows = db.execute(query).scalars()
+    return [
+        {**LogResponse.model_validate(row).model_dump(), "created_at": wib_iso(row.created_at)}
+        for row in rows
+    ]
 
 
 @router.get("/logs/export.csv")
@@ -98,7 +102,7 @@ def export_logs(
     writer = csv.writer(output)
     writer.writerow(["id", "created_at", "level", "source", "message"])
     for row in rows:
-        writer.writerow([row.id, row.created_at.isoformat(), _csv_text(row.level), _csv_text(row.source), _csv_text(row.message)])
+        writer.writerow([row.id, wib_iso(row.created_at), _csv_text(row.level), _csv_text(row.source), _csv_text(row.message)])
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=logs.csv"})
 
 
@@ -114,6 +118,8 @@ def _trades_query(
     symbol: str | None,
     result: str | None,
 ):
+    date_from = wib_datetime_to_utc_naive(date_from) if date_from else None
+    date_to = wib_datetime_to_utc_naive(date_to) if date_to else None
     if date_from and date_to and date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from harus sebelum atau sama dengan date_to")
     query = select(Trade, Signal.group_id, Signal.group_name).outerjoin(Signal, Signal.id == Trade.signal_id)
@@ -146,8 +152,8 @@ def _trade_dict(trade: Trade, group_id: str | None, group_name: str | None) -> d
         "exec_price": trade.exec_price,
         "profit": trade.profit,
         "result": trade.result,
-        "opened_at": trade.opened_at.isoformat() if trade.opened_at else None,
-        "closed_at": trade.closed_at.isoformat() if trade.closed_at else None,
+        "opened_at": wib_iso(trade.opened_at),
+        "closed_at": wib_iso(trade.closed_at),
     }
 
 
@@ -183,7 +189,7 @@ def export_trades(
         writer.writerow([
             _csv_text(trade.ticket), _csv_text(group_name), _csv_text(trade.symbol), _csv_text(trade.action), trade.lots, trade.entry,
             trade.exec_price, trade.profit, trade.result,
-            trade.opened_at.isoformat() if trade.opened_at else "",
-            trade.closed_at.isoformat() if trade.closed_at else "",
+            wib_iso(trade.opened_at) or "",
+            wib_iso(trade.closed_at) or "",
         ])
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=trades.csv"})

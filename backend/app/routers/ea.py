@@ -25,6 +25,7 @@ from ..models import (
 )
 from ..schemas import CopySnapshotInput
 from ..risk_controls import risk_state
+from ..time_utils import wib_iso
 
 
 router = APIRouter(prefix="/api/ea", tags=["ea"])
@@ -68,7 +69,7 @@ def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(ge
         db.add(state)
     state.last_snapshot_at = now
     db.commit()
-    return {"status": "ok", "positions": len(payload.positions), "last_snapshot_at": now.isoformat()}
+    return {"status": "ok", "positions": len(payload.positions), "last_snapshot_at": wib_iso(now)}
 
 
 class ExecutionReport(BaseModel):
@@ -209,7 +210,7 @@ def pending(
         )
     }
     if controls["trading_paused"]:
-        return {"items": [], **response_controls, "server_time": now.isoformat()}
+        return {"items": [], **response_controls, "server_time": wib_iso(now)}
 
     eligible = or_(
         Signal.status == "PENDING",
@@ -219,7 +220,7 @@ def pending(
         select(Signal.id).where(eligible).order_by(Signal.created_at.asc(), Signal.id.asc()).limit(limit)
     ).scalars())
     if not candidate_ids:
-        return {"items": [], **response_controls, "server_time": now.isoformat()}
+        return {"items": [], **response_controls, "server_time": wib_iso(now)}
 
     # Conditional update makes claiming safe when multiple EA clients poll together.
     db.execute(
@@ -269,13 +270,13 @@ def pending(
             "sl": parsed.sl,
             "tp": parsed.tp or [],
             "confidence": parsed.confidence,
-            "created_at": row.created_at.isoformat(),
+            "created_at": wib_iso(row.created_at),
             # SQLite returns naive datetimes for UTC values; normalize before
             # converting to Unix time so the host's local timezone is ignored.
             "created_epoch": int(created_at.timestamp()),
         })
     db.commit()
-    return {"items": items, **response_controls, "server_time": now.isoformat()}
+    return {"items": items, **response_controls, "server_time": wib_iso(now)}
 
 
 @router.post("/report", dependencies=[Depends(require_ea_key)])
@@ -423,4 +424,4 @@ def heartbeat(payload: HeartbeatReport, db: Session = Depends(get_db)) -> dict[s
     status.version = payload.version
     status.symbol = payload.symbol
     db.commit()
-    return {"status": "ok", "active": status.active, "last_heartbeat": status.last_heartbeat.isoformat()}
+    return {"status": "ok", "active": status.active, "last_heartbeat": wib_iso(status.last_heartbeat)}

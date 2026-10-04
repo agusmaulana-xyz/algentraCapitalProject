@@ -111,7 +111,7 @@ class RateLimitMiddleware:
             return 4, 60
         if path in {"/api/auth/verify-email", "/api/auth/password-reset/confirm"}:
             return 10, 60
-        if path in {"/api/ea/master/snapshot", "/api/mt5/follower/positions"}:
+        if path in {"/api/ea/master/snapshot", "/api/mt5/follower/positions", "/api/mt5/follower/report"}:
             return 720, 60
         if path.startswith("/api/tg/"):
             return 12, 60

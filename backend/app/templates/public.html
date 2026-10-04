@@ -57,6 +57,12 @@
   #chart-empty[hidden],#pnl-chart[hidden] { display:none; }
   .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.chart-area { fill:url(#chartFill); }.chart-line { fill:none; stroke:#a9c5ac; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }.chart-point { fill:#d5e3d2; stroke:#16211c; stroke-width:4; }
   .chart-empty { display:grid; height:235px; place-items:center; color:#82918a; font-size:12px; text-align:center; }
+  .public-data-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); gap:12px; }
+  .public-data-card { min-width:0; padding:17px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
+  .public-data-card p { margin:9px 0 0; color:#aab5ae; font-size:11px; }
+  .public-data-card small { display:block; margin-top:9px; color:#819089; font-size:10px; line-height:1.55; }
+  .public-data-value { display:block; margin-top:10px; color:#dce6dc; font-size:clamp(21px,3vw,31px); font-weight:570; letter-spacing:-.035em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  .chart-title select { width:auto; max-width:200px; margin-left:auto; padding:5px 8px; border-radius:6px; font-size:10px; }
   .data-note { margin:15px 0 0; padding:12px 14px; border:1px solid #3b463b; border-left:2px solid #a5b693; border-radius:8px; color:#aab4aa; background:#191f1a; font-size:11px; line-height:1.65; }
   .approach-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   .approach-card { min-height:155px; padding:18px; border:1px solid #2e3b38; border-radius:12px; background:#141e23; }
@@ -78,7 +84,7 @@
   .closing h2 { margin:0 0 5px; font-size:21px; font-weight:560; }.closing p { margin:0; color:#9eaaa3; font-size:12px; }
   .risk-copy { max-width:880px; margin:14px auto 0; color:#75837e; font-size:10px; line-height:1.7; text-align:center; }
   @media(max-width:850px) { .hero { grid-template-columns:1fr; min-height:auto; }.hero-visual { min-height:285px; }.perf-grid { grid-template-columns:1fr; }.approach-grid,.contact-grid { grid-template-columns:1fr; } }
-  @media(max-width:600px) { .public-shell { padding:20px 13px 48px; }.hero { gap:8px; padding:24px 20px; border-radius:18px; }.hero-visual { min-height:245px; }.signal-orbit { width:225px; }.orbit-core { width:88px; height:88px; border-radius:22px; }.community-card { grid-template-columns:auto minmax(0,1fr); gap:13px; padding:17px; }.community-emblem { width:49px; height:49px; border-radius:15px; }.community-emblem svg { width:26px; height:26px; }.community-count { grid-column:1/-1; justify-content:flex-start; padding-left:62px; }.community-count strong { font-size:43px; }.perf-summary { gap:7px; }.perf-metric { padding:13px; }.public-section { padding:19px 14px; }.closing { padding:20px; } }
+  @media(max-width:600px) { .public-shell { padding:20px 13px 48px; }.hero { gap:8px; padding:24px 20px; border-radius:18px; }.hero-visual { min-height:245px; }.signal-orbit { width:225px; }.orbit-core { width:88px; height:88px; border-radius:22px; }.community-card { grid-template-columns:auto minmax(0,1fr); gap:13px; padding:17px; }.community-emblem { width:49px; height:49px; border-radius:15px; }.community-emblem svg { width:26px; height:26px; }.community-count { grid-column:1/-1; justify-content:flex-start; padding-left:62px; }.community-count strong { font-size:43px; }.perf-summary { gap:7px; }.perf-metric { padding:13px; }.public-section { padding:19px 14px; }.closing { padding:20px; }.chart-title { flex-wrap:wrap; gap:8px; }.chart-title select { max-width:100%; } }
 </style>
 {% endblock %}
 {% block content %}
@@ -87,7 +93,7 @@
     <div class="hero-copy">
       <span class="section-kicker">AI · Copy trading otomatis · Kontrol risiko</span>
       <h1>Sinyal dianalisis AI, eksekusi berjalan <em>otomatis.</em></h1>
-      <p class="hero-text">AI membantu membaca dan menyusun sinyal XAUUSD dari kanal Telegram pilihan. EA (robot MetaTrader 5) menjalankan instruksi sesuai pengaturan dan batas risiko; posisi di akun utama juga dapat disalin ke akun follower yang terhubung.</p>
+      <p class="hero-text">AI membantu membaca dan menyusun sinyal XAUUSD dari kanal Telegram pilihan. EA (robot MetaTrader 5) menjalankan instruksi sesuai pengaturan dan batas risiko; semua posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading yang terhubung.</p>
       <div class="hero-actions"><a class="public-button" href="#performance">Lihat performa</a><a class="public-button secondary" href="#approach">Pelajari cara kerja</a></div>
     </div>
     <div class="hero-visual" aria-hidden="true">
@@ -115,24 +121,21 @@
   </section>
 
   <section class="public-section" id="performance">
-    <div class="section-heading"><div><span class="section-kicker">Data performa</span><h2>Ringkasan transaksi tertutup.</h2><p>Angka berikut dihitung dari transaksi yang tercatat pada akun sumber Algentra Capital.</p></div><span id="pnl-updated" class="section-kicker">Memuat data</span></div>
-    <div class="perf-grid">
-      <div class="perf-summary">
-        <article class="perf-metric primary"><span>Laba/rugi terealisasi</span><strong id="pnl-total">—</strong><small>Akumulasi transaksi yang sudah ditutup</small></article>
-        <article class="perf-metric"><span>Transaksi tertutup</span><strong id="trade-count">—</strong><small id="win-loss-count">Memuat ringkasan</small></article>
-        <article class="perf-metric"><span>Tingkat kemenangan</span><strong id="win-rate">—</strong><small>Berdasarkan hasil menang atau kalah</small></article>
-      </div>
-      <div class="chart-card"><div class="chart-title"><span>P&L kumulatif</span><b id="chart-period">Seluruh histori</b></div><div id="chart-empty" class="chart-empty">Memuat histori performa…</div><svg id="pnl-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik P&L kumulatif" hidden><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a9c5ac" stop-opacity=".22"/><stop offset="100%" stop-color="#a9c5ac" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><path id="chart-area" class="chart-area"/><path id="chart-line" class="chart-line"/><circle id="chart-point" class="chart-point" r="5"/></svg></div>
-    </div>
-    <p class="data-note" id="performance-note">Hasil ditampilkan sebagai gabungan transaksi tertutup pada akun sumber, bukan hasil masing-masing akun follower dan bukan jaminan kinerja mendatang. Nilai mengikuti mata uang akun sumber.</p>
+    <div class="section-heading"><div><span class="section-kicker">Data performa</span><h2>Saldo dan hasil dari akun client MT5.</h2><p>Saldo dan transaksi berasal dari laporan terminal MT5 akun Copy Trading yang terhubung.</p></div><span id="pnl-updated" class="section-kicker">Memuat data</span></div>
+    <div class="section-heading"><div><span class="section-kicker">Saldo akun</span><p>Saldo, ekuitas, dan floating profit terkini, dikelompokkan menurut mata uang dan jenis akun.</p></div><span id="account-coverage" class="section-kicker"></span></div>
+    <div id="public-balance-groups" class="public-data-grid"><p class="chart-empty">Memuat laporan saldo MT5…</p></div>
+    <div class="section-heading" style="margin-top:28px"><div><span class="section-kicker">Riwayat MT5</span><p>Hasil terealisasi dihitung dari deal MT5 pada posisi yang sudah ditutup.</p></div></div>
+    <div id="public-performance-groups" class="public-data-grid"><p class="chart-empty">Memuat histori MT5…</p></div>
+    <div class="chart-card" style="margin-top:16px"><div class="chart-title"><span>Grafik hasil terealisasi kumulatif</span><label for="performance-group-select">Mata uang/akun</label><select id="performance-group-select" aria-label="Pilih grup grafik"></select></div><div id="chart-empty" class="chart-empty">Belum ada transaksi tertutup untuk ditampilkan.</div><svg id="pnl-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik hasil kumulatif berdasarkan riwayat transaksi MT5" hidden><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a9c5ac" stop-opacity=".22"/><stop offset="100%" stop-color="#a9c5ac" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><path id="chart-area" class="chart-area"/><path id="chart-line" class="chart-line"/><circle id="chart-point" class="chart-point" r="5"/></svg></div>
+    <p class="data-note" id="performance-note">Saldo dijumlahkan hanya dalam mata uang dan jenis akun yang sama; konversi antar mata uang tidak dilakukan. Nilai mengikuti laporan terakhir yang diterima dari MT5. Riwayat performa berasal dari transaksi yang tercatat di MT5, bukan dari sinyal, dan bukan jaminan kinerja mendatang.</p>
   </section>
 
   <section class="public-section" id="approach">
-    <div class="section-heading"><div><span class="section-kicker">Alur copy trading</span><h2>Dari sinyal hingga posisi tersalin.</h2><p>AI membantu menyusun informasi sinyal. Sistem memeriksa aturan, lalu EA MetaTrader menjalankan instruksi yang lolos dan menyinkronkan posisi ke akun follower.</p></div></div>
+    <div class="section-heading"><div><span class="section-kicker">Alur copy trading</span><h2>Dari sinyal hingga posisi tersalin.</h2><p>AI membantu menyusun informasi sinyal. EA MetaTrader menjalankan instruksi yang lolos, sementara posisi terbuka di akun utama termasuk entry manual disinkronkan ke akun Copy Trading.</p></div></div>
     <div class="approach-grid">
       <article class="approach-card"><span class="index">01 / SUMBER</span><h3>Pilih kanal sinyal</h3><p>Pesan dari kanal Telegram yang dipilih disaring untuk menemukan sinyal XAUUSD yang relevan.</p></article>
       <article class="approach-card"><span class="index">02 / ANALISIS AI</span><h3>Susun detail sinyal</h3><p>AI membantu mengenali arah, harga masuk, target, dan batas rugi sebelum instruksi diteruskan.</p></article>
-      <article class="approach-card"><span class="index">03 / OTOMASI MT5</span><h3>Eksekusi dan salin</h3><p>EA menjalankan instruksi sesuai pengaturan. Posisi yang dibuka EA utama dapat disalin ke akun follower.</p></article>
+      <article class="approach-card"><span class="index">03 / OTOMASI MT5</span><h3>Eksekusi dan salin</h3><p>EA menjalankan instruksi sesuai pengaturan. Posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading.</p></article>
     </div>
   </section>
 
@@ -177,17 +180,23 @@
   </section>
 
   <section class="closing"><div><h2>Copy trading otomatis dengan AI.</h2><p>Analisis sinyal, eksekusi MetaTrader, dan penyalinan posisi dalam satu alur.</p></div><a class="public-button secondary" href="/register">Buat akun klien</a></section>
-  <p class="risk-copy">Trading memiliki risiko kerugian. Kinerja historis bukan jaminan hasil di masa depan. Data pada halaman ini merupakan gabungan transaksi tertutup di akun sumber dan tidak mewakili hasil masing-masing akun follower.</p>
+  <p class="risk-copy">Trading memiliki risiko kerugian. Kinerja historis bukan jaminan hasil di masa depan. Ringkasan saldo dan riwayat pada halaman ini merupakan agregat laporan akun client MT5 yang terhubung, dikelompokkan menurut mata uang dan jenis akun.</p>
 </main>
 {% endblock %}
 {% block scripts %}
 <script>
 (() => {
-  const money = (value) => Number(value).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const balanceBox = document.querySelector("#public-balance-groups");
+  const performanceBox = document.querySelector("#public-performance-groups");
+  const groupSelect = document.querySelector("#performance-group-select");
+  let performanceGroups = [];
+  const money = (value, currency) => `${Number(value || 0).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2})} ${currency || ""}`.trim();
+  const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mode] || mode || "MT5");
+  const addText = (parent, tag, className, value) => { const el = document.createElement(tag); if (className) el.className = className; el.textContent = value; parent.append(el); return el; };
   const showChart = (curve) => {
     const svg = document.querySelector("#pnl-chart");
     const empty = document.querySelector("#chart-empty");
-    if (!curve.length) { empty.textContent = "Belum ada transaksi tertutup untuk ditampilkan."; return; }
+    if (!curve.length) { svg.hidden = true; empty.hidden = false; empty.textContent = "Belum ada transaksi tertutup untuk ditampilkan."; return; }
     const values = curve.map((point) => Number(point.pnl));
     const min = Math.min(0, ...values), max = Math.max(0, ...values);
     const spread = max - min || 1;
@@ -202,35 +211,57 @@
     document.querySelector("#chart-point").setAttribute("cy", coords.at(-1).y);
     empty.hidden = true; svg.hidden = false;
   };
-  fetch("/api/public/performance").then((response) => {
-    if (!response.ok) throw new Error("Data performa belum tersedia");
-    return response.json();
-  }).then((data) => {
-    document.querySelector("#registered-client-count").textContent = Number(data.registered_clients || 0).toLocaleString("id-ID");
-    const pnl = document.querySelector("#pnl-total");
-    if (!data.available) {
-      pnl.textContent = "Belum tersedia";
-      document.querySelector("#trade-count").textContent = "0";
-      document.querySelector("#win-loss-count").textContent = "Belum ada transaksi tertutup";
-      document.querySelector("#win-rate").textContent = "—";
-      document.querySelector("#pnl-updated").textContent = "BELUM ADA DATA";
-      document.querySelector("#chart-period").textContent = "Belum tersedia";
+  const renderChartForSelection = () => {
+    const group = performanceGroups[Number(groupSelect.value)];
+    showChart(group ? group.curve || [] : []);
+  };
+  groupSelect.addEventListener("change", renderChartForSelection);
+  async function refresh() {
+    try {
+      const response = await fetch("/api/public/performance", {cache:"no-store"});
+      if (!response.ok) throw new Error("Data performa belum tersedia");
+      const data = await response.json();
+      document.querySelector("#registered-client-count").textContent = Number(data.registered_clients || 0).toLocaleString("id-ID");
+      document.querySelector("#pnl-updated").textContent = data.updated_at ? `LAPORAN MT5 ${new Date(data.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB` : "BELUM ADA LAPORAN MT5";
+      document.querySelector("#account-coverage").textContent = `${Number(data.accounts_reporting || 0)} dari ${Number(data.accounts_total || 0)} akun punya laporan`;
+
+      balanceBox.replaceChildren();
+      for (const group of data.balance_groups || []) {
+        const card = document.createElement("article"); card.className = "public-data-card";
+        addText(card, "span", "section-kicker", `SALDO ${modeLabel(group.trade_mode)} · ${group.currency}`);
+        addText(card, "strong", "public-data-value", money(group.balance, group.currency));
+        addText(card, "p", "", `Ekuitas ${money(group.equity, group.currency)}`);
+        addText(card, "p", "", `Floating ${money(group.floating_profit, group.currency)}`);
+        addText(card, "small", "", `${group.online_accounts} dari ${group.reported_accounts} akun melapor aktif · diperbarui ${group.updated_at ? new Date(group.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) + " WIB" : "waktu tidak tersedia"}`);
+        balanceBox.append(card);
+      }
+      if (!balanceBox.childElementCount) addText(balanceBox, "p", "chart-empty", "Saldo akan tampil setelah EA Copy Trading mengirim data dari MT5.");
+
+      performanceGroups = data.performance_groups || [];
+      performanceBox.replaceChildren();
+      groupSelect.replaceChildren();
+      performanceGroups.forEach((group, index) => {
+        const card = document.createElement("article"); card.className = "public-data-card";
+        addText(card, "span", "section-kicker", `PERFORMA ${modeLabel(group.trade_mode)} · ${group.currency}`);
+        const pnl = addText(card, "strong", "public-data-value", money(group.realized_pnl, group.currency));
+        pnl.classList.toggle("pnl-positive", group.realized_pnl > 0);
+        pnl.classList.toggle("pnl-negative", group.realized_pnl < 0);
+        addText(card, "p", "", `Hasil terealisasi · ${group.closed_trades} transaksi ditutup`);
+        addText(card, "small", "", `${group.wins} menang · ${group.losses} kalah · ${group.break_even} impas · tingkat kemenangan ${group.win_rate}%`);
+        performanceBox.append(card);
+        const option = document.createElement("option"); option.value = String(index); option.textContent = `${modeLabel(group.trade_mode)} · ${group.currency}`; groupSelect.append(option);
+      });
+      if (!performanceBox.childElementCount) addText(performanceBox, "p", "chart-empty", "Belum ada transaksi tertutup yang dilaporkan oleh MT5.");
+      renderChartForSelection();
+    } catch (_) {
+      document.querySelector("#pnl-updated").textContent = "DATA MT5 TIDAK TERSEDIA";
+      balanceBox.replaceChildren(); addText(balanceBox, "p", "chart-empty", "Data saldo belum dapat dimuat.");
+      performanceBox.replaceChildren(); addText(performanceBox, "p", "chart-empty", "Data riwayat belum dapat dimuat.");
       showChart([]);
-      return;
     }
-    pnl.textContent = money(data.realized_pnl);
-    pnl.classList.toggle("pnl-positive", data.realized_pnl > 0);
-    pnl.classList.toggle("pnl-negative", data.realized_pnl < 0);
-    document.querySelector("#trade-count").textContent = data.closed_trades;
-    document.querySelector("#win-loss-count").textContent = `${data.wins} menang · ${data.losses} kalah`;
-    document.querySelector("#win-rate").textContent = data.wins + data.losses ? `${money(data.win_rate)}%` : "—";
-    document.querySelector("#pnl-updated").textContent = data.last_updated ? `PEMBARUAN ${new Date(data.last_updated).toLocaleDateString("id-ID")}` : "BELUM ADA DATA";
-    document.querySelector("#chart-period").textContent = `${data.curve.length} hari aktif`;
-    showChart(data.curve || []);
-  }).catch(() => {
-    document.querySelector("#chart-empty").textContent = "Data performa belum dapat dimuat.";
-    document.querySelector("#pnl-updated").textContent = "DATA TIDAK TERSEDIA";
-  });
+  }
+  refresh();
+  setInterval(() => { if (!document.hidden) refresh(); }, 10000);
 })();
 </script>
 {% endblock %}

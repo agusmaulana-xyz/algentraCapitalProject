@@ -1,4 +1,3 @@
-from collections import defaultdict
 import re
 from urllib.parse import urlsplit
 
@@ -10,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..config import PROJECT_ROOT, get_settings
 from ..database import get_db
-from ..models import ClientUser, Trade
+from ..models import ClientUser, MT5Account
+from ..mt5_performance import get_mt5_performance
 
 
 router = APIRouter(tags=["public"])
@@ -74,36 +74,11 @@ def _public_contact_context() -> dict[str, object]:
 @router.get("/api/public/performance")
 def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
     registered_clients = db.execute(select(func.count(ClientUser.id))).scalar_one()
-    rows = db.execute(
-        select(Trade.profit, Trade.result, Trade.closed_at)
-        .where(Trade.closed_at.is_not(None))
-        .order_by(Trade.closed_at.asc(), Trade.id.asc())
-    ).all()
-    wins = sum(1 for _, result, _ in rows if (result or "").upper() == "WIN")
-    losses = sum(1 for _, result, _ in rows if (result or "").upper() == "LOSS")
-    total_profit = sum(float(profit or 0.0) for profit, _, _ in rows)
-
-    daily: dict[str, float] = defaultdict(float)
-    for profit, _, closed_at in rows:
-        daily[closed_at.date().isoformat()] += float(profit or 0.0)
-    cumulative = 0.0
-    curve = []
-    for day, profit in sorted(daily.items()):
-        cumulative += profit
-        curve.append({"date": day, "pnl": round(cumulative, 2)})
-
-    decided = wins + losses
+    account_ids = list(db.execute(select(MT5Account.id)).scalars())
     return {
-        "available": bool(rows),
-        "scope": "aggregate",
+        **get_mt5_performance(db, account_ids),
+        "scope": "all_client_mt5_accounts",
         "registered_clients": registered_clients,
-        "closed_trades": len(rows),
-        "wins": wins,
-        "losses": losses,
-        "win_rate": round(wins / decided * 100.0, 2) if decided else 0.0,
-        "realized_pnl": round(total_profit, 2),
-        "curve": curve[-180:],
-        "last_updated": rows[-1][2].isoformat() if rows else None,
     }
 
 

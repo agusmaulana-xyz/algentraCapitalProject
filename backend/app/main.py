@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
-from .models import AppSetting, Signal
+from .models import AppSetting, Signal, utc_now
 from .routers import auth, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
 from .routers.mt5 import require_client_id
 from .signal_service import SignalService
@@ -27,6 +27,7 @@ from .security import (
     require_csrf,
 )
 from .stats_service import get_dashboard_stats
+from .time_utils import wib_iso
 
 
 @asynccontextmanager
@@ -226,7 +227,7 @@ async def dashboard_websocket(websocket: WebSocket) -> None:
                 "type": "dashboard_refresh",
                 "stats": stats,
                 "latest_signal_id": latest.id if latest else None,
-                "server_time": asyncio.get_running_loop().time(),
+                "server_time": wib_iso(utc_now()),
             })
             await asyncio.sleep(3)
     except WebSocketDisconnect:

@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .models import ClientUser, EAStatus, Signal, Trade
+from .time_utils import as_utc, wib_iso
 
 
 def calculate_trade_stats(trades: Iterable[Any]) -> dict[str, int | float]:
@@ -41,8 +42,7 @@ def get_dashboard_stats(db: Session) -> dict[str, int | float]:
     ea = db.get(EAStatus, 1)
     heartbeat = ea.last_heartbeat if ea else None
     if heartbeat is not None:
-        if heartbeat.tzinfo is None:
-            heartbeat = heartbeat.replace(tzinfo=timezone.utc)
+        heartbeat = as_utc(heartbeat)
         ea_online = bool(ea.active and (datetime.now(timezone.utc) - heartbeat).total_seconds() <= 90)
     else:
         ea_online = False
@@ -55,7 +55,7 @@ def get_dashboard_stats(db: Session) -> dict[str, int | float]:
         "signals_ignored": status_counts["IGNORED"],
         "active_clients": active_clients,
         "ea_online": ea_online,
-        "ea_last_heartbeat": heartbeat.isoformat() if heartbeat else None,
+        "ea_last_heartbeat": wib_iso(heartbeat),
         **trade_stats,
     }
 
