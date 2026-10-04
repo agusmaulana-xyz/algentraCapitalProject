@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -97,6 +98,11 @@ def read_settings(db: Session = Depends(get_db)) -> dict[str, object]:
 
 @router.put("/gemini-config")
 def update_gemini_config(payload: GeminiConfigUpdate) -> dict[str, object]:
+    if os.getenv("VERCEL") == "1":
+        raise HTTPException(
+            status_code=409,
+            detail="Atur GEMINI_API_KEY dan GEMINI_MODEL di Environment Variables Vercel, lalu redeploy.",
+        )
     env_path = PROJECT_ROOT / ".env"
     if not env_path.exists():
         raise HTTPException(status_code=409, detail="Buat file .env dari .env.example terlebih dahulu")

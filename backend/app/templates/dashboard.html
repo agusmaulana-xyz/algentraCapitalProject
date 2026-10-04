@@ -198,12 +198,20 @@ const $ = (selector) => document.querySelector(selector);
     });
 
     let socket;
+    let pollingTimer;
+    function startPolling() {
+      if (pollingTimer) return;
+      $("#connection").textContent="Realtime tidak tersedia; dashboard diperbarui berkala.";
+      pollingTimer=setInterval(()=>{if($("#auto-refresh").checked) refresh();},10000);
+    }
     function connectSocket() {
       const protocol=location.protocol==="https:"?"wss:":"ws:";
-      socket=new WebSocket(`${protocol}//${location.host}/ws`);
-      socket.onopen=()=>$("#connection").textContent="Realtime tersambung.";
+      socket=new WebSocket(protocol+"//"+location.host+"/ws");
+      const fallback=setTimeout(()=>{if(socket.readyState!==WebSocket.OPEN){startPolling();socket.close();}},8000);
+      socket.onopen=()=>{clearTimeout(fallback);if(pollingTimer){clearInterval(pollingTimer);pollingTimer=null;}$("#connection").textContent="Realtime tersambung.";};
       socket.onmessage=()=>{if($("#auto-refresh").checked) refresh();};
-      socket.onclose=()=>{$("#connection").textContent="Realtime terputus; mencoba sambung ulang…";setTimeout(connectSocket,3000);};
+      socket.onerror=()=>{clearTimeout(fallback);startPolling();};
+      socket.onclose=()=>{clearTimeout(fallback);if(!pollingTimer){$("#connection").textContent="Realtime terputus; mencoba sambung ulang…";setTimeout(connectSocket,3000);}};
     }
     refresh();
     loadSettings().catch((error)=>{ $("#settings-message").textContent=`Gagal memuat: ${error.message}`; });

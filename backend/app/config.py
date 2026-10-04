@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -44,9 +45,13 @@ class Settings(BaseSettings):
     contact_x: str | None = Field(default=None, validation_alias="CONTACT_X")
     contact_youtube: str | None = Field(default=None, validation_alias="CONTACT_YOUTUBE")
     contact_tiktok: str | None = Field(default=None, validation_alias="CONTACT_TIKTOK")
-    database_url: str = Field(
-        default="sqlite:///backend/data/app.db",
+    database_url: str | None = Field(
+        default=None,
         validation_alias="DATABASE_URL",
+    )
+    local_database_url: str = Field(
+        default="sqlite:///backend/data/app.db",
+        validation_alias="LOCAL_DATABASE_URL",
     )
 
     @model_validator(mode="after")
@@ -67,6 +72,14 @@ class Settings(BaseSettings):
             raise ValueError("GEMINI_MODEL cannot be empty")
         if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
+        if self.database_url and self.database_url.startswith("postgres://"):
+            self.database_url = "postgresql+psycopg://" + self.database_url.removeprefix("postgres://")
+        elif self.database_url and self.database_url.startswith("postgresql://"):
+            self.database_url = "postgresql+psycopg://" + self.database_url.removeprefix("postgresql://")
+        if os.getenv("VERCEL") == "1" and (
+            not self.database_url or not self.database_url.startswith("postgresql+psycopg://")
+        ):
+            raise ValueError("Vercel memerlukan DATABASE_URL PostgreSQL persisten; SQLite lokal tidak persisten di serverless")
         if self.ea_api_key is not None:
             ea_key = self.ea_api_key.get_secret_value()
             if len(ea_key) < 24:
@@ -81,6 +94,10 @@ class Settings(BaseSettings):
     @property
     def email_configured(self) -> bool:
         return all((self.email_smtp_host, self.email_smtp_username, self.email_smtp_password, self.email_from))
+
+    @property
+    def resolved_database_url(self) -> str:
+        return self.database_url or self.local_database_url
 
 
 @lru_cache

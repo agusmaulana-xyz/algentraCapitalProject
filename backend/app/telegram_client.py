@@ -58,12 +58,21 @@ class TelegramManager:
 
     @property
     def configured(self) -> bool:
-        return self.settings.telegram_api_id is not None and self.settings.telegram_api_hash is not None
+        # Vercel functions are request-scoped; the Telethon listener must run in
+        # a persistent process with a durable session file (for example, the
+        # Cloudflare Tunnel host).
+        return (
+            os.getenv("VERCEL") != "1"
+            and self.settings.telegram_api_id is not None
+            and self.settings.telegram_api_hash is not None
+        )
 
     def set_processor(self, processor: SignalService) -> None:
         self.processor = processor
 
     def _ensure_configured(self) -> None:
+        if os.getenv("VERCEL") == "1":
+            raise RuntimeError("Listener Telegram harus dijalankan di host persisten, bukan sebagai Vercel Function")
         if not self.configured:
             raise RuntimeError("TELEGRAM_API_ID dan TELEGRAM_API_HASH belum dikonfigurasi di .env")
 

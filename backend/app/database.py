@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 
 
 def _make_engine():
-    database_url = get_settings().database_url
+    database_url = get_settings().resolved_database_url
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     is_memory_database = database_url in {"sqlite://", "sqlite:///:memory:"}
     if database_url.startswith("sqlite:///"):

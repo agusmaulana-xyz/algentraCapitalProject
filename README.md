@@ -14,7 +14,40 @@ Layanan copy trading XAUUSD berbasis AI dengan FastAPI, SQLite, parser Gemini, k
 
 Kontak publik pada beranda diatur melalui `CONTACT_PERSON_NAME`, `CONTACT_WHATSAPP` (nomor dengan kode negara), `CONTACT_EMAIL`, dan URL resmi `CONTACT_INSTAGRAM`, `CONTACT_TELEGRAM`, `CONTACT_FACEBOOK`, `CONTACT_LINKEDIN`, `CONTACT_X`, `CONTACT_YOUTUBE`, atau `CONTACT_TIKTOK` di `.env`.
 
+## Akses publik melalui Cloudflare Tunnel
+
+Quick Tunnel untuk pengembangan membuat URL sementara pada domain trycloudflare.com. Untuk menggunakannya:
+
+1. Jalankan backend dengan run.bat atau ./run.sh.
+2. Buka terminal kedua dari folder proyek dan jalankan **cloudflared tunnel --url http://127.0.0.1:8000**.
+3. Buka URL HTTPS yang dicetak cloudflared. URL berhenti berlaku ketika proses tunnel dihentikan.
+
+Quick Tunnel ditujukan untuk pengembangan. Untuk domain tetap, buat named tunnel di Cloudflare, atur public hostname menuju http://127.0.0.1:8000, lalu jalankan **cloudflared tunnel run --token TOKEN_DARI_DASHBOARD** dengan token dari dashboard Cloudflare. Gunakan COOKIE_SECURE=true di .env untuk akses HTTPS produksi. Backend tetap mendengarkan di localhost; tunnel meneruskan trafik tanpa membuka port 8000 ke internet. Lihat [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) dan [panduan tunnel bernama](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/create-local-tunnel/).
+
+## Deploy ke Vercel
+
+Proyek menyediakan entrypoint FastAPI di index.py, daftar dependency di requirements.txt, dan file pendukung fungsi di vercel.json. Atur root proyek Vercel ke folder Algentra Capital. Vercel dapat dihubungkan ke Git atau dideploy dari folder ini dengan CLI.
+
+Vercel memerlukan PostgreSQL yang persisten. Buat database PostgreSQL terkelola, lalu tambahkan environment variables berikut di pengaturan project Vercel:
+
+- APP_SECRET_KEY: secret acak minimal 32 karakter.
+- ADMIN_USERNAME dan ADMIN_PASSWORD: akun admin, password minimal 12 karakter.
+- EA_API_KEY: secret acak minimal 24 karakter.
+- DATABASE_URL: URL database PostgreSQL, misalnya postgresql://user:password@host:5432/database?sslmode=require.
+- LOCAL_DATABASE_URL: untuk lokal saja, URL SQLite. Di Vercel variabel ini diabaikan.
+- COOKIE_SECURE=true.
+
+Tambahkan GEMINI_API_KEY, konfigurasi SMTP, dan CONTACT_* bila diperlukan. Isi rahasia lewat pengaturan Environment Variables Vercel, bukan file .env. Perubahan Gemini dari halaman Settings tidak tersedia di Vercel; atur GEMINI_API_KEY atau GEMINI_MODEL di Vercel lalu deploy ulang.
+
+SQLite hanya dipakai untuk lokal. Jika DATABASE_URL kosong, aplikasi memakai LOCAL_DATABASE_URL; di Vercel DATABASE_URL PostgreSQL wajib diisi. Skema database kosong dibuat otomatis saat aplikasi mulai, tetapi data dari SQLite lokal tidak dipindahkan otomatis. Untuk berbagi data antara Vercel dan host Cloudflare Tunnel, gunakan URL PostgreSQL yang sama pada DATABASE_URL di Vercel dan .env host.
+
+Vercel menjalankan request HTTP sebagai Functions, sehingga bukan tempat untuk proses listener Telegram yang harus terus hidup. Koneksi Telegram otomatis dinonaktifkan di Vercel. Jalankan aplikasi di mesin yang selalu aktif lewat Cloudflare Tunnel untuk menangani Telegram; pastikan host itu memakai PostgreSQL yang sama agar signal dan status EA terlihat dari Vercel. Dashboard menggunakan polling otomatis bila WebSocket tidak tersedia.
+
+Setelah environment variables disimpan, deploy preview dengan **vercel**, lalu deploy production dengan **vercel --prod**, atau hubungkan repository ke Vercel. Python deployment dipatok ke versi 3.12.
+
 ## Akses publik melalui Caddy
+
+Gunakan Caddy atau Cloudflare Tunnel untuk hostname publik yang sama.
 
 File `caddyFile` mengarahkan domain `algentracapital.my.id` ke backend lokal di `127.0.0.1:8000`. Caddy mengurus HTTPS otomatis untuk domain tersebut.
 
