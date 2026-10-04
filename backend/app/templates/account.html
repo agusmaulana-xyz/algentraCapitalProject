@@ -24,7 +24,7 @@
 
   <section>
     <h2>Akun yang terhubung</h2>
-    <p class="section-help">Hubungkan hingga 10 akun follower. Setiap akun memiliki token akses tersendiri.</p>
+    <p class="section-help">Hubungkan hingga 10 akun follower. Tanda hijau berarti token dan identitas akun berhasil diverifikasi oleh server dalam 30 detik terakhir, serta EA utama mengirim pembaruan dalam 20 detik terakhir. Tanda ini tidak memeriksa izin <code>AllowLiveTrading</code> atau <strong>Algo Trading</strong> di MT5.</p>
     <div id="accounts" class="grid"></div>
   </section>
 
@@ -41,6 +41,11 @@
       <li>Dari <strong>Navigator → Expert Advisors</strong>, pasang EA di chart. Isi <code>AccountToken</code> dengan token akun tersebut, pastikan <code>ServerURL</code> benar, lalu aktifkan <strong>Algo Trading</strong>.</li>
       <li>Pastikan EA utama Algentra aktif dan uji EA follower di akun demo. <code>AllowLiveTrading</code> nonaktif secara default. Atur <code>VolumeMultiplier</code> sesuai kebutuhan sebelum mengaktifkan trading live.</li>
     </ol>
+    <div class="notice-box" role="note" aria-label="Bantuan pesan status EA follower">
+      <h3>Arti pesan di chart MT5</h3>
+      <p><strong>HTTP -1 / ERROR 4006:</strong> EA belum mendapat jawaban dari server. Kode 4006 berarti MT5 menemukan data array yang tidak valid saat EA berjalan; pesan ini sendiri belum membuktikan token salah. Pastikan URL <code>ServerURL</code> sama dengan alamat yang diizinkan di <em>Allow WebRequest</em>. Jika masih muncul, kirim tangkapan tab <strong>Experts</strong> kepada dukungan. Jangan kirim token.</p>
+      <p><strong>LIVE COPYING OFF:</strong> EA follower belum diizinkan membuka posisi live. Periksa opsi <code>AllowLiveTrading</code> pada input EA. Pengaturan ini terpisah dari koneksi server; uji lebih dulu di akun demo.</p>
+    </div>
     <p class="notice-box">Akun follower harus memakai mode <strong>hedging</strong>. Volume salinan mengikuti volume sumber dikalikan <code>VolumeMultiplier</code>; nilainya tidak menyesuaikan ekuitas secara otomatis. Jika pembaruan dari akun utama terhenti lebih dari 20 detik, sinkronisasi berhenti. Posisi yang sudah terbuka tetap berada di MT5 jika EA berhenti.</p>
     <p class="section-help">Jangan bagikan token EA. Jika token hilang atau terekspos, pilih <strong>Rotasi token</strong> dan perbarui token di EA follower. Hanya posisi yang dibuat oleh EA utama Algentra yang disalin; posisi manual dan EA lain tidak ikut disinkronkan.</p>
   </section>
@@ -81,6 +86,19 @@ function addAccountCard(account) {
   const detail = document.createElement("p"); detail.textContent = `Follower · ${account.login} · ${account.server}`;
   const state = document.createElement("p"); state.className = "muted";
   state.textContent = `${account.active ? "Aktif" : "Nonaktif"} · Terakhir terhubung: ${account.last_seen_at ? new Date(account.last_seen_at).toLocaleString() : "belum ada koneksi"}`;
+  const statusLabels = {
+    ready: "Siap menyalin: EA follower dan sumber Algentra terhubung.",
+    waiting_for_source: "EA follower terhubung; menunggu pembaruan dari EA utama.",
+    offline: "EA follower belum terhubung. Periksa token, ServerURL, dan Allow WebRequest.",
+    disabled: "Akun follower ini dinonaktifkan."
+  };
+  const connectionStatus = statusLabels[account.connection_status] ? account.connection_status : "offline";
+  const connectionState = document.createElement("div");
+  connectionState.className = `account-state account-state--${connectionStatus}`;
+  connectionState.setAttribute("role", "status");
+  const dot = document.createElement("span"); dot.className = "account-state__dot"; dot.textContent = connectionStatus === "ready" ? "✓" : ""; dot.setAttribute("aria-hidden", "true");
+  const message = document.createElement("span"); message.textContent = statusLabels[connectionStatus];
+  connectionState.append(dot, message);
   const controls = document.createElement("div"); controls.className = "toolbar";
   const edit = document.createElement("button"); edit.className = "secondary"; edit.textContent = "Edit akun";
   edit.addEventListener("click", async () => {
@@ -98,7 +116,7 @@ function addAccountCard(account) {
   });
   const rotate = document.createElement("button"); rotate.className = "secondary"; rotate.textContent = "Rotasi token";
   rotate.addEventListener("click", async () => {
-    try { const result = await api(`/api/mt5/accounts/${account.id}/rotate-token`, {method:"POST"}); showToken(`Token baru: ${account.label}`, result.token, account.id); }
+    try { const result = await api(`/api/mt5/accounts/${account.id}/rotate-token`, {method:"POST"}); showToken(`Token baru: ${account.label}`, result.token, account.id); await loadAccounts(); }
     catch (error) { statusBox.textContent = error.message; }
   });
   const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger icon-button";
@@ -115,12 +133,12 @@ function addAccountCard(account) {
       await loadAccounts();
     } catch (error) { statusBox.textContent = error.message; }
   });
-  controls.append(edit, active, rotate, remove); card.append(title, detail, state, controls); accountsBox.append(card);
+  controls.append(edit, active, rotate, remove); card.append(title, detail, state, connectionState, controls); accountsBox.append(card);
 }
 
 async function loadAccounts() {
   try {
-    const accounts = await api("/api/mt5/accounts");
+    const accounts = await api("/api/mt5/accounts", {cache:"no-store"});
     accountsBox.replaceChildren();
     if (!accounts.length) { accountsBox.textContent = "Belum ada akun MT5."; return; }
     accounts.forEach(addAccountCard);
@@ -141,5 +159,6 @@ document.querySelector("#account-form").addEventListener("submit", async (event)
 });
 
 loadAccounts();
+setInterval(() => { if (!document.hidden) loadAccounts(); }, 5000);
 </script>
 {% endblock %}

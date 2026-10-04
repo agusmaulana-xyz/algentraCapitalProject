@@ -79,6 +79,17 @@
     .card span { display: block; color: var(--muted); font-size: 11px; }
     .card b { display: block; margin-top: 9px; font-size: 22px; font-variant-numeric: tabular-nums; }
     .card small { display: block; margin-top: 2px; color: #7790a4; font-size: 10px; }
+    .account-state { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 5px; font-size: 12px; }
+    .account-state__dot { display: grid; flex: 0 0 16px; width: 16px; height: 16px; place-items: center; border-radius: 50%; background: #829099; font-size: 11px; font-weight: 900; }
+    .account-state--ready .account-state__dot { color: #102318; background: #43d17d; box-shadow: 0 0 10px #43d17d88; }
+    .account-state--waiting_for_source .account-state__dot { background: #e7bb5b; }
+    .account-state--offline .account-state__dot { background: #e18181; }
+    .account-state--disabled .account-state__dot { background: #829099; }
+    .account-state--ready { color: #83e3a8; }
+    .account-state--waiting_for_source { color: #ead18f; }
+    .account-state--offline { color: #e8a2a2; }
+    .account-state--disabled { color: var(--muted); }
+    .account-last-seen { margin: 0 0 12px; color: var(--muted); font-size: 11px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 14px; }
     .table-wrap { overflow: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }

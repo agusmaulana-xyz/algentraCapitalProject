@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
@@ -16,13 +16,38 @@ from ..security import csrf_token, require_csrf
 router = APIRouter(prefix="/api/mt5", tags=["mt5"])
 MAX_ACCOUNTS_PER_USER = 10
 MASTER_SNAPSHOT_MAX_AGE = timedelta(seconds=20)
+FOLLOWER_ONLINE_MAX_AGE = timedelta(seconds=30)
 
 
 def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def _account_payload(account: MT5Account) -> dict[str, object]:
+def _master_source_is_online(db: Session, now: datetime | None = None) -> bool:
+    now = now or utc_now()
+    state = db.get(MasterCopyState, 1)
+    return bool(
+        state
+        and state.last_snapshot_at
+        and now - _aware(state.last_snapshot_at) <= MASTER_SNAPSHOT_MAX_AGE
+    )
+
+
+def _account_payload(account: MT5Account, master_online: bool = False) -> dict[str, object]:
+    now = utc_now()
+    follower_online = bool(
+        account.active
+        and account.last_seen_at
+        and now - _aware(account.last_seen_at) <= FOLLOWER_ONLINE_MAX_AGE
+    )
+    if not account.active:
+        connection_status = "disabled"
+    elif not follower_online:
+        connection_status = "offline"
+    elif not master_online:
+        connection_status = "waiting_for_source"
+    else:
+        connection_status = "ready"
     return {
         "id": account.id,
         "label": account.label,
@@ -31,6 +56,7 @@ def _account_payload(account: MT5Account) -> dict[str, object]:
         "role": "follower",
         "active": account.active,
         "last_seen_at": account.last_seen_at.isoformat() if account.last_seen_at else None,
+        "connection_status": connection_status,
         "created_at": account.created_at.isoformat(),
     }
 
@@ -80,7 +106,8 @@ def _account_from_token(
 @router.get("/accounts")
 def list_accounts(owner_id: int = Depends(require_client_id), db: Session = Depends(get_db)) -> list[dict[str, object]]:
     # The owner id is taken from the signed client session, never from query input.
-    return [_account_payload(row) for row in db.execute(
+    master_online = _master_source_is_online(db)
+    return [_account_payload(row, master_online) for row in db.execute(
         select(MT5Account).where(MT5Account.owner_id == owner_id).order_by(MT5Account.id.asc())
     ).scalars()]
 
@@ -111,7 +138,7 @@ def create_account(payload: MT5AccountCreate, owner_id: int = Depends(require_cl
         db.rollback()
         raise HTTPException(status_code=409, detail="Server dan nomor akun tersebut sudah terdaftar") from exc
     db.refresh(account)
-    return {"account": _account_payload(account), "token": token}
+    return {"account": _account_payload(account, _master_source_is_online(db)), "token": token}
 
 
 @router.post("/accounts/{account_id}/rotate-token")
@@ -119,6 +146,7 @@ def rotate_token(account_id: int, owner_id: int = Depends(require_client_id), db
     account = _owned_account(db, owner_id, account_id)
     token = secrets.token_urlsafe(32)
     account.token_hash = _token_hash(token)
+    account.last_seen_at = None
     db.commit()
     return {"token": token}
 
@@ -126,9 +154,11 @@ def rotate_token(account_id: int, owner_id: int = Depends(require_client_id), db
 @router.put("/accounts/{account_id}/active")
 def set_active(account_id: int, payload: MT5AccountActive, owner_id: int = Depends(require_client_id), db: Session = Depends(get_db)) -> dict[str, object]:
     account = _owned_account(db, owner_id, account_id)
+    if account.active != payload.active:
+        account.last_seen_at = None
     account.active = payload.active
     db.commit()
-    return _account_payload(account)
+    return _account_payload(account, _master_source_is_online(db))
 
 
 @router.put("/accounts/{account_id}")
@@ -142,13 +172,15 @@ def update_account(
     label, server, login = payload.label.strip(), payload.server.strip(), payload.login.strip()
     if not label or not server or not login:
         raise HTTPException(status_code=422, detail="Nama, server, dan nomor login wajib diisi")
+    if account.server.casefold() != server.casefold() or account.login != login:
+        account.last_seen_at = None
     account.label, account.server, account.login = label, server, login
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Server dan nomor akun tersebut sudah terdaftar") from exc
-    return _account_payload(account)
+    return _account_payload(account, _master_source_is_online(db))
 
 
 @router.delete("/accounts/{account_id}")
@@ -169,8 +201,7 @@ def follower_positions(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     now = utc_now()
-    state = db.get(MasterCopyState, 1)
-    fresh = bool(state and state.last_snapshot_at and now - _aware(state.last_snapshot_at) <= MASTER_SNAPSHOT_MAX_AGE)
+    fresh = _master_source_is_online(db, now)
     positions: list[dict[str, object]] = []
     if fresh:
         rows = db.execute(select(MasterCopyPosition).where(
