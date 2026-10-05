@@ -263,17 +263,18 @@
             <div class="panel-head"><span id="equity-label" class="section-kicker">Equity account</span></div>
             <strong id="equity-value" class="equity-value">&mdash;</strong>
             <div class="equity-stats">
+              <div class="stat"><small>Saldo MT5</small><b id="equity-balance">&mdash;</b></div>
               <div class="stat"><small>Floating profit</small><b id="equity-floating">&mdash;</b></div>
-              <div class="stat"><small>Terendah 5 jam</small><b id="equity-low">&mdash;</b></div>
-              <div class="stat"><small>Tertinggi 5 jam</small><b id="equity-high">&mdash;</b></div>
+              <div class="stat"><small>Terendah 24 jam</small><b id="equity-low">&mdash;</b></div>
+              <div class="stat"><small>Tertinggi 24 jam</small><b id="equity-high">&mdash;</b></div>
             </div>
             <span id="equity-updated" class="equity-updated"></span>
           </div>
           <div class="equity-chart">
-            <div class="chart-head"><span class="chart-caption">Realtime Equity</span><span id="equity-chart-delta" class="delta-chip" title="Perubahan equity dalam 5 jam terakhir"></span></div>
+            <div class="chart-head"><span class="chart-caption">Realtime Equity</span><span id="equity-chart-delta" class="delta-chip" title="Perubahan equity dalam 24 jam terakhir"></span></div>
             <div id="equity-chart-wrap" class="chart-wrap">
               <div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div>
-              <svg id="equity-chart" viewBox="0 0 640 200" role="img" aria-label="Grafik equity akun utama selama 5 jam terakhir" hidden>
+              <svg id="equity-chart" viewBox="0 0 640 200" role="img" aria-label="Grafik equity akun utama selama 24 jam terakhir" hidden>
                 <defs><linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".22"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
                 <rect id="equity-chart-gap" class="chart-gap" hidden/>
                 <path id="equity-chart-grid" class="chart-grid"/>
@@ -387,7 +388,8 @@
   let lastCurve = [];
   let liveCurve = [];
   let equityHistory = [];
-  const EQUITY_WINDOW_MS = 5 * 60 * 60 * 1000;
+  let activeEquityAccountKey = null;
+  const EQUITY_WINDOW_MS = 24 * 60 * 60 * 1000;
   const wrap = $("#equity-chart-wrap");
   const drawChart = () => {
     const curve = lastCurve;
@@ -457,6 +459,7 @@
       xLabels.append(label);
     }
   };
+  let equityCandles = [];
   const showEquityChart = (curve) => {
     lastCurve = curve;
     const svg = $("#equity-chart"), empty = $("#equity-chart-empty"), meta = $("#equity-chart-meta");
@@ -474,8 +477,11 @@
     const pct = values[0] ? change / values[0] * 100 : 0;
     delta.textContent = `${signed(change, currency ? ` ${currency}` : "")} (${signed(pct, "%")})`;
     delta.dataset.tone = tone(change);
-    low.textContent = money(Math.min(...values), currency);
-    high.textContent = money(Math.max(...values), currency);
+    const windowCandles = equityCandles.filter((candle) => new Date(candle.minute).getTime() >= Date.now() - EQUITY_WINDOW_MS);
+    const lows = windowCandles.map((candle) => Number(candle.low)).filter(Number.isFinite);
+    const highs = windowCandles.map((candle) => Number(candle.high)).filter(Number.isFinite);
+    low.textContent = money(Math.min(...values, ...lows), currency);
+    high.textContent = money(Math.max(...values, ...highs), currency);
     const hourOpts = { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" };
     const now = Date.now();
     $("#equity-chart-first").textContent = wib(new Date(now - EQUITY_WINDOW_MS), hourOpts);
@@ -566,22 +572,28 @@
   const renderPerformance = (data) => {
     $("#registered-client-count").textContent = Number(data.registered_clients || 0).toLocaleString("id-ID");
     const master = data.master_account || {};
+    if (master.account_key && master.account_key !== activeEquityAccountKey) {
+      activeEquityAccountKey = master.account_key;
+      liveCurve = [];
+    }
     const status = $("#master-account-status");
     if (master.online) setStatus(status, "EA utama online", "live");
     else if (master.available) setStatus(status, "Offline · equity terakhir", "warn");
     else setStatus(status, "Menunggu laporan", "");
 
-    const label = $("#equity-label"), value = $("#equity-value"), floating = $("#equity-floating"), updated = $("#equity-updated");
+    const label = $("#equity-label"), value = $("#equity-value"), balance = $("#equity-balance"), floating = $("#equity-floating"), updated = $("#equity-updated");
     if (master.available) {
       const fp = Number(master.floating_profit || 0);
       label.textContent = `Equity akun utama · ${modeLabel(master.trade_mode)}`;
       value.textContent = money(master.equity, master.currency);
+      balance.textContent = money(master.balance, master.currency);
       floating.textContent = money(fp, master.currency);
       floating.dataset.tone = tone(fp);
       updated.textContent = master.updated_at ? `Diperbarui ${wib(master.updated_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : "";
     } else {
       label.textContent = "Equity akun utama";
       value.textContent = "—";
+      balance.textContent = "—";
       floating.textContent = "—"; floating.removeAttribute("data-tone");
       updated.textContent = "Equity akan tampil setelah EA utama mengirim laporan akun MT5.";
     }
@@ -603,6 +615,7 @@
       const cutoff = Date.now() - EQUITY_WINDOW_MS;
       equityHistory = data.equity_curve.filter((point) => new Date(point.hour).getTime() >= cutoff);
     }
+    if (Array.isArray(data.equity_candles)) equityCandles = data.equity_candles;
     const points = new Map();
     for (const point of [...equityHistory, ...liveCurve]) {
       const timestamp = new Date(point.hour).getTime();

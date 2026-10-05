@@ -46,13 +46,15 @@ async def lifespan(_: FastAPI):
             ("max_open_trades", "3"),
             ("max_signal_age_seconds", "120"),
             ("max_market_deviation_pct", "5.0"),
-            ("allowed_symbols", "[]"),
+            ("allowed_symbols", '["XAUUSD"]'),
             ("allow_updates", "false"),
             ("symbol_mapping", '{"GOLD":"XAUUSD","XAU":"XAUUSD","EMAS":"XAUUSD"}'),
         )
         for key, value in defaults:
             if db.get(AppSetting, key) is None:
                 db.add(AppSetting(key=key, value=value))
+            elif key == "allowed_symbols" and db.get(AppSetting, key).value.strip() == "[]":
+                db.get(AppSetting, key).value = '["XAUUSD"]'
         db.commit()
     await telegram_manager.startup()
     try:

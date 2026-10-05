@@ -17,8 +17,6 @@ from ..models import (
     MasterCopyState,
     MT5MasterAccountState,
     MT5MasterEquityCandle,
-    MT5MasterEquityMinuteSample,
-    MT5MasterEquitySample,
     MT5MasterMarketState,
     utc_now,
 )
@@ -135,45 +133,32 @@ def public_performance_payload(db: Session, *, include_equity_curve: bool = True
         and now - as_utc(market_state.observed_at) <= timedelta(seconds=30)
     )
     equity_curve: list[dict[str, object]] = []
+    equity_candles: list[MT5MasterEquityCandle] = []
     if include_equity_curve:
-        cutoff = now - timedelta(hours=5)
-        minute_samples = list(db.execute(
-            select(MT5MasterEquityMinuteSample)
-            .where(MT5MasterEquityMinuteSample.observed_at >= cutoff)
-            .order_by(MT5MasterEquityMinuteSample.observed_at.asc())
-        ).scalars())
-        legacy_cutoff = (
-            minute_samples[0].sample_minute.replace(minute=0, second=0, microsecond=0)
-            if minute_samples
-            else now.replace(minute=0, second=0, microsecond=0)
-        )
-        legacy_samples = db.execute(
-            select(MT5MasterEquitySample)
+        latest_equity_account_key = db.execute(
+            select(MT5MasterEquityCandle.account_key)
+            .order_by(MT5MasterEquityCandle.observed_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        equity_candles = list(db.execute(
+            select(MT5MasterEquityCandle)
             .where(
-                MT5MasterEquitySample.sample_hour >= cutoff,
-                MT5MasterEquitySample.sample_hour < legacy_cutoff,
+                MT5MasterEquityCandle.account_key == latest_equity_account_key,
+                MT5MasterEquityCandle.minute_start >= now - timedelta(hours=24),
             )
-            .order_by(MT5MasterEquitySample.sample_hour.asc())
-        ).scalars()
-        equity_curve = [
-            {
-                "hour": wib_iso(sample.sample_hour),
-                "equity": round(sample.equity, 2),
-                "currency": sample.currency,
-            }
-            for sample in legacy_samples
-        ] + [
-            {
-                "hour": wib_iso(sample.observed_at),
-                "equity": round(sample.equity, 2),
-                "currency": sample.currency,
-            }
-            for sample in minute_samples
-        ]
+            .order_by(MT5MasterEquityCandle.minute_start.asc())
+        ).scalars()) if latest_equity_account_key else []
+        equity_curve = [{
+            "hour": wib_iso(candle.minute_start),
+            "equity": round(candle.close_equity, 2),
+            "currency": candle.currency,
+        } for candle in equity_candles]
     payload: dict[str, object] = {
         "master_account": {
             "available": master_account is not None,
             "online": master_online,
+            "account_key": latest_equity_account_key if include_equity_curve else None,
+            "balance": master_account.balance if master_account else None,
             "equity": master_account.equity if master_account else None,
             "floating_profit": master_account.floating_profit if master_account else None,
             "currency": master_account.currency if master_account else None,
@@ -186,21 +171,6 @@ def public_performance_payload(db: Session, *, include_equity_curve: bool = True
         "registered_clients": registered_clients,
     }
     if include_equity_curve:
-        latest_equity_account_key = db.execute(
-            select(MT5MasterEquityCandle.account_key)
-            .order_by(MT5MasterEquityCandle.observed_at.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-        equity_candles = list(db.execute(
-            select(MT5MasterEquityCandle)
-            .where(
-                MT5MasterEquityCandle.account_key == latest_equity_account_key,
-                MT5MasterEquityCandle.minute_start >= now - timedelta(hours=5),
-            )
-            .order_by(MT5MasterEquityCandle.minute_start.desc())
-            .limit(300)
-        ).scalars()) if latest_equity_account_key else []
-        equity_candles.reverse()
         current_minute = now.replace(second=0, microsecond=0)
         payload["equity_curve"] = equity_curve
         payload["equity_candles"] = [{
