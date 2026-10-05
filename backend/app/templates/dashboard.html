@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Operations Workspace | Algentra Capital{% endblock %}
 {% block extra_head %}
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" nonce="{{ request.state.csp_nonce }}"></script>
 {% endblock %}
 {% block content %}
-<main class="page-shell dashboard-page">
+<main id="main" tabindex="-1" class="page-shell dashboard-page">
     <div class="page-heading"><div><span class="eyebrow">Algentra Capital / Operations</span><h1>Operations workspace</h1><p class="page-description">Pantau sinyal, hasil eksekusi, performa trade, dan batas risiko dalam satu tampilan.</p></div><div class="heading-aside">Internal workspace · access controlled</div></div>
     <div class="cards">
       <div class="card"><span>Total signal</span><b id="signals-total">&mdash;</b><small>Semua sinyal yang tercatat.</small></div>
@@ -54,7 +54,7 @@
       <p class="section-help">Pengaturan ini memengaruhi validasi sinyal dan guard backend. Periksa semuanya sebelum mematikan Demo mode.</p>
       <p class="muted">API key Gemini disimpan di `.env` dan tidak dikirim kembali ke browser. Perubahan berlaku langsung untuk parser; Telegram API ID/HASH tetap di `.env`.</p>
       <form id="gemini-form" class="form-grid">
-        <label>Gemini API key<small class="field-help">Tempel key baru untuk mengganti key; kosongkan untuk mempertahankan konfigurasi sekarang.</small><input type="password" id="gemini-key" autocomplete="new-password" placeholder="Kosongkan agar tidak mengubah key"></label>
+        <p class="field-help">API key Gemini dikelola melalui environment layanan. Ubah key di konfigurasi layanan lalu mulai ulang aplikasi.</p>
         <label>Model<small class="field-help">ID model Gemini yang menangani klasifikasi dan ekstraksi signal.</small><input id="gemini-model-input" placeholder="gemini-3.8-flash"></label>
         <div><button type="submit">Simpan konfigurasi Gemini</button><p id="gemini-message" class="status"></p></div>
       </form>
@@ -81,7 +81,7 @@
   </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 const $ = (selector) => document.querySelector(selector);
     if (typeof Chart !== "undefined") { Chart.defaults.color = "#9bb0c2"; Chart.defaults.borderColor = "#253c50"; }
     let groupChart = null, profitChart = null;
@@ -192,8 +192,7 @@ const $ = (selector) => document.querySelector(selector);
     });
     $("#gemini-form").addEventListener("submit",async(event)=>{
       event.preventDefault(); const message=$("#gemini-message"),body={model:$("#gemini-model-input").value.trim()};
-      const key=$("#gemini-key").value; if(key) body.api_key=key;
-      try { const result=await api("/api/settings/gemini-config",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); $("#gemini-key").value=""; message.textContent=`Tersimpan. Model: ${result.gemini_model}; API key ${result.gemini_configured?"terpasang":"belum ada"}.`; await loadStatsAndSignals(); }
+      try { const result=await api("/api/settings/gemini-config",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); message.textContent=`Tersimpan. Model: ${result.gemini_model}; API key ${result.gemini_configured?"terpasang":"belum ada"}.`; await loadStatsAndSignals(); }
       catch(error) { message.textContent=`Gagal: ${error.message}`; }
     });
 

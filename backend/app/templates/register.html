@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Buat akun klien | Algentra Capital{% endblock %}
 {% block content %}
-<main class="page-shell login-shell">
+<main id="main" tabindex="-1" class="page-shell login-shell">
   <section class="login-card">
     <span class="eyebrow">REGISTRASI KLIEN / VERIFIKASI EMAIL</span>
     <h1>Buat akun klien</h1>
@@ -25,7 +25,7 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 const registerForm = document.querySelector("#register-form");
 const verifyForm = document.querySelector("#verify-form");
 const message = document.querySelector("#message");

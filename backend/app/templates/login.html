@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Masuk | Algentra Capital{% endblock %}
 {% block content %}
-<main class="page-shell login-shell">
+<main id="main" tabindex="-1" class="page-shell login-shell">
   <section class="login-card">
     <span class="eyebrow">PORTAL KLIEN / MASUK</span>
     <h1>Masuk ke akun</h1>
@@ -21,7 +21,7 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 async function submitLogin(event, endpoint, payload, messageId, destination) {
   event.preventDefault();
   const message = document.querySelector(messageId);

@@ -17,6 +17,7 @@ from ..models import (
     EAExecution,
     EAStatus,
     MT5MasterEquityCandle,
+    MT5MasterEquityMinuteSample,
     MT5MasterEquitySample,
     MasterCopyPosition,
     MasterCopyState,
@@ -27,6 +28,8 @@ from ..models import (
     Trade,
     utc_now,
 )
+from ..public_realtime import public_performance_hub
+from .public import public_performance_payload
 from ..schemas import CopySnapshotInput
 from ..risk_controls import risk_state
 from ..time_utils import wib_iso
@@ -114,6 +117,31 @@ def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(ge
                 equity_sample.currency = payload.currency.upper()
                 equity_sample.observed_at = now
 
+        sample_minute = now.replace(second=0, microsecond=0)
+        minute_sample = db.execute(
+            select(MT5MasterEquityMinuteSample).where(
+                MT5MasterEquityMinuteSample.sample_minute == sample_minute,
+            )
+        ).scalar_one_or_none()
+        if minute_sample is None:
+            db.add(MT5MasterEquityMinuteSample(
+                sample_minute=sample_minute,
+                equity=payload.equity,
+                currency=payload.currency.upper(),
+                observed_at=now,
+            ))
+            db.execute(delete(MT5MasterEquityMinuteSample).where(
+                MT5MasterEquityMinuteSample.sample_minute < now - timedelta(hours=48),
+            ))
+        else:
+            observed_at = minute_sample.observed_at
+            if observed_at.tzinfo is None:
+                observed_at = observed_at.replace(tzinfo=now.tzinfo)
+            if (now - observed_at).total_seconds() >= 15:
+                minute_sample.equity = payload.equity
+                minute_sample.currency = payload.currency.upper()
+                minute_sample.observed_at = now
+
         minute_start = now.replace(second=0, microsecond=0)
         account_key = f"{payload.terminal_login.strip()}@{payload.terminal_server.strip()}".upper()
         equity_candle = db.execute(
@@ -154,6 +182,12 @@ def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(ge
         )
         market_state.observed_at = now
     db.commit()
+    if public_performance_hub.connected:
+        live_payload = public_performance_payload(db, include_equity_curve=False)
+        if public_performance_hub.history_refresh_due():
+            live_payload = public_performance_payload(db)
+            public_performance_hub.mark_history_published()
+        public_performance_hub.publish(live_payload)
     return {"status": "ok", "positions": len(payload.positions), "last_snapshot_at": wib_iso(now)}
 
 

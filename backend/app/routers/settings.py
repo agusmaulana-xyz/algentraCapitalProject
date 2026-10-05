@@ -1,6 +1,5 @@
 import json
 import math
-import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -98,21 +97,17 @@ def read_settings(db: Session = Depends(get_db)) -> dict[str, object]:
 
 @router.put("/gemini-config")
 def update_gemini_config(payload: GeminiConfigUpdate) -> dict[str, object]:
-    if os.getenv("VERCEL") == "1":
+    if payload.api_key is not None:
         raise HTTPException(
             status_code=409,
-            detail="Atur GEMINI_API_KEY dan GEMINI_MODEL di Environment Variables Vercel, lalu redeploy.",
+            detail="Atur GEMINI_API_KEY di environment layanan, lalu mulai ulang aplikasi.",
         )
-    env_path = PROJECT_ROOT / ".env"
-    if not env_path.exists():
-        raise HTTPException(status_code=409, detail="Buat file .env dari .env.example terlebih dahulu")
-    if payload.api_key is not None:
-        if not payload.api_key.strip() or "\r" in payload.api_key or "\n" in payload.api_key:
-            raise HTTPException(status_code=422, detail="API key Gemini tidak valid")
-        set_key(str(env_path), "GEMINI_API_KEY", payload.api_key, quote_mode="always")
     if payload.model is not None:
+        env_path = PROJECT_ROOT / ".env"
+        if not env_path.exists():
+            raise HTTPException(status_code=409, detail="Model Gemini hanya dapat diubah bila file .env tersedia")
         set_key(str(env_path), "GEMINI_MODEL", payload.model, quote_mode="always")
-    get_settings.cache_clear()
+        get_settings.cache_clear()
     GeminiParser.reload_instances()
     config = get_settings()
     return {"gemini_configured": bool(config.gemini_api_key and config.gemini_api_key.get_secret_value()), "gemini_model": config.gemini_model}

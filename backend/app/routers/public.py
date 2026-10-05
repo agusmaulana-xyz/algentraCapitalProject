@@ -16,7 +16,7 @@ from ..models import (
     ClientUser,
     MasterCopyState,
     MT5MasterAccountState,
-    MT5MasterEquityCandle,
+    MT5MasterEquityMinuteSample,
     MT5MasterEquitySample,
     MT5MasterMarketState,
     utc_now,
@@ -83,8 +83,7 @@ def _public_contact_context() -> dict[str, object]:
     }
 
 
-@router.get("/api/public/performance")
-def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
+def public_performance_payload(db: Session, *, include_equity_curve: bool = True) -> dict[str, object]:
     registered_clients = db.execute(select(func.count(ClientUser.id))).scalar_one()
     master_account = db.get(MT5MasterAccountState, 1)
     master_copy_state = db.get(MasterCopyState, 1)
@@ -134,25 +133,43 @@ def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
         and market_state
         and now - as_utc(market_state.observed_at) <= timedelta(seconds=30)
     )
-    equity_samples = db.execute(
-        select(MT5MasterEquitySample)
-        .where(MT5MasterEquitySample.sample_hour >= now - timedelta(hours=24))
-        .order_by(MT5MasterEquitySample.sample_hour.asc())
-    ).scalars()
-    latest_equity_account_key = db.execute(
-        select(MT5MasterEquityCandle.account_key)
-        .order_by(MT5MasterEquityCandle.observed_at.desc())
-        .limit(1)
-    ).scalar_one_or_none()
-    equity_candles = list(db.execute(
-        select(MT5MasterEquityCandle)
-        .where(MT5MasterEquityCandle.account_key == latest_equity_account_key)
-        .order_by(MT5MasterEquityCandle.minute_start.desc())
-        .limit(60)
-    ).scalars()) if latest_equity_account_key else []
-    equity_candles.reverse()
-    current_minute = now.replace(second=0, microsecond=0)
-    return {
+    equity_curve: list[dict[str, object]] = []
+    if include_equity_curve:
+        cutoff = now - timedelta(hours=5)
+        minute_samples = list(db.execute(
+            select(MT5MasterEquityMinuteSample)
+            .where(MT5MasterEquityMinuteSample.observed_at >= cutoff)
+            .order_by(MT5MasterEquityMinuteSample.observed_at.asc())
+        ).scalars())
+        legacy_cutoff = (
+            minute_samples[0].sample_minute.replace(minute=0, second=0, microsecond=0)
+            if minute_samples
+            else now.replace(minute=0, second=0, microsecond=0)
+        )
+        legacy_samples = db.execute(
+            select(MT5MasterEquitySample)
+            .where(
+                MT5MasterEquitySample.sample_hour >= cutoff,
+                MT5MasterEquitySample.sample_hour < legacy_cutoff,
+            )
+            .order_by(MT5MasterEquitySample.sample_hour.asc())
+        ).scalars()
+        equity_curve = [
+            {
+                "hour": wib_iso(sample.sample_hour),
+                "equity": round(sample.equity, 2),
+                "currency": sample.currency,
+            }
+            for sample in legacy_samples
+        ] + [
+            {
+                "hour": wib_iso(sample.observed_at),
+                "equity": round(sample.equity, 2),
+                "currency": sample.currency,
+            }
+            for sample in minute_samples
+        ]
+    payload: dict[str, object] = {
         "master_account": {
             "available": master_account is not None,
             "online": master_online,
@@ -165,12 +182,27 @@ def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
         "market_quotes": market_quotes,
         "market_quotes_online": market_quotes_online,
         "market_quotes_reported_at": wib_iso(market_state.observed_at) if market_state else None,
-        "equity_curve": [{
-            "hour": wib_iso(sample.sample_hour),
-            "equity": round(sample.equity, 2),
-            "currency": sample.currency,
-        } for sample in equity_samples],
-        "equity_candles": [{
+        "registered_clients": registered_clients,
+    }
+    if include_equity_curve:
+        latest_equity_account_key = db.execute(
+            select(MT5MasterEquityCandle.account_key)
+            .order_by(MT5MasterEquityCandle.observed_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        equity_candles = list(db.execute(
+            select(MT5MasterEquityCandle)
+            .where(
+                MT5MasterEquityCandle.account_key == latest_equity_account_key,
+                MT5MasterEquityCandle.minute_start >= now - timedelta(hours=5),
+            )
+            .order_by(MT5MasterEquityCandle.minute_start.desc())
+            .limit(300)
+        ).scalars()) if latest_equity_account_key else []
+        equity_candles.reverse()
+        current_minute = now.replace(second=0, microsecond=0)
+        payload["equity_curve"] = equity_curve
+        payload["equity_candles"] = [{
             "minute": wib_iso(candle.minute_start),
             "open": round(candle.open_equity, 2),
             "high": round(candle.high_equity, 2),
@@ -179,9 +211,13 @@ def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
             "currency": candle.currency,
             "closed": as_utc(candle.minute_start) < current_minute,
             "observed_at": wib_iso(candle.observed_at),
-        } for candle in equity_candles],
-        "registered_clients": registered_clients,
-    }
+        } for candle in equity_candles]
+    return payload
+
+
+@router.get("/api/public/performance")
+def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
+    return public_performance_payload(db)
 
 
 @router.get("/musik.mp3", include_in_schema=False)

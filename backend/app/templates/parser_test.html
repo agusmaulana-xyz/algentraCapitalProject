@@ -4,7 +4,7 @@
 
 {% endblock %}
 {% block content %}
-<main class="page-shell">
+<main id="main" tabindex="-1" class="page-shell">
     <div class="page-heading"><div><span class="eyebrow">Signal lab</span><h1>Tes Parser Signal</h1><p class="page-description">Uji format pesan sebelum mengaktifkan whitelist. Hasil ini hanya validasi parser dan tidak mengirim order ke MT5.</p></div></div>
     <form id="parser-form">
       <label for="message">Pesan baru<small class="field-help">Tempel pesan signal asli; format rentang seperti 4100:::4093 atau 4000-4010 menjadi zona; zona mengesampingkan kata BUY NOW/SELL NOW.</small></label>
@@ -19,7 +19,7 @@
   </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 document.querySelector("#parser-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const output = document.querySelector("#result");

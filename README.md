@@ -7,7 +7,7 @@ Layanan copy trading berbasis AI dengan FastAPI, SQLite, parser Gemini, koneksi 
 1. Gunakan Python 3.11 atau lebih baru.
 2. Dari folder proyek, salin `.env.example` menjadi `.env`, lalu ganti `APP_SECRET_KEY` dengan nilai acak minimal 32 karakter, `ADMIN_PASSWORD` dengan password minimal 12 karakter, dan `EA_API_KEY` dengan nilai acak. Isi konfigurasi SMTP untuk mengaktifkan pendaftaran klien dan reset kata sandi melalui email.
 3. Buat virtual environment (`python -m venv .venv` di Windows atau `python3 -m venv .venv` di Linux/macOS), lalu pasang dependensi dengan `.venv\Scripts\python -m pip install -r backend/requirements.txt` di Windows atau `.venv/bin/python -m pip install -r backend/requirements.txt` di Linux/macOS.
-4. Jalankan `run.bat` di Windows atau `./run.sh` di Linux/macOS. Backend bind ke `127.0.0.1:8000` dan otomatis restart ketika file program di `backend` berubah.
+4. Jalankan `run.bat` untuk pengembangan. Backend bind ke `127.0.0.1:8000` dan memuat ulang saat kode berubah.
 5. Buka `http://127.0.0.1:8000/loginAdmin` untuk masuk sebagai admin. Klien masuk melalui `/login`, mendaftar dari `/register`, dan mereset kata sandi melalui `/forgot-password` setelah SMTP diisi.
 6. Isi `GEMINI_API_KEY` di `.env` untuk mengaktifkan Gemini. Model default `gemini-3.8-flash` dapat diganti lewat `GEMINI_MODEL`; regex fallback mati kecuali `ENABLE_REGEX_FALLBACK=true`.
 7. Untuk Telegram, isi `TELEGRAM_API_ID` dan `TELEGRAM_API_HASH` dari [my.telegram.org](https://my.telegram.org), lalu restart backend dan buka `/telegram-setup` setelah login admin.
@@ -24,40 +24,13 @@ Quick Tunnel untuk pengembangan membuat URL sementara pada domain trycloudflare.
 
 Quick Tunnel ditujukan untuk pengembangan. Untuk domain tetap, buat named tunnel di Cloudflare, atur public hostname menuju http://127.0.0.1:8000, lalu jalankan **cloudflared tunnel run --token TOKEN_DARI_DASHBOARD** dengan token dari dashboard Cloudflare. Gunakan COOKIE_SECURE=true di .env untuk akses HTTPS produksi. Backend tetap mendengarkan di localhost; tunnel meneruskan trafik tanpa membuka port 8000 ke internet. Lihat [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) dan [panduan tunnel bernama](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/create-local-tunnel/).
 
-## Deploy ke Vercel
+## Produksi di Windows Server
 
-Proyek menyediakan entrypoint FastAPI di index.py, daftar dependency di requirements.txt, dan file pendukung fungsi di vercel.json. Atur root proyek Vercel ke folder Algentra Capital. Vercel dapat dihubungkan ke Git atau dideploy dari folder ini dengan CLI.
+Gunakan satu Windows Server dengan Cloudflare Tunnel. Simpan `.env`, SQLite, sesi Telegram, dan backup di folder data persisten di luar folder kode; berikan akses folder hanya ke akun layanan. Atur `APP_ENV=production`, `COOKIE_SECURE=true`, dan `DATABASE_URL` ke jalur SQLite absolut, misalnya `sqlite:///D:/algentra-data/app.db`. Jangan gunakan jalur relatif karena layanan dapat dimulai dengan direktori kerja berbeda.
 
-Tambahkan environment variables berikut di pengaturan project Vercel:
+Pasang aplikasi sebagai Windows Service melalui NSSM atau Task Scheduler saat boot. Jalankan `run-service.bat` sebagai perintah layanan; ia bind ke `127.0.0.1:8000`, memakai satu worker, dan tidak mengaktifkan reload. Atur Cloudflare Tunnel ingress ke `http://127.0.0.1:8000`; jangan buka port 8000 ke jaringan. Aktifkan HSTS pada Cloudflare SSL/TLS Edge Certificates. Konfigurasikan rotasi log pada service manager.
 
-- APP_SECRET_KEY: secret acak minimal 32 karakter.
-- ADMIN_USERNAME dan ADMIN_PASSWORD: akun admin, password minimal 12 karakter.
-- EA_API_KEY: secret acak minimal 24 karakter.
-- DATABASE_URL: `sqlite:////tmp/algentra-capital/app.db`. Penyimpanan SQLite Vercel bersifat sementara dan tidak dibagi antar instance.
-- COOKIE_SECURE=true.
-
-Tambahkan GEMINI_API_KEY, konfigurasi SMTP, dan CONTACT_* bila diperlukan. Agar kontak ini tampil pada deployment Vercel, tambahkan CONTACT_PERSON_NAME, CONTACT_EMAIL, CONTACT_INSTAGRAM, CONTACT_TELEGRAM, CONTACT_TELEGRAM_ADMIN, CONTACT_TIKTOK, dan CONTACT_WEBSITE di Environment Variables. Isi rahasia lewat pengaturan Vercel, bukan file .env. Perubahan Gemini dari halaman Settings tidak tersedia di Vercel; atur GEMINI_API_KEY atau GEMINI_MODEL di Vercel lalu deploy ulang.
-
-Untuk lokal atau host Cloudflare Tunnel, gunakan `DATABASE_URL=sqlite:///backend/data/app.db`; berkas database dibuat otomatis di `backend/data/app.db`. Untuk Vercel, aplikasi memakai SQLite di `/tmp`, yang dapat hilang saat function dibuat ulang dan tidak tersinkron dengan database di komputer lokal. Data lama PostgreSQL tidak dipindahkan otomatis.
-
-Vercel menjalankan request HTTP sebagai Functions, sehingga bukan tempat untuk proses listener Telegram yang harus terus hidup. Koneksi Telegram otomatis dinonaktifkan di Vercel. Jalankan aplikasi di mesin yang selalu aktif lewat Cloudflare Tunnel untuk menangani Telegram. Karena SQLite pada host dan Vercel terpisah, data signal dan status EA tidak otomatis tersinkron di antara keduanya. Dashboard menggunakan polling otomatis bila WebSocket tidak tersedia.
-
-Setelah environment variables disimpan, deploy preview dengan **vercel**, lalu deploy production dengan **vercel --prod**, atau hubungkan repository ke Vercel. Python deployment dipatok ke versi 3.12.
-
-## Akses publik melalui Caddy
-
-Gunakan Caddy atau Cloudflare Tunnel untuk hostname publik yang sama.
-
-File `caddyFile` mengarahkan domain `algentracapital.my.id` ke backend lokal di `127.0.0.1:8000`. Caddy mengurus HTTPS otomatis untuk domain tersebut.
-
-1. Arahkan DNS A/AAAA domain ke alamat server publik dan izinkan koneksi masuk TCP port 80 dan 443 pada firewall/server. Pastikan record AAAA benar bila server belum memiliki IPv6.
-2. Di `.env` server produksi, isi `COOKIE_SECURE=true` agar cookie admin hanya dikirim lewat HTTPS. Jalankan backend dengan `run.bat` atau `./run.sh`; backend tetap bind ke loopback, hanya mempercayai header proxy dari Caddy lokal, dan restart otomatis saat kode di `backend` berubah.
-3. Dari folder proyek, jalankan Caddy dengan `caddy run --config caddyFile --adapter caddyfile`.
-4. Publik dapat membuka `https://algentracapital.my.id`. Jangan buka port 8000 ke internet; hanya port Caddy 80/443 yang perlu dapat diakses dari luar.
-
-Untuk EA MT5 yang berjalan pada komputer berbeda dari server, gunakan `https://algentracapital.my.id` sebagai `ServerURL` dan tambahkan URL yang sama ke daftar **Allow WebRequest**. URL `http://127.0.0.1:8000` hanya untuk EA dan backend yang berjalan pada komputer yang sama.
-
-Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpan sebagai hash bcrypt. Saat backend mulai, password admin di `.env` disinkronkan ke database, jadi perubahan password berlaku setelah server direstart. Endpoint dashboard memerlukan cookie sesi admin; gunakan login melalui halaman web terlebih dahulu.
+Database SQLite dibuat otomatis pada jalur yang ditentukan. Atur `BACKUP_DIR` pada environment layanan ke folder backup di disk/lokasi terpisah. Buat task harian Windows Task Scheduler yang menjalankan `run-backup.bat`; skrip menggunakan SQLite online backup API dan mempertahankan 14 salinan terakhir. Pulihkan dengan menyalin file backup saat aplikasi berhenti, lalu mulai ulang layanan. Uji restore sebelum peluncuran. Perubahan Gemini hanya menerima nama model dari dashboard; simpan API key di environment layanan.
 
 ## Endpoint M1
 

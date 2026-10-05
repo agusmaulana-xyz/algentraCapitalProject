@@ -1,101 +1,234 @@
 {% extends "base.html" %}
 {% block title %}Algentra Capital | Copy Trading Otomatis Berbasis AI{% endblock %}
 {% block extra_head %}
-<style>
-  .public-shell { position:relative; z-index:1; width:min(1240px,100%); margin:0 auto; padding:34px 26px 80px; }
-  .hero { position:relative; display:grid; grid-template-columns:1.08fr .92fr; align-items:center; min-height:510px; gap:34px; overflow:hidden; margin:10px 0 26px; padding:clamp(26px,5vw,62px); border:1px solid #34413d; border-radius:26px; background:linear-gradient(115deg,#121c20f2 0%,#141e25eF 54%,#18221eeb 100%); box-shadow:0 30px 80px #00000030; }
-  .hero::after { position:absolute; right:-150px; top:-190px; width:490px; height:490px; border:1px solid #a6c3ad18; border-radius:50%; content:""; box-shadow:0 0 0 45px #9eb9a208,0 0 0 100px #9eb9a205; pointer-events:none; }
-  .hero-copy { position:relative; z-index:1; max-width:650px; }
-  .hero h1 { max-width:640px; margin:13px 0 17px; font-size:clamp(38px,6vw,68px); font-weight:580; line-height:1.02; letter-spacing:-.055em; }
-  .hero h1 em { color:#b7cbbd; font-style:normal; }
-  .hero-text { max-width:570px; color:#aab5af; font-size:16px; line-height:1.75; }
-  .hero-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:26px; }
-  .public-button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 18px; border:1px solid #a8c2ae66; border-radius:9px; color:#101a15; background:linear-gradient(135deg,#c3d2c4,#92ac98); font-size:12px; font-weight:750; letter-spacing:.02em; }
-  .public-button.secondary { border-color:#47544d; color:#d5ddd6; background:#18221f; }
-  .public-button:hover { color:#101a15; filter:brightness(1.06); }
-  .hero-visual { position:relative; z-index:1; display:grid; min-height:340px; place-items:center; }
-  .signal-orbit { position:relative; display:grid; width:min(330px,70vw); aspect-ratio:1; place-items:center; border:1px solid #9bb69e30; border-radius:50%; background:radial-gradient(circle,#a4c0a50b 0 25%,transparent 25% 48%,#a4c0a509 49% 50%,transparent 51%); box-shadow:0 0 75px #92b39a0a,inset 0 0 70px #9cb29c08; }
-  .signal-orbit::before,.signal-orbit::after { position:absolute; inset:12%; border:1px solid #9bb69e20; border-radius:50%; content:""; }
-  .signal-orbit::after { inset:26%; border-color:#9bb69e28; }
-  .orbit-line { position:absolute; width:130%; height:1px; background:linear-gradient(90deg,transparent,#a8c4ad66,transparent); transform:rotate(-32deg); }
-  .orbit-core { z-index:1; display:grid; width:112px; height:112px; place-content:center; border:1px solid #b2c9b366; border-radius:29px; color:#dce8dc; background:linear-gradient(145deg,#293a31,#17232b); text-align:center; box-shadow:0 0 45px #a2c3a716,inset 0 0 28px #bacfb20c; }
-  .orbit-core b { font-size:26px; letter-spacing:.08em; }
-  .orbit-core small { color:#a0b1a4; font-size:8px; letter-spacing:.17em; }
-  .orbit-node { position:absolute; z-index:2; width:9px; height:9px; border:2px solid #0d1519; border-radius:50%; background:#bfd0b5; box-shadow:0 0 18px #b5cdb477; }
-  .orbit-node.one { top:17%; left:29%; }.orbit-node.two { right:13%; top:43%; }.orbit-node.three { bottom:16%; left:34%; }
-  .visual-caption { position:absolute; bottom:1%; color:#83928a; font-size:9px; letter-spacing:.14em; text-transform:uppercase; }
-  .public-section { margin:24px 0; padding:clamp(20px,3vw,34px); border:1px solid #2c3a39; border-radius:19px; background:linear-gradient(145deg,#121b21f2,#10181df2); }
-  #performance,#approach,#contact { scroll-margin-top:100px; }
-  .section-heading { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px; }
-  .section-heading h2 { margin:0 0 5px; font-size:clamp(22px,3vw,30px); font-weight:560; letter-spacing:-.035em; }
-  .section-heading p { max-width:650px; margin:0; color:#98a6a0; font-size:12px; }
-  .section-kicker { color:#a9c3af; font-size:9px; font-weight:750; letter-spacing:.18em; text-transform:uppercase; }
-  .perf-grid { display:grid; grid-template-columns:.82fr 1.18fr; gap:15px; }
-  .community-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:20px; overflow:hidden; margin:20px 0 28px; padding:22px 26px; border:1px solid #78967d55; border-radius:18px; background:radial-gradient(ellipse at 88% 0%,#a8c7a51c,transparent 42%),linear-gradient(110deg,#17231f,#111b20 65%,#18231f); box-shadow:0 18px 50px #00000024; }
-  .community-card::after { position:absolute; right:10%; top:-115px; width:230px; height:230px; border:1px solid #a9c8aa15; border-radius:50%; content:""; box-shadow:0 0 0 28px #a9c8aa08,0 0 0 58px #a9c8aa06; pointer-events:none; }
-  .community-emblem { position:relative; z-index:1; display:grid; width:62px; height:62px; place-items:center; border:1px solid #b7d0b47a; border-radius:19px; color:#d1e3d0; background:linear-gradient(145deg,#344b3b,#1c2b29); box-shadow:0 0 30px #a9c8aa16,inset 0 0 20px #bcd4b411; }
-  .community-emblem svg { width:32px; height:32px; }
-  .community-copy { position:relative; z-index:1; }
-  .community-copy .section-kicker { color:#c2d8bc; }
-  .community-copy h2 { margin:5px 0 4px; color:#e3ece3; font-size:clamp(17px,2.2vw,22px); font-weight:570; letter-spacing:-.03em; }
-  .community-copy p { margin:0; color:#96a79c; font-size:11px; }
-  .community-count { position:relative; z-index:1; display:flex; align-items:baseline; gap:9px; min-width:145px; justify-content:flex-end; }
-  .community-count strong { color:#d6e8d2; font-size:clamp(40px,6vw,58px); font-weight:570; line-height:1; letter-spacing:-.06em; font-variant-numeric:tabular-nums; text-shadow:0 0 30px #a8c7a533; }
-  .community-count span { color:#a6b7a8; font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
-  .chart-card { min-height:300px; padding:18px 18px 12px; border:1px solid #2e3d39; border-radius:13px; background:#111a20; }
-  .chart-title { display:flex; justify-content:space-between; color:#a4b1aa; font-size:10px; }
-  .chart-title b { color:#d9e2da; font-weight:600; }
-  #equity-chart { display:block; width:100%; height:235px; margin-top:16px; overflow:visible; }
-  #equity-chart-empty[hidden],#equity-chart[hidden] { display:none; }
-  .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.equity-axis-label { fill:#819089; font-size:9px; text-anchor:end; }.equity-candle-wick { stroke-width:1.5; }.equity-candle-body { stroke-width:.7; }.equity-candle--up { stroke:#29bf88; fill:#29bf88; }.equity-candle--down { stroke:#f06a6a; fill:#f06a6a; }.equity-candle--flat { stroke:#a2b0aa; fill:#a2b0aa; }
-  .chart-empty { display:grid; height:235px; place-items:center; color:#82918a; font-size:12px; text-align:center; }
-  .public-data-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); gap:12px; }
-  .public-data-card { min-width:0; padding:17px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
-  .public-data-card p { margin:9px 0 0; color:#aab5ae; font-size:11px; }
-  .public-data-card small { display:block; margin-top:9px; color:#819089; font-size:10px; line-height:1.55; }
-  .public-data-value { display:block; margin-top:10px; color:#dce6dc; font-size:clamp(21px,3vw,31px); font-weight:570; letter-spacing:-.035em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-  .public-data-card--equity { grid-column:1/-1; padding:clamp(20px,4vw,34px); background:radial-gradient(ellipse at 88% 0%,#a8c7a51c,transparent 45%),linear-gradient(110deg,#17231f,#111b20 65%,#18231f); }
-  .public-data-card--equity .public-data-value { font-size:clamp(36px,7vw,62px); }
-  .quote-card { min-width:0; padding:16px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
-  .quote-card strong { display:block; margin-top:9px; color:#dce6dc; font-size:clamp(20px,3vw,27px); font-variant-numeric:tabular-nums; letter-spacing:-.035em; }
-  .quote-pair { display:flex; justify-content:space-between; gap:8px; margin-top:10px; color:#aab5ae; font-size:10px; }
-  .quote-card small { display:block; margin-top:8px; color:#819089; font-size:10px; }
-  .chart-axis-labels { display:flex; justify-content:space-between; color:#819089; font-size:10px; }
-  .data-note { margin:15px 0 0; padding:12px 14px; border:1px solid #3b463b; border-left:2px solid #a5b693; border-radius:8px; color:#aab4aa; background:#191f1a; font-size:11px; line-height:1.65; }
-  .approach-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-  .approach-card { min-height:155px; padding:18px; border:1px solid #2e3b38; border-radius:12px; background:#141e23; }
-  .approach-card .index { color:#b5c6ad; font-size:10px; letter-spacing:.12em; }
-  .approach-card h3 { margin:15px 0 7px; color:#e1e8e2; font-size:15px; font-weight:590; }
-  .approach-card p { margin:0; color:#93a19a; font-size:11px; line-height:1.7; }
-  .contact-grid { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
-  .contact-card { min-height:150px; padding:19px; border:1px solid #2e3b38; border-radius:13px; background:#141e23; }
-  .contact-card h3 { margin:0 0 7px; color:#e1e8e2; font-size:14px; font-weight:620; }
-  .contact-card p { margin:0 0 13px; color:#93a19a; font-size:11px; line-height:1.7; }
-  .contact-person { color:#dce6dc!important; font-size:15px!important; font-weight:650; }
-  .contact-links { display:flex; flex-wrap:wrap; gap:9px; }
-  .contact-link { display:inline-flex; min-height:42px; align-items:center; gap:9px; padding:7px 12px; border:1px solid #42534a; border-radius:8px; color:#cbdace; background:#19241f; font-size:11px; font-weight:700; }
-  .contact-link svg { width:17px; height:17px; flex:none; }
-  .contact-link span { display:grid; gap:2px; }
-  .contact-link small { color:#92a39a; font-size:9px; font-weight:500; }
-  .contact-link:hover { border-color:#8da995; color:#e4efe7; }
-  .closing { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:22px; padding:28px 30px; border:1px solid #38443c; border-radius:15px; background:linear-gradient(100deg,#19241f,#121d23); }
-  .closing h2 { margin:0 0 5px; font-size:21px; font-weight:560; }.closing p { margin:0; color:#9eaaa3; font-size:12px; }
-  .risk-copy { max-width:880px; margin:14px auto 0; color:#75837e; font-size:10px; line-height:1.7; text-align:center; }
-  @media(max-width:850px) { .hero { grid-template-columns:1fr; min-height:auto; }.hero-visual { min-height:285px; }.perf-grid { grid-template-columns:1fr; }.approach-grid,.contact-grid { grid-template-columns:1fr; } }
-  @media(max-width:600px) { .public-shell { padding:20px 13px 48px; }.hero { gap:8px; padding:24px 20px; border-radius:18px; }.hero-visual { min-height:245px; }.signal-orbit { width:225px; }.orbit-core { width:88px; height:88px; border-radius:22px; }.community-card { grid-template-columns:auto minmax(0,1fr); gap:13px; padding:17px; }.community-emblem { width:49px; height:49px; border-radius:15px; }.community-emblem svg { width:26px; height:26px; }.community-count { grid-column:1/-1; justify-content:flex-start; padding-left:62px; }.community-count strong { font-size:43px; }.perf-summary { gap:7px; }.perf-metric { padding:13px; }.public-section { padding:19px 14px; }.closing { padding:20px; }.chart-title { flex-wrap:wrap; gap:8px; }.chart-title select { max-width:100%; } }
+<style nonce="{{ request.state.csp_nonce }}">
+  /* ---------- Tokens (mengikuti variabel base.html, dengan fallback) ---------- */
+  .public-shell {
+    --accent: #a9c5ac;
+    --accent-ink: #0f1a14;
+    --text: var(--ink, #e4ebe5);
+    --text-2: var(--muted, #9aa8a1);
+    --surface: var(--glass-surface, rgba(18, 27, 33, .88));
+    --surface-2: var(--glass-raised, rgba(25, 37, 31, .92));
+    --border: var(--glass-border, #2e3d39);
+    --radius: var(--radius-panel, 18px);
+    --shadow: var(--shadow-soft, 0 18px 50px rgba(0, 0, 0, .22));
+    --pos: #7fd3a0;
+    --neg: #f19a9a;
+    --warn: #e2c27a;
+    --line: color-mix(in srgb, var(--text) 22%, transparent);
+    position: relative; z-index: 1;
+    width: min(1200px, 100%); margin: 0 auto; padding: 36px 24px 80px;
+    color: var(--text); font-size: 15px; line-height: 1.6;
+  }
+  :root[data-theme="light"] .public-shell {
+    --accent: var(--action, #2f6f4f);
+    --accent-ink: #fff;
+    --pos: #18794e; --neg: #c0392b; --warn: #9a6b00;
+    --line: color-mix(in srgb, var(--text) 24%, transparent);
+  }
+  .public-shell a { text-decoration: none; }
+  .public-shell :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+  /* ---------- Elemen dasar ---------- */
+  .section-kicker { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  .hero, .public-section, .community-card, .approach-card, .contact-card, .closing {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); box-shadow: var(--shadow);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  }
+  .public-section { margin: 24px 0; padding: clamp(22px, 3.5vw, 36px); }
+  .section-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 22px; }
+  .section-heading h2 { margin: 6px 0 6px; font-size: clamp(24px, 3vw, 32px); font-weight: 600; line-height: 1.2; letter-spacing: -.03em; }
+  .section-heading p { max-width: 660px; margin: 0; color: var(--text-2); font-size: 14px; }
+  #performance, #approach, #contact { scroll-margin-top: 96px; }
+
+  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; color: var(--text-2); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .8; }
+  .status-pill[data-state="live"] { color: var(--pos); }
+  .status-pill[data-state="live"]::before { box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); }
+  .status-pill[data-state="warn"] { color: var(--warn); }
+
+  .public-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 22px; border: 1px solid var(--accent); border-radius: 10px; color: var(--accent-ink); background: var(--accent); font-size: 14px; font-weight: 700; transition: filter .2s ease, transform .2s ease; }
+  .public-button:hover { filter: brightness(1.08); transform: translateY(-1px); color: var(--accent-ink); }
+  .public-button.secondary { color: var(--text); background: var(--surface-2); border-color: var(--border); }
+  .public-button.secondary:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ---------- Hero ---------- */
+  .hero { position: relative; display: grid; grid-template-columns: 1.1fr .9fr; align-items: center; gap: 40px; min-height: 480px; overflow: hidden; margin: 8px 0 24px; padding: clamp(28px, 5vw, 60px); border-radius: 28px; }
+  .hero::after { position: absolute; right: -150px; top: -190px; width: 490px; height: 490px; border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 50%; content: ""; box-shadow: 0 0 0 45px color-mix(in srgb, var(--accent) 4%, transparent), 0 0 0 100px color-mix(in srgb, var(--accent) 2.5%, transparent); pointer-events: none; }
+  .hero-copy { position: relative; z-index: 1; max-width: 640px; }
+  .hero h1 { margin: 14px 0 18px; font-size: clamp(36px, 5.6vw, 62px); font-weight: 600; line-height: 1.05; letter-spacing: -.045em; }
+  .hero h1 em { color: var(--accent); font-style: normal; }
+  .hero-text { max-width: 560px; margin: 0; color: var(--text-2); font-size: 16px; line-height: 1.75; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .hero-visual { position: relative; z-index: 1; display: grid; min-height: 320px; place-items: center; }
+  .signal-orbit { position: relative; display: grid; width: min(320px, 70vw); aspect-ratio: 1; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 50%; }
+  .signal-orbit::before, .signal-orbit::after { position: absolute; inset: 13%; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 50%; content: ""; }
+  .signal-orbit::after { inset: 27%; border-color: color-mix(in srgb, var(--accent) 24%, transparent); }
+  .orbit-line { position: absolute; width: 130%; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 45%, transparent), transparent); transform: rotate(-32deg); }
+  .orbit-core { z-index: 1; display: grid; width: 116px; height: 116px; place-content: center; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 30px; background: var(--surface-2); color: var(--accent); text-align: center; box-shadow: 0 0 45px color-mix(in srgb, var(--accent) 14%, transparent); }
+  .orbit-core svg { display: block; width: 40px; height: 40px; margin: 0 auto 6px; }
+  .orbit-core small { color: var(--text-2); font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+  .orbit-node { position: absolute; z-index: 2; width: 10px; height: 10px; border: 2px solid var(--panel, #0d1519); border-radius: 50%; background: var(--accent); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 50%, transparent); }
+  .orbit-node.one { top: 17%; left: 29%; } .orbit-node.two { right: 13%; top: 43%; } .orbit-node.three { bottom: 16%; left: 34%; }
+  .visual-caption { position: absolute; bottom: 0; color: var(--text-2); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+
+  /* ---------- Komunitas ---------- */
+  .community-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 20px; margin: 0 0 24px; padding: 22px 26px; }
+  .community-emblem { display: grid; width: 60px; height: 60px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 18px; color: var(--accent); background: var(--surface-2); }
+  .community-emblem svg { width: 30px; height: 30px; }
+  .community-copy h2 { margin: 4px 0 2px; font-size: clamp(18px, 2.2vw, 22px); font-weight: 600; letter-spacing: -.02em; }
+  .community-copy p { margin: 0; color: var(--text-2); font-size: 13px; }
+  .community-count { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; min-width: 140px; }
+  .community-count strong { color: var(--accent); font-size: clamp(38px, 5.5vw, 54px); font-weight: 600; line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+  .community-count span { color: var(--text-2); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+
+  /* ---------- Performa ---------- */
+  .market-overview-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .panel { min-width: 0; padding: clamp(18px, 2.6vw, 28px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+  [data-tone="pos"] { color: var(--pos); } [data-tone="neg"] { color: var(--neg); }
+
+  .equity-layout { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: stretch; gap: clamp(22px, 4vw, 48px); }
+  .equity-info, .equity-chart { display: flex; flex-direction: column; min-width: 0; }
+  .equity-value { display: block; margin: 8px 0 18px; font-size: clamp(32px, 4.4vw, 46px); font-weight: 600; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .equity-stats { display: grid; }
+  .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); }
+  .stat:last-child { border-bottom: 1px solid var(--border); }
+  .stat small { color: var(--text-2); font-size: 13px; }
+  .stat b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .equity-updated { display: block; margin-top: 12px; color: var(--text-2); font-size: 12px; }
+
+  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+  .chart-caption { color: var(--text-2); font-size: 13px; font-weight: 600; }
+  .delta-chip { padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .delta-chip:empty { display: none; }
+  .chart-wrap { position: relative; flex: 1; min-height: 190px; margin-top: 12px; }
+  #equity-chart { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; color: var(--accent); }
+  #equity-chart[hidden], #equity-chart-empty[hidden], #equity-chart-meta[hidden], #equity-chart-gap[hidden], #equity-chart-gap-label[hidden] { display: none; }
+  .chart-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 6; fill: none; }
+  .chart-gap { fill: var(--surface); opacity: .48; }
+  .chart-gap-label { fill: var(--text-2); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
+  .chart-axis-label { fill: var(--text-2); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .chart-line { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-point { fill: currentColor; stroke: var(--panel, #16211c); stroke-width: 4; }
+  .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; color: var(--text-2); font-size: 14px; text-align: center; }
+  .chart-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--text-2); font-size: 12px; }
+
+  .watchlist-panel .panel-head { margin-bottom: 12px; }
+  .quote-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .quote-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  .quote-symbol { display: flex; align-items: center; gap: 9px; }
+  .live-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--text-2); opacity: .5; }
+  .quote-card.is-live .live-dot { background: var(--pos); opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--pos) 22%, transparent); }
+  .quote-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--text-2); font-size: 12px; }
+  .quote-line strong { color: var(--text); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .quote-empty { color: var(--text-2); font-size: 13px; }
+  .quote-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .quote-meta .quote-age { white-space: nowrap; }
+  .quote-line strong.tick-up { animation: tick-up 1.1s ease-out; }
+  .quote-line strong.tick-down { animation: tick-down 1.1s ease-out; }
+  @keyframes tick-up { 0% { color: var(--pos); background: color-mix(in srgb, var(--pos) 18%, transparent); } 100% { background: transparent; } }
+  @keyframes tick-down { 0% { color: var(--neg); background: color-mix(in srgb, var(--neg) 18%, transparent); } 100% { background: transparent; } }
+  .quote-line strong { border-radius: 6px; padding: 0 3px; margin: 0 -3px; }
+
+  /* ---------- Cara kerja ---------- */
+  .approach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .approach-card { padding: 22px; background: var(--surface-2); }
+  .approach-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .approach-icon { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 12px; color: var(--accent); }
+  .approach-icon svg { width: 22px; height: 22px; }
+  .approach-card .index { color: var(--text-2); font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+  .approach-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  .approach-card p { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.7; }
+
+  /* ---------- Kontak ---------- */
+  .contact-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; gap: 16px; }
+  .contact-card { display: flex; flex-direction: column; padding: 22px; background: var(--surface-2); }
+  .contact-card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 600; }
+  .contact-card p { margin: 0 0 16px; color: var(--text-2); font-size: 14px; }
+  .contact-card p.contact-person { color: var(--text); font-size: 16px; font-weight: 600; }
+  .contact-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
+  .contact-link { display: flex; min-width: 0; min-height: 62px; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; color: var(--text); background: var(--surface); font-size: 14px; font-weight: 600; transition: border-color .2s ease, transform .2s ease; }
+  .contact-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .contact-link svg { width: 22px; height: 22px; flex: none; color: var(--accent); }
+  .contact-link span { display: grid; gap: 1px; min-width: 0; line-height: 1.3; }
+  .contact-link small { overflow: hidden; color: var(--text-2); font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Penutup ---------- */
+  .closing { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 22px; padding: 28px 32px; }
+  .closing h2 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+  .closing p { margin: 0; color: var(--text-2); font-size: 14px; }
+  .risk-copy { max-width: 860px; margin: 16px auto 0; color: var(--text-2); font-size: 12px; line-height: 1.7; text-align: center; }
+
+  /* ---------- Interaksi ---------- */
+  .approach-card, .contact-card, .community-card { transition: transform .2s ease, border-color .2s ease; }
+  .approach-card:hover, .contact-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  @media (prefers-reduced-motion: reduce) {
+    .quote-line strong.tick-up, .quote-line strong.tick-down { animation: none; }
+    .public-shell * { transition: none !important; }
+    .approach-card:hover, .contact-card:hover, .public-button:hover, .contact-link:hover { transform: none; }
+  }
+
+  /* ---------- Responsif ---------- */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; min-height: auto; gap: 16px; }
+    .hero-visual { min-height: 240px; }
+    .equity-layout { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+    .quote-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .approach-grid, .contact-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .public-shell { padding: 18px 14px 44px; font-size: 14px; }
+    .hero { margin: 4px 0 16px; padding: 22px 18px; border-radius: 20px; }
+    .hero h1 { font-size: clamp(30px, 8.5vw, 38px); }
+    .hero-text { font-size: 15px; line-height: 1.65; }
+    .hero-actions { margin-top: 20px; }
+    .hero-actions .public-button { flex: 1 1 100%; }
+    .hero-visual { min-height: 190px; }
+    .signal-orbit { width: min(170px, 52vw); }
+    .orbit-core { width: 70px; height: 70px; border-radius: 18px; }
+    .orbit-core svg { width: 26px; height: 26px; margin-bottom: 2px; }
+    .orbit-core small { font-size: 9px; }
+    .visual-caption { font-size: 10px; }
+    .public-section { margin: 16px 0; padding: 20px 16px; }
+    .section-heading { margin-bottom: 16px; }
+    .section-heading h2 { font-size: 23px; }
+    .community-card { grid-template-columns: auto minmax(0, 1fr); gap: 12px 14px; padding: 16px; }
+    .community-emblem { width: 48px; height: 48px; border-radius: 14px; }
+    .community-count { grid-column: 1 / -1; justify-content: flex-start; }
+    .panel { padding: 16px; }
+    .chart-wrap { min-height: 170px; }
+    .quote-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .quote-card { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "sym bid ask" "meta meta meta"; align-items: center; column-gap: 18px; row-gap: 6px; padding: 12px 14px; }
+    .quote-card .quote-symbol { grid-area: sym; }
+    .quote-card .quote-bid { grid-area: bid; }
+    .quote-card .quote-ask { grid-area: ask; }
+    .quote-card .quote-meta { grid-area: meta; padding-top: 8px; border-top: 1px solid var(--line); }
+    .quote-card .quote-empty { grid-column: 2 / -1; text-align: right; }
+    .quote-line { flex-direction: column; align-items: flex-end; gap: 2px; }
+    .quote-line strong { font-size: 16px; }
+    .contact-card { padding: 18px; }
+    .contact-links { grid-template-columns: minmax(0, 1fr); }
+    .closing { padding: 22px 18px; }
+    .closing .public-button { width: 100%; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<main class="public-shell">
+<main id="main" tabindex="-1" class="public-shell">
   <section class="hero">
     <div class="hero-copy">
-      <span class="section-kicker">AI · Copy trading otomatis · Kontrol risiko</span>
+      <span class="section-kicker">Analisis AI • Copy Trading • Kontrol Risiko</span>
       <h1>Sinyal dianalisis AI, eksekusi berjalan <em>otomatis.</em></h1>
-      <p class="hero-text">AI membantu membaca dan menyusun sinyal trading dari kanal Telegram pilihan. EA (robot MetaTrader 5) menjalankan instruksi sesuai simbol, pengaturan, dan batas risiko; semua posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading yang terhubung.</p>
+      <p class="hero-text">AI membantu membaca dan menyusun sinyal XAUUSD dari kanal Telegram pilihan. EA (robot MetaTrader 5) menjalankan instruksi sesuai pengaturan dan batas risiko; semua posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading yang terhubung.</p>
       <div class="hero-actions"><a class="public-button" href="#performance">Lihat performa</a><a class="public-button secondary" href="#approach">Pelajari cara kerja</a></div>
     </div>
     <div class="hero-visual" aria-hidden="true">
-      <div class="signal-orbit"><span class="orbit-line"></span><span class="orbit-node one"></span><span class="orbit-node two"></span><span class="orbit-node three"></span><div class="orbit-core"><b>AC</b><small>AI · MT5</small></div></div>
+      <div class="signal-orbit"><span class="orbit-line"></span><span class="orbit-node one"></span><span class="orbit-node two"></span><span class="orbit-node three"></span>
+        <div class="orbit-core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v5"/><path d="M16 14.639V21"/><path d="M20 10.656V21"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"/><path d="M4 18.463V21"/><path d="M8 14.656V21"/></svg><small>AI • MT5</small></div>
+      </div>
       <span class="visual-caption">Dari sinyal ke eksekusi otomatis</span>
     </div>
   </section>
@@ -119,20 +252,65 @@
   </section>
 
   <section class="public-section" id="performance">
-    <div class="section-heading"><div><span class="section-kicker">Indeks Algentra Capital</span><h2>INDEX EQUITY ALGENTRA CAPITAL</h2><p>Equity akun utama MT5 yang menjalankan Telegram Signal EA.</p></div><span id="master-account-status" class="section-kicker">Menunggu laporan EA utama</span></div>
-    <div id="master-account-equity" class="public-data-grid"><p class="chart-empty">Memuat equity akun utama MT5…</p></div>
-    <div class="section-heading" style="margin-top:28px"><div><span class="section-kicker">Watchlist harga</span><p>Harga Bid dan Ask terbaru yang dilaporkan terminal MT5 akun utama.</p></div><span id="market-status" class="section-kicker">Menunggu harga</span></div>
-    <div id="market-prices" class="public-data-grid"></div>
-    <div class="chart-card" style="margin-top:18px"><div class="chart-title"><span>Indeks equity · candlestick M1 / 60 candle terakhir</span><span><b id="equity-chart-currency"></b> <b id="equity-chart-status">MENUNGGU EQUITY</b></span></div><div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div><svg id="equity-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik candlestick M1 indeks equity akun utama" hidden><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><g id="equity-axis-labels"></g><g id="equity-candle-layer"></g></svg><div class="chart-axis-labels"><span id="equity-chart-first"></span><span id="equity-chart-latest"></span></div></div>
-    <p class="data-note">Setiap candle memakai perubahan equity akun utama MT5: open adalah laporan pertama dalam menit itu, high/low adalah nilai tertinggi/terendah selama menit berjalan, dan close adalah laporan terakhir. Candle hijau berarti close naik dari open; candle merah berarti turun. Candle berjalan diperbarui dari laporan EA, bukan dari harga emas atau feed pasar eksternal. Watchlist menampilkan semua simbol yang dikirim EA utama. Jika nama simbol broker memakai suffix, sesuaikan input <code>SymbolSuffix</code> pada EA.</p>
+    <div class="section-heading">
+      <div><span class="section-kicker">Performa</span><h2>Index Equity Algentra Capital</h2><p>Equity akun utama MT5 yang menjalankan Telegram Signal EA.</p></div>
+      <span id="master-account-status" class="status-pill">Menunggu laporan</span>
+    </div>
+    <div class="market-overview-grid">
+      <article class="panel equity-panel">
+        <div class="equity-layout">
+          <div class="equity-info">
+            <div class="panel-head"><span id="equity-label" class="section-kicker">Equity account</span></div>
+            <strong id="equity-value" class="equity-value">&mdash;</strong>
+            <div class="equity-stats">
+              <div class="stat"><small>Floating profit</small><b id="equity-floating">&mdash;</b></div>
+              <div class="stat"><small>Terendah 5 jam</small><b id="equity-low">&mdash;</b></div>
+              <div class="stat"><small>Tertinggi 5 jam</small><b id="equity-high">&mdash;</b></div>
+            </div>
+            <span id="equity-updated" class="equity-updated"></span>
+          </div>
+          <div class="equity-chart">
+            <div class="chart-head"><span class="chart-caption">Realtime Equity</span><span id="equity-chart-delta" class="delta-chip" title="Perubahan equity dalam 5 jam terakhir"></span></div>
+            <div id="equity-chart-wrap" class="chart-wrap">
+              <div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div>
+              <svg id="equity-chart" viewBox="0 0 640 200" role="img" aria-label="Grafik equity akun utama selama 5 jam terakhir" hidden>
+                <defs><linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".22"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+                <rect id="equity-chart-gap" class="chart-gap" hidden/>
+                <path id="equity-chart-grid" class="chart-grid"/>
+                <path id="equity-chart-area" fill="url(#equityFill)"/>
+                <path id="equity-chart-line" class="chart-line"/>
+                <circle id="equity-chart-point" class="chart-point" r="5"/>
+                <text id="equity-chart-gap-label" class="chart-gap-label" hidden>Riwayat belum tersedia</text>
+                <g id="equity-chart-y-labels" class="chart-axis-label"></g>
+                <g id="equity-chart-x-labels" class="chart-axis-label"></g>
+              </svg>
+            </div>
+            <div id="equity-chart-meta" class="chart-meta" hidden><span id="equity-chart-first"></span><span id="equity-chart-latest"></span></div>
+          </div>
+        </div>
+      </article>
+      <article class="panel watchlist-panel">
+        <div class="panel-head"><span class="section-kicker">Watchlist harga</span><span id="market-status" class="status-pill">Menunggu harga</span></div>
+        <div id="market-prices" class="quote-list"></div>
+      </article>
+    </div>
   </section>
 
   <section class="public-section" id="approach">
     <div class="section-heading"><div><span class="section-kicker">Alur copy trading</span><h2>Dari sinyal hingga posisi tersalin.</h2><p>AI membantu menyusun informasi sinyal. EA MetaTrader menjalankan instruksi yang lolos, sementara posisi terbuka di akun utama termasuk entry manual disinkronkan ke akun Copy Trading.</p></div></div>
     <div class="approach-grid">
-      <article class="approach-card"><span class="index">01 / SUMBER</span><h3>Pilih kanal sinyal</h3><p>Pesan dari kanal Telegram yang dipilih disaring untuk menemukan instruksi trading yang relevan.</p></article>
-      <article class="approach-card"><span class="index">02 / ANALISIS AI</span><h3>Susun detail sinyal</h3><p>AI membantu mengenali arah, harga masuk, target, dan batas rugi sebelum instruksi diteruskan.</p></article>
-      <article class="approach-card"><span class="index">03 / OTOMASI MT5</span><h3>Eksekusi dan salin</h3><p>EA menjalankan instruksi sesuai pengaturan. Posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading.</p></article>
+      <article class="approach-card">
+        <div class="approach-top"><span class="approach-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 3-20 8 6 3 2 6 3-4 5 4z"/><path d="m8 14 14-11"/></svg></span><span class="index">01 / SUMBER</span></div>
+        <h3>Pilih kanal sinyal</h3><p>Pesan dari kanal Telegram yang dipilih disaring untuk menemukan sinyal XAUUSD yang relevan.</p>
+      </article>
+      <article class="approach-card">
+        <div class="approach-top"><span class="approach-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16v4M17 18h4"/></svg></span><span class="index">02 / ANALISIS AI</span></div>
+        <h3>Susun detail sinyal</h3><p>AI membantu mengenali arah, harga masuk, target, dan batas rugi sebelum instruksi diteruskan.</p>
+      </article>
+      <article class="approach-card">
+        <div class="approach-top"><span class="approach-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></span><span class="index">03 / OTOMASI MT5</span></div>
+        <h3>Eksekusi dan salin</h3><p>EA menjalankan instruksi sesuai pengaturan. Posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading.</p>
+      </article>
     </div>
   </section>
 
@@ -143,7 +321,7 @@
         <h3>Narahubung</h3>
         {% if contact_person %}<p class="contact-person">{{ contact_person }}</p>{% endif %}
         <div class="contact-links">
-          {% if contact_whatsapp %}<a class="contact-link" href="https://wa.me/{{ contact_whatsapp }}" target="_blank" rel="noopener noreferrer">WhatsApp · +{{ contact_whatsapp }}</a>{% endif %}
+          {% if contact_whatsapp %}<a class="contact-link" href="https://wa.me/{{ contact_whatsapp }}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-.8.8c-.9-.4-1.6-1.1-2-2l.8-.8-1-2z"/></svg><span>WhatsApp<small>+{{ contact_whatsapp }}</small></span></a>{% endif %}
           {% if contact_email %}<a class="contact-link" href="mailto:{{ contact_email }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>Email<small>{{ contact_email }}</small></span></a>{% endif %}
           {% if not contact_whatsapp and not contact_email %}<a class="contact-link" href="/register">Buat akun klien</a><a class="contact-link" href="/login">Masuk</a>{% endif %}
         </div>
@@ -176,144 +354,289 @@
     </div>
   </section>
 
-  <section class="closing"><div><h2>Copy trading otomatis dengan AI.</h2><p>Analisis sinyal, eksekusi MetaTrader, dan penyalinan posisi dalam satu alur.</p></div><a class="public-button secondary" href="/register">Buat akun klien</a></section>
+  <section class="closing"><div><h2>Copy trading otomatis dengan AI.</h2><p>Analisis sinyal, eksekusi MetaTrader, dan penyalinan posisi dalam satu alur.</p></div><a class="public-button" href="/register">Buat akun klien</a></section>
   <p class="risk-copy">Trading memiliki risiko kerugian. Equity dan perubahan historis bukan jaminan hasil di masa depan. Data publik ini berasal dari akun utama MT5 yang menjalankan Telegram Signal EA.</p>
 </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (() => {
-  const equityBox = document.querySelector("#master-account-equity");
-  const pricesBox = document.querySelector("#market-prices");
-  const money = (value, currency) => `${Number(value || 0).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2})} ${currency || ""}`.trim();
-  const priceNumber = (value) => Number(value).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:5});
-  const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mode] || mode || "MT5");
-  const addText = (parent, tag, className, value) => { const el = document.createElement(tag); if (className) el.className = className; el.textContent = value; parent.append(el); return el; };
-  const showEquityChart = (candles, online) => {
-    const svg = document.querySelector("#equity-chart");
-    const empty = document.querySelector("#equity-chart-empty");
-    const layer = document.querySelector("#equity-candle-layer");
-    const axis = document.querySelector("#equity-axis-labels");
-    const status = document.querySelector("#equity-chart-status");
-    const validCandles = (candles || []).filter((candle) =>
-      [candle.open, candle.high, candle.low, candle.close].every((value) => Number.isFinite(Number(value)))
-    );
-    if (!validCandles.length) {
-      svg.hidden = true; empty.hidden = false;
-      layer.replaceChildren();
-      axis.replaceChildren();
-      status.textContent = "MENUNGGU EQUITY";
-      document.querySelector("#equity-chart-first").textContent = "";
-      document.querySelector("#equity-chart-latest").textContent = "";
+  const $ = (selector) => document.querySelector(selector);
+  const pricesBox = $("#market-prices");
+  const watchlist = ["XAUUSD", "EURUSD", "USDJPY", "GBPUSD"];
+  const digits = { XAUUSD: 2, EURUSD: 5, USDJPY: 3, GBPUSD: 5 };
+  const FRESH_MS = 120000;
+
+  const fmt = (value, min, max) => Number(value).toLocaleString("id-ID", { minimumFractionDigits: min, maximumFractionDigits: max });
+  const money = (value, currency) => `${fmt(value || 0, 2, 2)} ${currency || ""}`.trim();
+  const signed = (value, suffix = "") => `${value > 0 ? "+" : value < 0 ? "\u2212" : ""}${fmt(Math.abs(value), 2, 2)}${suffix}`;
+  const price = (symbol, value) => { const d = digits[symbol]; return fmt(value, d ?? 2, d ?? 5); };
+  const tone = (value) => (value > 0 ? "pos" : value < 0 ? "neg" : "");
+  const modeLabel = (mode) => ({ real: "Live", demo: "Demo", contest: "Kompetisi" }[mode] || mode || "MT5");
+  const wib = (value, opts) => `${new Date(value).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", ...opts })} WIB`;
+  const el = (tag, className, text, parent) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    if (parent) parent.append(node);
+    return node;
+  };
+  const setStatus = (node, text, state) => { node.textContent = text; node.dataset.state = state || ""; };
+
+  /* ---------- Grafik equity ---------- */
+  let lastCurve = [];
+  let liveCurve = [];
+  let equityHistory = [];
+  const EQUITY_WINDOW_MS = 5 * 60 * 60 * 1000;
+  const wrap = $("#equity-chart-wrap");
+  const drawChart = () => {
+    const curve = lastCurve;
+    if (!curve.length) return;
+    const svg = $("#equity-chart");
+    const rect = wrap.getBoundingClientRect();
+    const width = Math.round(rect.width) || 640;
+    const height = Math.round(rect.height) || 200;
+    const values = curve.map((point) => Number(point.equity));
+    const min = Math.min(...values), max = Math.max(...values);
+    const padding = Math.max((max - min) * 0.1, Math.max(Math.abs(max) * 0.002, 0.01));
+    const lower = min - padding, upper = max + padding, spread = upper - lower;
+    const padLeft = 8, padRight = Math.min(90, Math.max(72, width * 0.25));
+    const padTop = 14, padBottom = 30;
+    const plotH = height - padTop - padBottom;
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const times = curve.map((point) => new Date(point.hour).getTime());
+    const endTime = Date.now();
+    const startTime = endTime - EQUITY_WINDOW_MS;
+    const coords = values.map((value, index) => ({
+      x: padLeft + Math.max(0, Math.min(1, (times[index] - startTime) / EQUITY_WINDOW_MS)) * (width - padLeft - padRight),
+      y: padTop + (upper - value) * plotH / spread
+    }));
+    const gap = $("#equity-chart-gap"), gapLabel = $("#equity-chart-gap-label");
+    const gapWidth = coords[0].x - padLeft;
+    if (gapWidth > 110) {
+      gap.removeAttribute("hidden");
+      gap.setAttribute("x", padLeft); gap.setAttribute("y", padTop);
+      gap.setAttribute("width", gapWidth); gap.setAttribute("height", plotH);
+      gapLabel.removeAttribute("hidden");
+      gapLabel.setAttribute("x", padLeft + gapWidth / 2);
+      gapLabel.setAttribute("y", padTop + plotH / 2);
+      gapLabel.textContent = gapWidth > 220
+        ? `Belum ada data sebelum ${wib(curve[0].hour, { hour: "2-digit", minute: "2-digit" })}`
+        : "Belum ada data";
+    } else {
+      gap.setAttribute("hidden", ""); gapLabel.setAttribute("hidden", "");
+    }
+    const line = coords.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+    const base = height - padBottom;
+    const plotRight = width - padRight;
+    $("#equity-chart-grid").setAttribute("d", [0, 1, 2, 3].map((k) => `M${padLeft} ${(padTop + k * plotH / 3).toFixed(1)}H${plotRight}`).join(" "));
+    $("#equity-chart-line").setAttribute("d", line);
+    $("#equity-chart-area").setAttribute("d", `${line} L${coords.at(-1).x.toFixed(1)} ${base} L${coords[0].x.toFixed(1)} ${base} Z`);
+    $("#equity-chart-point").setAttribute("cx", coords.at(-1).x);
+    $("#equity-chart-point").setAttribute("cy", coords.at(-1).y);
+    const yLabels = $("#equity-chart-y-labels"), xLabels = $("#equity-chart-x-labels");
+    yLabels.replaceChildren(); xLabels.replaceChildren();
+    const svgNS = "http://www.w3.org/2000/svg";
+    [0, 1, 2].forEach((index) => {
+      const value = upper - spread * index / 2;
+      const label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", width - 4);
+      label.setAttribute("y", padTop + plotH * index / 2 + 4);
+      label.setAttribute("text-anchor", "end");
+      label.textContent = money(value, curve.at(-1).currency || "");
+      yLabels.append(label);
+    });
+    const timeTicks = width < 460 ? 3 : 5;
+    for (let index = 0; index < timeTicks; index++) {
+      const ratio = index / (timeTicks - 1);
+      const label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", padLeft + ratio * (plotRight - padLeft));
+      label.setAttribute("y", height - 5);
+      label.setAttribute("text-anchor", index === 0 ? "start" : index === timeTicks - 1 ? "end" : "middle");
+      label.textContent = wib(new Date(startTime + ratio * EQUITY_WINDOW_MS), { hour: "2-digit", minute: "2-digit" });
+      xLabels.append(label);
+    }
+  };
+  const showEquityChart = (curve) => {
+    lastCurve = curve;
+    const svg = $("#equity-chart"), empty = $("#equity-chart-empty"), meta = $("#equity-chart-meta");
+    const delta = $("#equity-chart-delta"), low = $("#equity-low"), high = $("#equity-high");
+    if (!curve.length) {
+      svg.setAttribute("hidden", ""); meta.hidden = true; empty.hidden = false;
+      delta.textContent = ""; delta.removeAttribute("data-tone");
+      low.textContent = "—"; high.textContent = "—";
       return;
     }
-    const low = Math.min(...validCandles.map((candle) => Number(candle.low)));
-    const high = Math.max(...validCandles.map((candle) => Number(candle.high)));
-    const padding = (high - low) * 0.08 || Math.max(Math.abs(high) * 0.001, 0.01);
-    const lower = low - padding, upper = high + padding, spread = upper - lower;
-    const left = 72, right = 704, top = 24, bottom = 186;
-    const step = (right - left) / validCandles.length;
-    const bodyWidth = Math.max(2, Math.min(9, step * 0.58));
-    const y = (value) => top + (upper - Number(value)) * (bottom - top) / spread;
-    const createSvgElement = (tag) => document.createElementNS("http://www.w3.org/2000/svg", tag);
-    layer.replaceChildren();
-    axis.replaceChildren();
-    const axisNumber = new Intl.NumberFormat("id-ID", {maximumFractionDigits:2});
-    [upper, upper - spread / 3, upper - spread * 2 / 3, lower].forEach((value, index) => {
-      const label = createSvgElement("text");
-      label.setAttribute("class", "equity-axis-label");
-      label.setAttribute("x", "64");
-      label.setAttribute("y", String(top + index * (bottom - top) / 3 + 3));
-      label.textContent = axisNumber.format(value);
-      axis.append(label);
+    empty.hidden = true; svg.removeAttribute("hidden"); meta.hidden = false;
+    const currency = curve.at(-1).currency || "";
+    const values = curve.map((point) => Number(point.equity));
+    const change = values.at(-1) - values[0];
+    const pct = values[0] ? change / values[0] * 100 : 0;
+    delta.textContent = `${signed(change, currency ? ` ${currency}` : "")} (${signed(pct, "%")})`;
+    delta.dataset.tone = tone(change);
+    low.textContent = money(Math.min(...values), currency);
+    high.textContent = money(Math.max(...values), currency);
+    const hourOpts = { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" };
+    const now = Date.now();
+    $("#equity-chart-first").textContent = wib(new Date(now - EQUITY_WINDOW_MS), hourOpts);
+    $("#equity-chart-latest").textContent = wib(new Date(now), { ...hourOpts, second: "2-digit" });
+    drawChart();
+  };
+  if (window.ResizeObserver) new ResizeObserver(drawChart).observe(wrap);
+
+  /* ---------- Watchlist ---------- */
+  const prevPrices = {};
+  let quoteState = { online: false };
+  const ageText = (ms) => {
+    if (!Number.isFinite(ms)) return "";
+    const sec = Math.max(0, Math.round(ms / 1000));
+    if (sec < 5) return "baru saja";
+    if (sec < 60) return `${sec} dtk lalu`;
+    if (sec < 3600) return `${Math.floor(sec / 60)} mnt lalu`;
+    return `${Math.floor(sec / 3600)} jam lalu`;
+  };
+  const isFresh = (updatedAt) => {
+    const age = updatedAt ? Date.now() - updatedAt : Infinity;
+    return quoteState.online && age <= FRESH_MS && age >= -60000;
+  };
+  /* Perbarui status live + umur harga tiap detik tanpa menunggu tick berikutnya */
+  const refreshFreshness = () => {
+    const cards = pricesBox.querySelectorAll(".quote-card[data-updated]");
+    let liveCount = 0;
+    cards.forEach((card) => {
+      const updatedAt = Number(card.dataset.updated);
+      const live = isFresh(updatedAt);
+      card.classList.toggle("is-live", live);
+      if (live) liveCount++;
+      const age = card.querySelector(".quote-age");
+      if (age) { const t = ageText(Date.now() - updatedAt); age.textContent = live || !t ? t : `Terakhir ${t}`; }
     });
-    validCandles.forEach((candle, index) => {
-      const open = Number(candle.open), close = Number(candle.close);
-      const x = left + (index + 0.5) * step;
-      const direction = close > open ? "up" : close < open ? "down" : "flat";
-      const group = createSvgElement("g");
-      group.setAttribute("class", `equity-candle equity-candle--${direction}`);
-      group.setAttribute("aria-label", `${new Date(candle.minute).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB · O ${open} H ${candle.high} L ${candle.low} C ${close}`);
-      const wick = createSvgElement("line");
-      wick.setAttribute("class", "equity-candle-wick");
-      wick.setAttribute("x1", x.toFixed(2)); wick.setAttribute("x2", x.toFixed(2));
-      wick.setAttribute("y1", y(candle.high).toFixed(2)); wick.setAttribute("y2", y(candle.low).toFixed(2));
-      const body = createSvgElement("rect");
-      body.setAttribute("class", "equity-candle-body");
-      body.setAttribute("x", (x - bodyWidth / 2).toFixed(2));
-      body.setAttribute("y", Math.min(y(open), y(close)).toFixed(2));
-      body.setAttribute("width", bodyWidth.toFixed(2));
-      body.setAttribute("height", Math.max(1.5, Math.abs(y(open) - y(close))).toFixed(2));
-      body.setAttribute("rx", "0.6");
-      const title = createSvgElement("title");
-      title.textContent = `${new Date(candle.minute).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB | O ${open} H ${candle.high} L ${candle.low} C ${close} ${candle.currency || ""}`;
-      group.append(wick, body, title);
-      layer.append(group);
-    });
-    const minuteLabel = (value) => `${new Date(value).toLocaleString("id-ID", {timeZone:"Asia/Jakarta", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"})} WIB`;
-    document.querySelector("#equity-chart-first").textContent = minuteLabel(validCandles[0].minute);
-    document.querySelector("#equity-chart-latest").textContent = minuteLabel(validCandles.at(-1).minute);
-    document.querySelector("#equity-chart-currency").textContent = validCandles.at(-1).currency || "";
-    status.textContent = online ? (validCandles.at(-1).closed ? "MENUNGGU CANDLE M1" : "LIVE M1") : "DATA TERAKHIR";
-    empty.hidden = true; svg.hidden = false;
+    if (quoteState.disconnected) return;
+    const status = $("#market-status");
+    if (liveCount) { setStatus(status, `${liveCount}/4 live`, "live"); status.title = "Harga diterima langsung dari EA"; }
+    else if (cards.length) {
+      if (!quoteState.online) {
+        setStatus(status, "EA offline", "warn");
+        status.title = "EA utama tidak mengirim laporan. Harga yang tampil adalah harga terakhir yang diterima.";
+      } else {
+        const oldest = Math.max(...[...cards].map((c) => Date.now() - Number(c.dataset.updated)));
+        setStatus(status, `${ageText(oldest).replace(" lalu", "")}`, "warn");
+        status.title = "Harga belum diperbarui dalam 2 menit terakhir. Pasar mungkin tutup.";
+      }
+    }
   };
   const renderQuotes = (quotes, reportOnline) => {
+    quoteState.online = !!reportOnline;
+    quoteState.disconnected = false;
+    const list = (quotes || []).map((quote) => ({ ...quote, key: String(quote.symbol || "").toUpperCase() }));
     pricesBox.replaceChildren();
-    const symbols = [...new Map((quotes || []).map((quote) => [quote.symbol, quote])).values()]
-      .sort((left, right) => left.symbol.localeCompare(right.symbol));
-    if (!symbols.length) {
-      addText(pricesBox, "p", "chart-empty", "Watchlist akan tampil saat EA utama melaporkan harga simbol broker.");
-    }
-    let liveCount = 0;
-    for (const quote of symbols) {
-      const card = document.createElement("article"); card.className = "quote-card";
-      addText(card, "span", "section-kicker", quote.symbol);
-      const fresh = quote && reportOnline && quote.updated_at && Date.now() - new Date(quote.updated_at).getTime() <= 120000 && Date.now() - new Date(quote.updated_at).getTime() >= -60000;
+    for (const symbol of watchlist) {
+      const quote = list.find((item) => item.key === symbol) || list.find((item) => item.key.startsWith(symbol));
+      const card = el("article", "quote-card");
+      const head = el("div", "quote-symbol", undefined, card);
+      el("i", "live-dot", undefined, head).setAttribute("aria-hidden", "true");
+      el("span", "section-kicker", symbol, head);
       if (quote) {
-        addText(card, "strong", "", priceNumber(quote.bid));
-        const pair = document.createElement("div"); pair.className = "quote-pair";
-        addText(pair, "span", "", `Bid ${priceNumber(quote.bid)}`);
-        addText(pair, "span", "", `Ask ${priceNumber(quote.ask)}`);
-        card.append(pair);
-        addText(card, "small", "", fresh ? `Tick MT5 ${new Date(quote.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB` : "Harga terakhir · tick sudah lama");
+        const bid = Number(quote.bid), ask = Number(quote.ask);
+        const updatedAt = quote.updated_at ? new Date(quote.updated_at).getTime() : NaN;
+        if (Number.isFinite(updatedAt)) card.dataset.updated = updatedAt;
+        const prev = prevPrices[symbol] || {};
+        const dir = (now, before) => (before === undefined || now === before ? "" : now > before ? "tick-up" : "tick-down");
+        const bidLine = el("div", "quote-line quote-bid", undefined, card);
+        el("span", "", "Bid", bidLine);
+        const bidEl = el("strong", dir(bid, prev.bid), price(symbol, bid), bidLine);
+        const askLine = el("div", "quote-line quote-ask", undefined, card);
+        el("span", "", "Ask", askLine);
+        const askEl = el("strong", dir(ask, prev.ask), price(symbol, ask), askLine);
+        prevPrices[symbol] = { bid, ask };
+        const meta = el("div", "quote-meta", undefined, card);
+        const d = digits[symbol] ?? 2;
+        el("span", "", `Spread ${fmt(Math.abs(ask - bid), d, d)}`, meta);
+        el("span", "quote-age", Number.isFinite(updatedAt) ? ageText(Date.now() - updatedAt) : "", meta);
+      } else {
+        el("span", "quote-empty", "Belum tersedia", card);
       }
-      if (fresh) liveCount++;
       pricesBox.append(card);
     }
-    document.querySelector("#market-status").textContent = liveCount ? `${liveCount} / ${symbols.length} HARGA TERBARU` : "MENUNGGU TICK MT5";
+    refreshFreshness();
   };
-  async function refresh() {
-    try {
-      const response = await fetch("/api/public/performance", {cache:"no-store"});
-      if (!response.ok) throw new Error("Data akun utama belum tersedia");
-      const data = await response.json();
-      document.querySelector("#registered-client-count").textContent = Number(data.registered_clients || 0).toLocaleString("id-ID");
-      const master = data.master_account || {};
-      const masterStatus = document.querySelector("#master-account-status");
-      masterStatus.textContent = master.online ? "EA UTAMA ONLINE" : master.available ? "EA UTAMA OFFLINE · EQUITY TERAKHIR" : "MENUNGGU LAPORAN EA UTAMA";
-      equityBox.replaceChildren();
-      if (master.available) {
-        const card = document.createElement("article"); card.className = "public-data-card public-data-card--equity";
-        addText(card, "span", "section-kicker", `EQUITY AKUN UTAMA ${modeLabel(master.trade_mode)} · ${master.currency}`);
-        addText(card, "strong", "public-data-value", money(master.equity, master.currency));
-        addText(card, "p", "", `Floating profit ${money(master.floating_profit, master.currency)}`);
-        addText(card, "small", "", `${master.online ? "Laporan Telegram Signal EA aktif" : "Menampilkan equity terakhir yang dilaporkan EA"} · diperbarui ${master.updated_at ? new Date(master.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) + " WIB" : "waktu tidak tersedia"}`);
-        equityBox.append(card);
-      } else {
-        addText(equityBox, "p", "chart-empty", "Equity utama akan tampil setelah Telegram Signal EA mengirim laporan akun MT5.");
-      }
-      renderQuotes(data.market_quotes, data.market_quotes_online);
-      showEquityChart(data.equity_candles || [], master.online);
-    } catch (_) {
-      document.querySelector("#master-account-status").textContent = "DATA AKUN UTAMA TIDAK TERSEDIA";
-      document.querySelector("#market-status").textContent = "DATA HARGA TIDAK TERSEDIA";
-      equityBox.replaceChildren(); addText(equityBox, "p", "chart-empty", "Data equity belum dapat dimuat.");
-      renderQuotes([], false);
-      showEquityChart([]);
+  setInterval(refreshFreshness, 1000);
+
+  /* ---------- Equity & performa ---------- */
+  const renderPerformance = (data) => {
+    $("#registered-client-count").textContent = Number(data.registered_clients || 0).toLocaleString("id-ID");
+    const master = data.master_account || {};
+    const status = $("#master-account-status");
+    if (master.online) setStatus(status, "EA utama online", "live");
+    else if (master.available) setStatus(status, "Offline · equity terakhir", "warn");
+    else setStatus(status, "Menunggu laporan", "");
+
+    const label = $("#equity-label"), value = $("#equity-value"), floating = $("#equity-floating"), updated = $("#equity-updated");
+    if (master.available) {
+      const fp = Number(master.floating_profit || 0);
+      label.textContent = `Equity akun utama · ${modeLabel(master.trade_mode)}`;
+      value.textContent = money(master.equity, master.currency);
+      floating.textContent = money(fp, master.currency);
+      floating.dataset.tone = tone(fp);
+      updated.textContent = master.updated_at ? `Diperbarui ${wib(master.updated_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : "";
+    } else {
+      label.textContent = "Equity akun utama";
+      value.textContent = "—";
+      floating.textContent = "—"; floating.removeAttribute("data-tone");
+      updated.textContent = "Equity akan tampil setelah EA utama mengirim laporan akun MT5.";
     }
-  }
-  refresh();
-  setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+    renderQuotes(data.market_quotes, data.market_quotes_online);
+    if (master.available && master.updated_at) {
+      const timestamp = new Date(master.updated_at).getTime();
+      const equity = Number(master.equity);
+      if (Number.isFinite(timestamp) && Number.isFinite(equity)) {
+        const latest = liveCurve.at(-1);
+        const latestTime = latest ? new Date(latest.hour).getTime() : 0;
+        if (!latest || timestamp - latestTime >= 1000 || equity !== Number(latest.equity)) {
+          liveCurve.push({ hour: master.updated_at, equity, currency: master.currency || "" });
+        }
+        const cutoff = Date.now() - EQUITY_WINDOW_MS;
+        liveCurve = liveCurve.filter((point) => new Date(point.hour).getTime() >= cutoff).slice(-180);
+      }
+    }
+    if (Array.isArray(data.equity_curve)) {
+      const cutoff = Date.now() - EQUITY_WINDOW_MS;
+      equityHistory = data.equity_curve.filter((point) => new Date(point.hour).getTime() >= cutoff);
+    }
+    const points = new Map();
+    for (const point of [...equityHistory, ...liveCurve]) {
+      const timestamp = new Date(point.hour).getTime();
+      if (Number.isFinite(timestamp) && Number.isFinite(Number(point.equity))) points.set(timestamp, point);
+    }
+    const curve = [...points.entries()].sort(([left], [right]) => left - right).map(([, point]) => point);
+    showEquityChart(curve);
+  };
+
+  /* ---------- Koneksi live ---------- */
+  const connectPerformance = () => {
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${protocol}//${location.host}/ws/public/performance`);
+    setStatus($("#market-status"), "Menghubungkan", "warn");
+    const heartbeat = setInterval(() => { if (socket.readyState === WebSocket.OPEN) socket.send("ping"); }, 25000);
+    socket.addEventListener("message", (event) => {
+      try { renderPerformance(JSON.parse(event.data)); }
+      catch (_) { setStatus($("#market-status"), "Data tidak valid", "warn"); }
+    });
+    socket.addEventListener("close", () => {
+      clearInterval(heartbeat);
+      quoteState.disconnected = true;
+      setStatus($("#market-status"), "Terputus · menyambung ulang", "warn");
+      setTimeout(connectPerformance, 3000);
+    });
+    socket.addEventListener("error", () => socket.close());
+  };
+
+  let resizeFrame = 0;
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => { if (lastCurve.length) showEquityChart(lastCurve); });
+  });
+  connectPerformance();
 })();
 </script>
 {% endblock %}
