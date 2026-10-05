@@ -1,6 +1,6 @@
 # Algentra Capital
 
-Layanan copy trading XAUUSD berbasis AI dengan FastAPI, SQLite, parser Gemini, koneksi Telegram, REST API untuk EA MT5, dashboard publik, dan workspace operasi privat.
+Layanan copy trading berbasis AI dengan FastAPI, SQLite, parser Gemini, koneksi Telegram, REST API untuk EA MT5, dashboard publik, dan workspace operasi privat.
 
 ## Menjalankan backend
 
@@ -78,13 +78,15 @@ Database SQLite dibuat otomatis di `backend/data/app.db`. Password admin disimpa
 
 Beranda publik Algentra Capital tersedia di `/`; bagian performa menampilkan P&L agregat aktual dari trade tertutup. Database saat ini belum mengaitkan trade dengan akun klien terpisah, jadi angka publik tidak diklaim sebagai hasil beberapa akun. Workspace privat tetap tersedia di `/dashboard` setelah login admin. Tabel signal terbaru dan log sistem menampilkan paling banyak lima baris.
 
+Grafik Indeks Equity publik membentuk candle M1 dari laporan equity akun utama MT5: open pertama, high/low selama menit berjalan, dan close terakhir. Halaman menampilkan hingga 60 candle dan memperbarui candle berjalan dari laporan EA. Grafik mulai terisi setelah EA mengirim data; data per jam lama tidak diubah menjadi candle menit sintetis.
+
 ## Dashboard admin
 
 Setelah login admin, buka `/dashboard` untuk melihat statistik signal dan trade, heartbeat EA, status Telegram/Gemini, signal terbaru, statistik grup, grafik profit, log, dan riwayat trade. WebSocket `/ws` mengirim pembaruan berkala; dashboard mencoba menyambung ulang otomatis. Log dan riwayat trade dapat difilter serta diekspor ke CSV. Halaman settings saat ini mengatur confidence, symbol default/mapping, demo mode, update signal, kill switch, dan konfigurasi Gemini. Chart.js dimuat dari CDN sehingga grafik memerlukan akses jaringan browser.
 
 Endpoint dashboard (semuanya memerlukan sesi admin): `GET /api/stats`, `GET /api/signals`, `GET /api/groups/stats`, `GET /api/logs`, `GET /api/logs/export.csv`, `GET /api/trades`, `GET /api/trades/export.csv`, `GET/PUT /api/settings`, `PUT /api/settings/gemini-config`, serta `WS /ws`.
 
-Sebelum memanggil Gemini, filter lokal hanya meneruskan pesan berformat kandidat signal XAUUSD; percakapan, laporan hasil trade, dan simbol non-XAU dilewati tanpa permintaan Gemini.
+Sebelum memanggil Gemini, filter lokal hanya meneruskan pesan yang memiliki arah transaksi dan harga; percakapan serta laporan hasil trade dilewati tanpa permintaan Gemini. Validasi simbol dan daftar simbol yang boleh dieksekusi dapat disesuaikan di settings dan EA.
 
 ## Uji login Telegram manual
 
@@ -100,13 +102,15 @@ Session Telethon berada di `backend/data/telegram_user.session`, tidak disajikan
 ## Memasang EA MT5
 
 1. Buat `EA_API_KEY` acak minimal 24 karakter di `.env`, lalu restart backend.
-2. Login sebagai admin dan unduh EA utama yang sudah dikompilasi dari `/downloads/TelegramSignalEA.ex5`.
-3. Di MT5, pilih **File > Open Data Folder**, buka `MQL5/Experts`, lalu salin file `.ex5` ke sana. File siap dipakai; tidak perlu compile di MetaEditor.
+2. Untuk rilis yang sudah dibangun, login sebagai admin dan unduh EA utama dari `/downloads/TelegramSignalEA.ex5`.
+3. Jika memakai perubahan source di repositori ini, buka `mt5/TelegramSignalEA.mq5` dengan MetaEditor dari MT5, tekan **F7** untuk compile, lalu salin `.ex5` hasil compile ke `MQL5/Experts`. File `.ex5` di repo/server harus dibangun ulang setelah source berubah.
 4. Di MT5, buka **Tools > Options > Expert Advisors**, aktifkan **Allow WebRequest for listed URL**, lalu tambahkan URL yang sama dengan `ServerURL` (default publik: `https://algentracapital.my.id`; untuk server lokal: `http://127.0.0.1:8000`).
 5. Pasang EA ke chart akun demo, isi `ApiKey` dengan nilai `EA_API_KEY`, gunakan `LotMode=LOT_RISK_PERCENT` dan `RiskPercent=1.0`, lalu biarkan `DemoMode=true`. Backend juga memulai `demo_mode=true`.
 6. Periksa tab Experts/Journal untuk heartbeat, status koneksi, dan laporan signal.
 
-`GET /api/ea/pending` mengklaim signal selama 90 detik. EA menyimpan penanda idempotensi per entry dan mengirim ulang laporan bila perlu agar polling/restart tidak membuat order ganda. Jika sinyal memiliki beberapa TP, EA membuat satu order untuk setiap TP. Semua order memakai SL dari sinyal; bila SL tidak tersedia, EA memakai `DefaultSLPoints`. Dengan `LotMode=LOT_RISK_PERCENT` dan `RiskPercent=1.0`, anggaran risiko seluruh entry dari satu sinyal adalah sekitar 1% ekuitas akun jika semua entry mencapai SL. Anggaran uang itu dibagi rata per entry, lalu lot tiap entry dihitung dari estimasi P/L MT5 antara harga entry dan SL serta dibulatkan ke bawah sesuai langkah lot broker. Batas `MaxOpenTrades` default EA adalah 20; sinyal tetap ditolak bila jumlah posisi/order yang dibutuhkan melampaui batas itu. Beberapa order memerlukan akun MT5 hedging.
+Resolusi simbol mencoba nama persis, akhiran broker yang unik, lalu pemetaan eksplisit. Untuk broker yang menambahkan akhiran umum, isi `SymbolSuffix` pada EA Telegram dan EA Copy Trading, misalnya `c`. Untuk nama berbeda atau beberapa kandidat yang sama-sama cocok, isi `SymbolMapCsv` dalam format `XAUUSD=XAUUSDc,US30=US30.cash` pada EA terkait. `MarketWatchlistCsv` mengatur simbol yang dipublikasikan EA utama untuk panel harga. `TradeOnlyAllowedSymbols` EA Telegram sekarang nonaktif secara default; daftar izin simbol di backend tetap berlaku bila dikonfigurasi. Akun cent didukung; batas rugi harian otomatis diskalakan 100 kali untuk kode mata uang cent yang dikenali.
+
+`GET /api/ea/pending` mengklaim signal selama 90 detik. Jika simbol atau quote belum tersedia, izin trading mati, spread melewati batas, atau batas posisi penuh, EA menunda laporan final agar signal bisa dicoba lagi setelah klaim dilepas. Signal tetap tunduk pada umur maksimum backend dan dapat kedaluwarsa jika kondisi belum pulih. EA menyimpan penanda idempotensi per entry dan mengirim ulang laporan bila perlu agar polling/restart tidak membuat order ganda. Jika sinyal memiliki beberapa TP, EA membuat satu order untuk setiap TP. Semua order memakai SL dari sinyal; bila SL tidak tersedia, EA memakai `DefaultSLPoints`. Dengan `LotMode=LOT_RISK_PERCENT` dan `RiskPercent=1.0`, anggaran risiko seluruh entry dari satu sinyal adalah sekitar 1% ekuitas akun jika semua entry mencapai SL. Anggaran uang itu dibagi rata per entry, lalu lot tiap entry dihitung dari estimasi P/L MT5 antara harga entry dan SL serta dibulatkan ke bawah sesuai langkah lot broker. Batas `MaxOpenTrades` default EA adalah 20; signal menunggu jika jumlah posisi/order yang dibutuhkan melampaui batas itu. Beberapa order memerlukan akun MT5 hedging.
 
 ## Copy posisi dari akun utama ke akun follower
 
@@ -132,12 +136,12 @@ Unduh EA setelah login ke portal:
 Untuk memasang EA:
 
 1. Di MT5, pilih **File → Open Data Folder**, lalu buka `MQL5/Experts`.
-2. Salin file `.ex5` yang diunduh ke folder tersebut. EA sudah dikompilasi dan bisa langsung dipasang dari Navigator.
+2. Salin file `.ex5` yang diunduh ke folder tersebut. Untuk membangun binary dari perubahan source repo, buka `mt5/MT5FollowerCopyEA.mq5` di MetaEditor dan tekan **F7**.
 3. Di MT5, pilih **Tools → Options → Expert Advisors**. Aktifkan **Allow WebRequest for listed URL** dan tambahkan `https://algentracapital.my.id`.
 4. Dari **Navigator → Expert Advisors**, tarik EA follower ke chart. Isi `AccountToken` dengan token akun itu dan pastikan `ServerURL` berisi `https://algentracapital.my.id`.
 5. Aktifkan **Algo Trading**. EA Telegram di terminal utama Algentra harus berjalan agar posisi sumber terus diperbarui. Uji follower di akun demo sebelum menggunakan akun live.
 
-EA Telegram menerbitkan posisi dengan magic number miliknya setiap detik; posisi manual atau EA lain di terminal utama tidak dibagikan. Follower hanya menyalin posisi terbuka, perubahan SL/TP, dan penutupan, bukan pending order sebelum terisi. Pada EA follower, `AllowLiveTrading` awalnya `false`; EA tidak akan membuka order live sampai opsi tersebut diaktifkan. `VolumeMultiplier` menentukan volume salinan relatif terhadap volume sumber, bukan persentase ekuitas. Akun follower harus menggunakan mode **hedging**. Jika data sumber tidak diperbarui selama 20 detik, follower berhenti menyinkronkan. Jika EA berhenti, posisi follower yang sudah terbuka tetap berada di terminal dan perlu dikelola di MT5. Rotasi token jika hilang atau terekspos, lalu masukkan token baru ke EA.
+EA Telegram menerbitkan posisi dengan magic number miliknya setiap detik; posisi manual atau EA lain di terminal utama tidak dibagikan. Follower hanya menyalin posisi terbuka, perubahan SL/TP, dan penutupan, bukan pending order sebelum terisi. Akun demo/contest bisa menyalin dengan izin trading MT5 aktif; akun real juga memerlukan `AllowLiveTrading=true`. `VolumeMultiplier` menentukan volume salinan relatif terhadap volume sumber, bukan persentase ekuitas. Lot disesuaikan dengan maksimum dan langkah volume broker. `MaxEntryDeviationPercent=0` menonaktifkan batas keterlambatan entry; isi angka positif bila ingin membatasi salinan yang jauh dari harga entry master. Akun follower tetap harus memakai mode **hedging** karena follower mengelola tiap posisi sumber secara terpisah. Jika data sumber tidak diperbarui selama 20 detik, follower berhenti menyinkronkan. Jika EA berhenti, posisi follower yang sudah terbuka tetap berada di terminal dan perlu dikelola di MT5. Rotasi token jika hilang atau terekspos, lalu masukkan token baru ke EA.
 
 Semua terminal follower klien menerima sumber posisi Algentra yang sama. Akun MT5 klien hanya perlu didaftarkan sebagai follower; terminal sumber tidak perlu didaftarkan lewat portal klien.
 

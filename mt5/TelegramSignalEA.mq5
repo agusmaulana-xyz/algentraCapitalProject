@@ -1,5 +1,5 @@
 #property strict
-#property version   "1.002"
+#property version   "1.100"
 #property description "Executes Telegram signals, reports master MT5 balance, and publishes all open positions"
 
 #define MAX_SIGNAL_TARGETS 20
@@ -28,9 +28,11 @@ input bool UseDefaultSLTP = true;
 input int DefaultSLPoints = 500;
 input int DefaultTPPoints = 1000;
 input string SymbolSuffix = "";
+input string SymbolMapCsv = ""; // Optional source-to-broker mapping, e.g. XAUUSD=XAUUSDc,US30=US30.cash
+input string MarketWatchlistCsv = "XAUUSD,EURUSD,USDJPY,GBPUSD";
 input int MaxSignalAgeSeconds = 120;
 input int PendingOrderExpiryMinutes = 60;
-input bool TradeOnlyAllowedSymbols = true;
+input bool TradeOnlyAllowedSymbols = false;
 input string AllowedSymbolsCsv = "XAUUSD,EURUSD,GBPUSD,USDJPY,AUDUSD";
 input bool DemoMode = true;
 input double MaxLot = 5.0;
@@ -108,17 +110,114 @@ string AccountTradeModeText()
    return "demo";
   }
 
+bool TrySelectBrokerSymbol(const string candidate, string &resolved)
+  {
+   if(StringLen(candidate) == 0 || !SymbolSelect(candidate, true))
+      return false;
+   resolved = candidate;
+   return true;
+  }
+
+bool ResolveBrokerSymbol(const string requested, const string suffix, const string mapping_csv,
+                         string &resolved, string &reason)
+  {
+   resolved = "";
+   reason = "";
+   string source = requested;
+   StringTrimLeft(source);
+   StringTrimRight(source);
+   if(StringLen(source) == 0)
+     {
+      reason = "signal symbol is empty";
+      return false;
+     }
+
+   string mapped = "";
+   string mappings[];
+   int mapping_count = StringSplit(mapping_csv, ',', mappings);
+   for(int i = 0; i < mapping_count; i++)
+     {
+      string item = mappings[i];
+      StringTrimLeft(item);
+      StringTrimRight(item);
+      int equal_at = StringFind(item, "=");
+      if(equal_at <= 0)
+         continue;
+      string from_symbol = StringSubstr(item, 0, equal_at);
+      string to_symbol = StringSubstr(item, equal_at + 1);
+      StringTrimLeft(from_symbol);
+      StringTrimRight(from_symbol);
+      StringTrimLeft(to_symbol);
+      StringTrimRight(to_symbol);
+      string from_upper = from_symbol;
+      string source_upper = source;
+      StringToUpper(from_upper);
+      StringToUpper(source_upper);
+      if(from_upper == source_upper && StringLen(to_symbol) > 0)
+        {
+         mapped = to_symbol;
+         break;
+        }
+     }
+
+   if(mapped != "")
+     {
+      if(TrySelectBrokerSymbol(mapped, resolved))
+         return true;
+      if(suffix != "" && TrySelectBrokerSymbol(mapped + suffix, resolved))
+         return true;
+     }
+   if(suffix != "" && TrySelectBrokerSymbol(source + suffix, resolved))
+      return true;
+   if(TrySelectBrokerSymbol(source, resolved))
+      return true;
+
+   string search_for = mapped != "" ? mapped : source;
+   string search_upper = search_for;
+   StringToUpper(search_upper);
+   int matches = 0;
+   string match = "";
+   string match_list = "";
+   int symbols_total = SymbolsTotal(false);
+   for(int i = 0; i < symbols_total; i++)
+     {
+      string candidate = SymbolName(i, false);
+      string candidate_upper = candidate;
+      StringToUpper(candidate_upper);
+      if(candidate_upper == search_upper)
+         continue;
+      bool candidate_has_suffix = StringFind(candidate_upper, search_upper) == 0;
+      bool candidate_is_base = StringLen(candidate_upper) >= 3 && StringFind(search_upper, candidate_upper) == 0;
+      if(!candidate_has_suffix && !candidate_is_base)
+         continue;
+      if(!SymbolSelect(candidate, true))
+         continue;
+      matches++;
+      match = candidate;
+      if(matches <= 3)
+         match_list += (matches == 1 ? "" : ", ") + candidate;
+     }
+
+   if(matches == 1)
+     {
+      resolved = match;
+      return true;
+     }
+   if(matches > 1)
+     {
+      reason = StringFormat("symbol %s matches multiple broker instruments (%s); configure SymbolSuffix or SymbolMapCsv", source, match_list);
+      return false;
+     }
+   reason = StringFormat("broker has no symbol matching %s; configure SymbolSuffix or SymbolMapCsv", source);
+   return false;
+  }
+
 bool AppendMasterMarketQuote(const string base_symbol, string &quotes, int &count)
   {
-   string symbol = base_symbol;
-   if(!SymbolSelect(symbol, true))
-     {
-      if(SymbolSuffix == "")
-         return false;
-      symbol = base_symbol + SymbolSuffix;
-      if(!SymbolSelect(symbol, true))
-         return false;
-     }
+   string symbol;
+   string reason;
+   if(!ResolveBrokerSymbol(base_symbol, SymbolSuffix, SymbolMapCsv, symbol, reason))
+      return false;
    MqlTick tick;
    if(!SymbolInfoTick(symbol, tick) || tick.bid <= 0.0 || tick.ask <= 0.0 || tick.time_msc <= 0)
       return false;
@@ -127,7 +226,7 @@ bool AppendMasterMarketQuote(const string base_symbol, string &quotes, int &coun
    int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
    quotes += StringFormat(
       "{\"symbol\":\"%s\",\"bid\":%s,\"ask\":%s,\"time_msc\":%I64d}",
-      base_symbol,
+      JsonEscape(symbol),
       DoubleToString(tick.bid, digits),
       DoubleToString(tick.ask, digits),
       tick.time_msc);
@@ -139,10 +238,16 @@ string MasterMarketQuotesJson()
   {
    string quotes = "[";
    int count = 0;
-   AppendMasterMarketQuote("XAUUSD", quotes, count);
-   AppendMasterMarketQuote("EURUSD", quotes, count);
-   AppendMasterMarketQuote("USDJPY", quotes, count);
-   AppendMasterMarketQuote("GBPUSD", quotes, count);
+   string watchlist[];
+   int watch_count = StringSplit(MarketWatchlistCsv, ',', watchlist);
+   for(int i = 0; i < watch_count && i < 100; i++)
+     {
+      string requested = watchlist[i];
+      StringTrimLeft(requested);
+      StringTrimRight(requested);
+      if(requested != "")
+         AppendMasterMarketQuote(requested, quotes, count);
+     }
    quotes += "]";
    return quotes;
   }
@@ -490,24 +595,19 @@ bool SymbolAllowed(const string symbol)
    for(int i = 0; i < count; i++)
      {
       string item = allowed[i];
+      StringTrimLeft(item);
+      StringTrimRight(item);
+      if(item == "")
+         continue;
       StringToUpper(item);
       string test = symbol;
+      StringTrimLeft(test);
+      StringTrimRight(test);
       StringToUpper(test);
-      if(item == test || (SymbolSuffix != "" && item + SymbolSuffix == test))
+      if(item == test || StringFind(test, item) == 0 || (SymbolSuffix != "" && item + SymbolSuffix == test))
          return true;
      }
    return false;
-  }
-
-string ResolveSymbol(string requested)
-  {
-   if(requested == "")
-      return _Symbol;
-   if(SymbolSelect(requested, true))
-      return requested;
-   if(SymbolSuffix != "" && SymbolSelect(requested + SymbolSuffix, true))
-      return requested + SymbolSuffix;
-   return requested;
   }
 
 int CountOpenTrades()
@@ -559,22 +659,26 @@ double NormalizePriceInRange(const string symbol, const double price, const doub
    return normalized;
   }
 
+int VolumePrecision(const double step)
+  {
+   for(int digits = 0; digits <= 8; digits++)
+      if(MathAbs(step - NormalizeDouble(step, digits)) < 0.000000001)
+         return digits;
+   return 8;
+  }
+
 double NormalizeLots(const string symbol, double lots)
   {
    double min_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
    double max_lot = MathMin(SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX), MaxLot);
    double step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-   if(step <= 0.0 || min_lot <= 0.0 || max_lot <= 0.0)
+   if(step <= 0.0 || min_lot <= 0.0 || max_lot < min_lot || lots < min_lot)
       return 0.0;
-   lots = MathMin(lots, max_lot);
-   lots = MathFloor(lots / step + 1e-8) * step;
-   int digits = 2;
-   if(step < 0.01) digits = 3;
-   if(step < 0.001) digits = 4;
-   lots = NormalizeDouble(lots, digits);
-   if(lots < min_lot)
-      return 0.0;
-   return lots;
+   double capped_lots = MathMin(lots, max_lot);
+   double normalized = min_lot + MathFloor((capped_lots - min_lot + step * 0.000001) / step) * step;
+   if(normalized > max_lot + step * 0.000001)
+      normalized -= step;
+   return NormalizeDouble(normalized, VolumePrecision(step));
   }
 
 double CalculateLots(const string symbol, const string action, const double price,
@@ -601,6 +705,8 @@ bool CheckSpread(const string symbol)
    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
    if(ask <= 0.0 || bid <= 0.0 || point <= 0.0)
       return false;
+   if(MaxSpreadPoints <= 0)
+      return true;
    double spread = (ask - bid) / point;
    return spread <= MaxSpreadPoints;
   }
@@ -745,6 +851,13 @@ void RejectSignal(const long signal_id, const string symbol, const string action
    Print("[TelegramSignalEA] signal ", signal_id, " rejected: ", reason);
   }
 
+void DeferSignal(const long signal_id, const string symbol, const string reason)
+  {
+   g_last_signal = StringFormat("waiting %s #%I64d", symbol, signal_id);
+   Print("[TelegramSignalEA] signal ", signal_id, " deferred: ", reason,
+         "; it will be retried after the backend claim lease expires");
+  }
+
 void ReportLegOutcome(const long signal_id, const string symbol, const string action, const int leg,
                       const string status, const double lots, const string reason)
   {
@@ -800,10 +913,15 @@ bool ProcessOrderLeg(const long signal_id, const string symbol, const string act
      }
    bool market = order_type == "MARKET";
    double current_price = action == "BUY" ? ask : bid;
-   double entry = market ? 0.0 : NormalizePrice(symbol, requested_entry);
-   if((market && current_price <= 0.0) || (!market && entry <= 0.0))
+   if(market && current_price <= 0.0)
      {
-      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Missing entry/current quote");
+      DeferSignal(signal_id, symbol, "current market quote disappeared before order submission");
+      return false;
+     }
+   double entry = market ? 0.0 : NormalizePrice(symbol, requested_entry);
+   if(!market && entry <= 0.0)
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Missing or invalid pending entry price");
       return false;
      }
    if(market && requested_entry > 0.0 && current_price > 0.0 &&
@@ -888,14 +1006,23 @@ void ProcessSignal(const string item)
       return;
    string action = JsonValue(item, "action");
    string order_type = JsonValue(item, "order_type");
-   string symbol = ResolveSymbol(JsonValue(item, "symbol"));
-   if(symbol == "") symbol = _Symbol;
-   g_last_signal = StringFormat("%s %s #%I64d", action, symbol, signal_id);
+   string requested_symbol = JsonValue(item, "symbol");
    if(SavedState(signal_id, 0) != 0)
      {
-      RepeatSavedReport(signal_id, symbol, action, 0);
+      RepeatSavedReport(signal_id, requested_symbol, action, 0);
       return;
      }
+   string symbol;
+   string symbol_error;
+   if(!ResolveBrokerSymbol(requested_symbol, SymbolSuffix, SymbolMapCsv, symbol, symbol_error))
+     {
+      for(int leg = 1; leg <= MAX_SIGNAL_TARGETS; leg++)
+         if(SavedState(signal_id, leg) != 0)
+            RepeatSavedReport(signal_id, requested_symbol, action, leg);
+      DeferSignal(signal_id, requested_symbol, symbol_error);
+      return;
+     }
+   g_last_signal = StringFormat("%s %s #%I64d", action, symbol, signal_id);
 
    double entry_low = JsonNumber(item, "entry_low");
    double entry_high = JsonNumber(item, "entry_high");
@@ -935,9 +1062,9 @@ void ProcessSignal(const string item)
       RejectSignal(signal_id, symbol, action, "Action disabled or invalid");
       return;
      }
-   if(!SymbolSelect(symbol, true) || !SymbolAllowed(symbol))
+   if(!SymbolAllowed(symbol))
      {
-      RejectSignal(signal_id, symbol, action, "Symbol unavailable or not allowed");
+      DeferSignal(signal_id, symbol, "symbol is outside AllowedSymbolsCsv; update the input and retry");
       return;
      }
    if(DemoMode)
@@ -947,14 +1074,15 @@ void ProcessSignal(const string item)
       g_signal_count++;
       return;
      }
-   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED) ||
+      !AccountInfoInteger(ACCOUNT_TRADE_ALLOWED) || !AccountInfoInteger(ACCOUNT_TRADE_EXPERT))
      {
-      RejectSignal(signal_id, symbol, action, "AutoTrading is disabled");
+      DeferSignal(signal_id, symbol, "MT5 terminal, account, or expert trading permission is disabled");
       return;
      }
    if(!CheckSpread(symbol))
      {
-      RejectSignal(signal_id, symbol, action, "Spread exceeds MaxSpreadPoints");
+      DeferSignal(signal_id, symbol, StringFormat("quote unavailable or spread exceeds MaxSpreadPoints (%d)", MaxSpreadPoints));
       return;
      }
 
@@ -993,7 +1121,7 @@ void ProcessSignal(const string item)
      }
    if(MaxOpenTrades > 0 && CountOpenTrades() + needed_orders > MaxOpenTrades)
      {
-      RejectSignal(signal_id, symbol, action, "MaxOpenTrades limit does not allow all signal entries");
+      DeferSignal(signal_id, symbol, "MaxOpenTrades limit is full; close an EA-managed position to retry");
       return;
      }
 
@@ -1037,7 +1165,7 @@ void SendHeartbeat()
   {
    string symbol = JsonEscape(_Symbol);
    string body = StringFormat(
-      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"0.7.0\",\"symbol\":\"%s\"}",
+      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"1.100\",\"symbol\":\"%s\"}",
       JsonEscape(TerminalInfoString(TERMINAL_NAME)), symbol);
    string response;
    HttpRequest("POST", "/api/ea/heartbeat", body, response);
@@ -1122,7 +1250,7 @@ void UpdatePanel()
   {
    int closed = g_wins + g_losses;
    double winrate = closed > 0 ? (double)g_wins / closed * 100.0 : 0.0;
-    Comment("TelegramSignalEA 1.002\n",
+    Comment("TelegramSignalEA 1.100\n",
            "Backend: ", g_connection_status, "\n",
            "Mode: ", DemoMode ? "DEMO / DRY RUN" : "LIVE", "\n",
            "Signals this session: ", g_signal_count, "\n",
@@ -1143,7 +1271,7 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
      }
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
-      Print("[TelegramSignalEA] AutoTrading is off; signals will be rejected unless DemoMode is active.");
+      Print("[TelegramSignalEA] AutoTrading is off; live signals will wait and retry when MT5 trading is enabled.");
    EventSetMillisecondTimer(PollIntervalMs);
    SendHeartbeat();
    PublishMasterSnapshot();

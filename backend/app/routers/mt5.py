@@ -65,8 +65,6 @@ def _account_payload(
         connection_status = "offline"
     elif not state.allow_live_trading or not state.terminal_trade_allowed or not state.expert_trade_allowed:
         connection_status = "trading_disabled"
-    elif state.trade_mode != "real":
-        connection_status = "not_real_account"
     elif not master_online:
         connection_status = "waiting_for_source"
     else:

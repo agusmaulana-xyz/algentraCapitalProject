@@ -93,7 +93,7 @@ class CopyPositionInput(BaseModel):
 
 
 class MT5MasterMarketQuoteInput(BaseModel):
-    symbol: Literal["XAUUSD", "EURUSD", "USDJPY", "GBPUSD"]
+    symbol: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9._-]+$")
     bid: float = Field(gt=0, allow_inf_nan=False)
     ask: float = Field(gt=0, allow_inf_nan=False)
     time_msc: int = Field(ge=1, le=4102444800000)
@@ -108,7 +108,7 @@ class CopySnapshotInput(BaseModel):
     floating_profit: float | None = Field(default=None, allow_inf_nan=False)
     currency: str | None = Field(default=None, min_length=3, max_length=16, pattern=r"^[A-Za-z0-9]+$")
     trade_mode: Literal["real", "demo", "contest"] | None = None
-    market_quotes: list[MT5MasterMarketQuoteInput] | None = Field(default=None, max_length=4)
+    market_quotes: list[MT5MasterMarketQuoteInput] | None = Field(default=None, max_length=100)
 
 
 class SignalResponse(BaseModel):

@@ -32,7 +32,7 @@
 
   <section>
     <h2>Akun Copy Trading Anda</h2>
-    <p class="section-help">Hubungkan hingga 10 akun Copy Trading. Tanda hijau berarti EA akun client aktif, akun MT5 berstatus live, izin trading MT5 menyala, dan EA utama mengirim pembaruan dalam 20 detik terakhir.</p>
+    <p class="section-help">Hubungkan hingga 10 akun Copy Trading. Tanda hijau berarti EA akun client aktif, izin trading MT5 menyala, dan EA utama mengirim pembaruan dalam 20 detik terakhir. Akun live, demo, dan kompetisi dapat terhubung; saldo ditampilkan dalam mata uang akun, termasuk unit cent broker.</p>
     <div id="accounts" class="grid"></div>
   </section>
 
@@ -105,11 +105,11 @@ function addAccountCard(account) {
   const accountBalanceTime = document.createElement("small"); accountBalanceTime.className = "muted account-balance-time";
   accountBalanceTime.textContent = account.state_updated_at ? `Data MT5 diperbarui ${new Date(account.state_updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB` : "Hubungkan EA agar saldo dan histori MT5 tersinkron.";
   const statusLabels = {
-    ready: "Siap menyalin: EA Copy Trading dan akun utama terhubung.",
+    ready: `Siap menyalin pada akun ${modeLabel(account.trade_mode)}: EA Copy Trading dan akun utama terhubung.`,
     waiting_for_source: "EA Copy Trading terhubung; menunggu pembaruan dari akun utama.",
     offline: "EA Copy Trading belum terhubung. Periksa token, ServerURL, dan Allow WebRequest.",
     trading_disabled: "Koneksi aktif, tetapi izin trading MT5 atau AllowLiveTrading belum aktif.",
-    not_real_account: "Akun MT5 terhubung, tetapi bukan akun live/real.",
+    not_real_account: "Mode akun MT5 belum dikenali.",
     disabled: "Akun Copy Trading ini dinonaktifkan."
   };
   const connectionStatus = statusLabels[account.connection_status] ? account.connection_status : "offline";

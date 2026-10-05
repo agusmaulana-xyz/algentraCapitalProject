@@ -65,7 +65,7 @@
           <label>Default symbol<small class="field-help">Simbol yang dipakai jika pesan tidak menyebut simbol.</small><input id="default-symbol"></label>
           <label>Symbol mapping (JSON)<small class="field-help">Alias simbol pesan ke nama simbol broker, misalnya GOLD ke XAUUSD.</small><textarea id="symbol-mapping"></textarea></label>
           <label>Allowed symbols<small class="field-help">Simbol yang boleh diterima EA; array kosong menonaktifkan filter server.</small><textarea id="allowed-symbols"></textarea></label>
-          <label>Batas rugi harian<small class="field-help">Jeda trading saat rugi harian mencapai nilai ini; 0 menonaktifkan batas ini.</small><input type="number" id="max-daily-loss" min="0" step="0.01"></label>
+          <label>Batas rugi harian<small class="field-help">Jeda trading saat rugi harian mencapai nilai ini. Mata uang cent seperti USC/EURC otomatis memakai skala 100; 0 menonaktifkan batas ini.</small><input type="number" id="max-daily-loss" min="0" step="0.01"></label>
           <label>Max lot<small class="field-help">Batas atas ukuran posisi yang diizinkan server.</small><input type="number" id="max-lot" min="0.01" step="0.01"></label>
           <label>Max posisi terbuka<small class="field-help">Jumlah maksimum trade terbuka yang dikelola EA.</small><input type="number" id="max-open-trades" min="1" step="1"></label>
           <label>Usia maksimal signal (detik)<small class="field-help">Sinyal yang lebih tua ditolak; 0 berarti tanpa batas usia server.</small><input type="number" id="max-signal-age" min="0" step="1"></label>

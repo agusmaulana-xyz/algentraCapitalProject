@@ -118,8 +118,11 @@ const notice = document.querySelector("#notice");
           enabled: checkbox.checked,
           alias: document.querySelector(`[data-alias-for="${CSS.escape(checkbox.dataset.chatId)}"]`).value || null
         }));
-        await request("/api/tg/groups/select", { method: "POST", body: JSON.stringify({ groups: rows }) });
-        notice.textContent = "Whitelist grup tersimpan.";
+        const result = await request("/api/tg/groups/select", { method: "POST", body: JSON.stringify({ groups: rows }) });
+        await loadGroups();
+        notice.textContent = result.disabled
+          ? `Whitelist tersimpan; ${result.disabled} sumber lama dinonaktifkan.`
+          : "Whitelist grup tersimpan.";
       } catch (error) { notice.textContent = error.message; }
       finally { button.disabled = false; button.textContent = "Simpan whitelist"; }
     });

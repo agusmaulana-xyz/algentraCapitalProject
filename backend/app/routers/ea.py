@@ -16,6 +16,7 @@ from ..models import (
     AppSetting,
     EAExecution,
     EAStatus,
+    MT5MasterEquityCandle,
     MT5MasterEquitySample,
     MasterCopyPosition,
     MasterCopyState,
@@ -112,6 +113,35 @@ def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(ge
                 equity_sample.equity = payload.equity
                 equity_sample.currency = payload.currency.upper()
                 equity_sample.observed_at = now
+
+        minute_start = now.replace(second=0, microsecond=0)
+        account_key = f"{payload.terminal_login.strip()}@{payload.terminal_server.strip()}".upper()
+        equity_candle = db.execute(
+            select(MT5MasterEquityCandle).where(
+                MT5MasterEquityCandle.account_key == account_key,
+                MT5MasterEquityCandle.minute_start == minute_start,
+            )
+        ).scalar_one_or_none()
+        if equity_candle is None:
+            db.add(MT5MasterEquityCandle(
+                account_key=account_key,
+                minute_start=minute_start,
+                open_equity=payload.equity,
+                high_equity=payload.equity,
+                low_equity=payload.equity,
+                close_equity=payload.equity,
+                currency=payload.currency.upper(),
+                observed_at=now,
+            ))
+            db.execute(delete(MT5MasterEquityCandle).where(
+                MT5MasterEquityCandle.minute_start < now - timedelta(days=45),
+            ))
+        else:
+            equity_candle.high_equity = max(equity_candle.high_equity, payload.equity)
+            equity_candle.low_equity = min(equity_candle.low_equity, payload.equity)
+            equity_candle.close_equity = payload.equity
+            equity_candle.currency = payload.currency.upper()
+            equity_candle.observed_at = now
 
     if payload.market_quotes is not None:
         market_state = db.get(MT5MasterMarketState, 1)

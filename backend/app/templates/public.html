@@ -47,7 +47,7 @@
   .chart-title b { color:#d9e2da; font-weight:600; }
   #equity-chart { display:block; width:100%; height:235px; margin-top:16px; overflow:visible; }
   #equity-chart-empty[hidden],#equity-chart[hidden] { display:none; }
-  .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.chart-line { fill:none; stroke:#a9c5ac; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }.chart-point { fill:#d5e3d2; stroke:#16211c; stroke-width:4; }
+  .chart-grid { stroke:#34423d; stroke-width:1; stroke-dasharray:3 6; }.equity-axis-label { fill:#819089; font-size:9px; text-anchor:end; }.equity-candle-wick { stroke-width:1.5; }.equity-candle-body { stroke-width:.7; }.equity-candle--up { stroke:#29bf88; fill:#29bf88; }.equity-candle--down { stroke:#f06a6a; fill:#f06a6a; }.equity-candle--flat { stroke:#a2b0aa; fill:#a2b0aa; }
   .chart-empty { display:grid; height:235px; place-items:center; color:#82918a; font-size:12px; text-align:center; }
   .public-data-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); gap:12px; }
   .public-data-card { min-width:0; padding:17px; border:1px solid #2e3d39; border-radius:13px; background:linear-gradient(145deg,#19251f,#141e23); }
@@ -91,7 +91,7 @@
     <div class="hero-copy">
       <span class="section-kicker">AI · Copy trading otomatis · Kontrol risiko</span>
       <h1>Sinyal dianalisis AI, eksekusi berjalan <em>otomatis.</em></h1>
-      <p class="hero-text">AI membantu membaca dan menyusun sinyal XAUUSD dari kanal Telegram pilihan. EA (robot MetaTrader 5) menjalankan instruksi sesuai pengaturan dan batas risiko; semua posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading yang terhubung.</p>
+      <p class="hero-text">AI membantu membaca dan menyusun sinyal trading dari kanal Telegram pilihan. EA (robot MetaTrader 5) menjalankan instruksi sesuai simbol, pengaturan, dan batas risiko; semua posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading yang terhubung.</p>
       <div class="hero-actions"><a class="public-button" href="#performance">Lihat performa</a><a class="public-button secondary" href="#approach">Pelajari cara kerja</a></div>
     </div>
     <div class="hero-visual" aria-hidden="true">
@@ -123,14 +123,14 @@
     <div id="master-account-equity" class="public-data-grid"><p class="chart-empty">Memuat equity akun utama MT5…</p></div>
     <div class="section-heading" style="margin-top:28px"><div><span class="section-kicker">Watchlist harga</span><p>Harga Bid dan Ask terbaru yang dilaporkan terminal MT5 akun utama.</p></div><span id="market-status" class="section-kicker">Menunggu harga</span></div>
     <div id="market-prices" class="public-data-grid"></div>
-    <div class="chart-card" style="margin-top:18px"><div class="chart-title"><span>Perubahan equity per jam · 24 jam terakhir</span><b id="equity-chart-currency"></b></div><div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div><svg id="equity-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik equity akun utama per jam" hidden><defs><linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a9c5ac" stop-opacity=".22"/><stop offset="100%" stop-color="#a9c5ac" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><path id="equity-chart-area" fill="url(#equityFill)"/><path id="equity-chart-line" class="chart-line"/><circle id="equity-chart-point" class="chart-point" r="5"/></svg><div class="chart-axis-labels"><span id="equity-chart-first"></span><span id="equity-chart-latest"></span></div></div>
-    <p class="data-note">Equity dan harga berasal dari laporan akun utama MT5. Grafik menyimpan satu titik per jam dan memperbarui titik pada jam berjalan. Watchlist menampilkan XAUUSD, EURUSD, USDJPY, dan GBPUSD jika simbol tersedia pada broker. Jika nama simbol broker memakai suffix, sesuaikan input <code>SymbolSuffix</code> pada EA. Data harga dapat tertunda saat pasar tutup.</p>
+    <div class="chart-card" style="margin-top:18px"><div class="chart-title"><span>Indeks equity · candlestick M1 / 60 candle terakhir</span><span><b id="equity-chart-currency"></b> <b id="equity-chart-status">MENUNGGU EQUITY</b></span></div><div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div><svg id="equity-chart" viewBox="0 0 720 240" role="img" aria-label="Grafik candlestick M1 indeks equity akun utama" hidden><path class="chart-grid" d="M24 24H700 M24 78H700 M24 132H700 M24 186H700"/><g id="equity-axis-labels"></g><g id="equity-candle-layer"></g></svg><div class="chart-axis-labels"><span id="equity-chart-first"></span><span id="equity-chart-latest"></span></div></div>
+    <p class="data-note">Setiap candle memakai perubahan equity akun utama MT5: open adalah laporan pertama dalam menit itu, high/low adalah nilai tertinggi/terendah selama menit berjalan, dan close adalah laporan terakhir. Candle hijau berarti close naik dari open; candle merah berarti turun. Candle berjalan diperbarui dari laporan EA, bukan dari harga emas atau feed pasar eksternal. Watchlist menampilkan semua simbol yang dikirim EA utama. Jika nama simbol broker memakai suffix, sesuaikan input <code>SymbolSuffix</code> pada EA.</p>
   </section>
 
   <section class="public-section" id="approach">
     <div class="section-heading"><div><span class="section-kicker">Alur copy trading</span><h2>Dari sinyal hingga posisi tersalin.</h2><p>AI membantu menyusun informasi sinyal. EA MetaTrader menjalankan instruksi yang lolos, sementara posisi terbuka di akun utama termasuk entry manual disinkronkan ke akun Copy Trading.</p></div></div>
     <div class="approach-grid">
-      <article class="approach-card"><span class="index">01 / SUMBER</span><h3>Pilih kanal sinyal</h3><p>Pesan dari kanal Telegram yang dipilih disaring untuk menemukan sinyal XAUUSD yang relevan.</p></article>
+      <article class="approach-card"><span class="index">01 / SUMBER</span><h3>Pilih kanal sinyal</h3><p>Pesan dari kanal Telegram yang dipilih disaring untuk menemukan instruksi trading yang relevan.</p></article>
       <article class="approach-card"><span class="index">02 / ANALISIS AI</span><h3>Susun detail sinyal</h3><p>AI membantu mengenali arah, harga masuk, target, dan batas rugi sebelum instruksi diteruskan.</p></article>
       <article class="approach-card"><span class="index">03 / OTOMASI MT5</span><h3>Eksekusi dan salin</h3><p>EA menjalankan instruksi sesuai pengaturan. Posisi terbuka di akun utama, termasuk entry manual, dapat disalin ke akun Copy Trading.</p></article>
     </div>
@@ -185,47 +185,89 @@
 (() => {
   const equityBox = document.querySelector("#master-account-equity");
   const pricesBox = document.querySelector("#market-prices");
-  const watchlist = ["XAUUSD", "EURUSD", "USDJPY", "GBPUSD"];
   const money = (value, currency) => `${Number(value || 0).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2})} ${currency || ""}`.trim();
   const priceNumber = (value) => Number(value).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:5});
   const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mode] || mode || "MT5");
   const addText = (parent, tag, className, value) => { const el = document.createElement(tag); if (className) el.className = className; el.textContent = value; parent.append(el); return el; };
-  const showEquityChart = (curve) => {
+  const showEquityChart = (candles, online) => {
     const svg = document.querySelector("#equity-chart");
     const empty = document.querySelector("#equity-chart-empty");
-    if (!curve.length) {
+    const layer = document.querySelector("#equity-candle-layer");
+    const axis = document.querySelector("#equity-axis-labels");
+    const status = document.querySelector("#equity-chart-status");
+    const validCandles = (candles || []).filter((candle) =>
+      [candle.open, candle.high, candle.low, candle.close].every((value) => Number.isFinite(Number(value)))
+    );
+    if (!validCandles.length) {
       svg.hidden = true; empty.hidden = false;
+      layer.replaceChildren();
+      axis.replaceChildren();
+      status.textContent = "MENUNGGU EQUITY";
       document.querySelector("#equity-chart-first").textContent = "";
       document.querySelector("#equity-chart-latest").textContent = "";
       return;
     }
-    const values = curve.map((point) => Number(point.equity));
-    const min = Math.min(...values), max = Math.max(...values);
-    const padding = (max - min) * 0.08 || Math.max(Math.abs(max) * 0.001, 0.01);
-    const lower = min - padding, upper = max + padding, spread = upper - lower;
-    const coords = values.map((value, index) => ({
-      x: 24 + (curve.length === 1 ? 676 : index * 676 / (curve.length - 1)),
-      y: 28 + (upper - value) * 156 / spread
-    }));
-    const line = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
-    document.querySelector("#equity-chart-line").setAttribute("d", line);
-    document.querySelector("#equity-chart-area").setAttribute("d", `${line} L${coords.at(-1).x.toFixed(1)} 210 L${coords[0].x.toFixed(1)} 210 Z`);
-    document.querySelector("#equity-chart-point").setAttribute("cx", coords.at(-1).x);
-    document.querySelector("#equity-chart-point").setAttribute("cy", coords.at(-1).y);
-    const hourLabel = (value) => `${new Date(value).toLocaleString("id-ID", {timeZone:"Asia/Jakarta", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"})} WIB`;
-    document.querySelector("#equity-chart-first").textContent = hourLabel(curve[0].hour);
-    document.querySelector("#equity-chart-latest").textContent = hourLabel(curve.at(-1).hour);
-    document.querySelector("#equity-chart-currency").textContent = curve.at(-1).currency || "";
+    const low = Math.min(...validCandles.map((candle) => Number(candle.low)));
+    const high = Math.max(...validCandles.map((candle) => Number(candle.high)));
+    const padding = (high - low) * 0.08 || Math.max(Math.abs(high) * 0.001, 0.01);
+    const lower = low - padding, upper = high + padding, spread = upper - lower;
+    const left = 72, right = 704, top = 24, bottom = 186;
+    const step = (right - left) / validCandles.length;
+    const bodyWidth = Math.max(2, Math.min(9, step * 0.58));
+    const y = (value) => top + (upper - Number(value)) * (bottom - top) / spread;
+    const createSvgElement = (tag) => document.createElementNS("http://www.w3.org/2000/svg", tag);
+    layer.replaceChildren();
+    axis.replaceChildren();
+    const axisNumber = new Intl.NumberFormat("id-ID", {maximumFractionDigits:2});
+    [upper, upper - spread / 3, upper - spread * 2 / 3, lower].forEach((value, index) => {
+      const label = createSvgElement("text");
+      label.setAttribute("class", "equity-axis-label");
+      label.setAttribute("x", "64");
+      label.setAttribute("y", String(top + index * (bottom - top) / 3 + 3));
+      label.textContent = axisNumber.format(value);
+      axis.append(label);
+    });
+    validCandles.forEach((candle, index) => {
+      const open = Number(candle.open), close = Number(candle.close);
+      const x = left + (index + 0.5) * step;
+      const direction = close > open ? "up" : close < open ? "down" : "flat";
+      const group = createSvgElement("g");
+      group.setAttribute("class", `equity-candle equity-candle--${direction}`);
+      group.setAttribute("aria-label", `${new Date(candle.minute).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB · O ${open} H ${candle.high} L ${candle.low} C ${close}`);
+      const wick = createSvgElement("line");
+      wick.setAttribute("class", "equity-candle-wick");
+      wick.setAttribute("x1", x.toFixed(2)); wick.setAttribute("x2", x.toFixed(2));
+      wick.setAttribute("y1", y(candle.high).toFixed(2)); wick.setAttribute("y2", y(candle.low).toFixed(2));
+      const body = createSvgElement("rect");
+      body.setAttribute("class", "equity-candle-body");
+      body.setAttribute("x", (x - bodyWidth / 2).toFixed(2));
+      body.setAttribute("y", Math.min(y(open), y(close)).toFixed(2));
+      body.setAttribute("width", bodyWidth.toFixed(2));
+      body.setAttribute("height", Math.max(1.5, Math.abs(y(open) - y(close))).toFixed(2));
+      body.setAttribute("rx", "0.6");
+      const title = createSvgElement("title");
+      title.textContent = `${new Date(candle.minute).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB | O ${open} H ${candle.high} L ${candle.low} C ${close} ${candle.currency || ""}`;
+      group.append(wick, body, title);
+      layer.append(group);
+    });
+    const minuteLabel = (value) => `${new Date(value).toLocaleString("id-ID", {timeZone:"Asia/Jakarta", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"})} WIB`;
+    document.querySelector("#equity-chart-first").textContent = minuteLabel(validCandles[0].minute);
+    document.querySelector("#equity-chart-latest").textContent = minuteLabel(validCandles.at(-1).minute);
+    document.querySelector("#equity-chart-currency").textContent = validCandles.at(-1).currency || "";
+    status.textContent = online ? (validCandles.at(-1).closed ? "MENUNGGU CANDLE M1" : "LIVE M1") : "DATA TERAKHIR";
     empty.hidden = true; svg.hidden = false;
   };
   const renderQuotes = (quotes, reportOnline) => {
-    const bySymbol = new Map((quotes || []).map((quote) => [quote.symbol, quote]));
     pricesBox.replaceChildren();
+    const symbols = [...new Map((quotes || []).map((quote) => [quote.symbol, quote])).values()]
+      .sort((left, right) => left.symbol.localeCompare(right.symbol));
+    if (!symbols.length) {
+      addText(pricesBox, "p", "chart-empty", "Watchlist akan tampil saat EA utama melaporkan harga simbol broker.");
+    }
     let liveCount = 0;
-    for (const symbol of watchlist) {
-      const quote = bySymbol.get(symbol);
+    for (const quote of symbols) {
       const card = document.createElement("article"); card.className = "quote-card";
-      addText(card, "span", "section-kicker", symbol);
+      addText(card, "span", "section-kicker", quote.symbol);
       const fresh = quote && reportOnline && quote.updated_at && Date.now() - new Date(quote.updated_at).getTime() <= 120000 && Date.now() - new Date(quote.updated_at).getTime() >= -60000;
       if (quote) {
         addText(card, "strong", "", priceNumber(quote.bid));
@@ -234,14 +276,11 @@
         addText(pair, "span", "", `Ask ${priceNumber(quote.ask)}`);
         card.append(pair);
         addText(card, "small", "", fresh ? `Tick MT5 ${new Date(quote.updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB` : "Harga terakhir · tick sudah lama");
-      } else {
-        addText(card, "strong", "", "Belum tersedia");
-        addText(card, "small", "", "Simbol belum tersedia pada broker akun utama.");
       }
       if (fresh) liveCount++;
       pricesBox.append(card);
     }
-    document.querySelector("#market-status").textContent = liveCount ? `${liveCount} / 4 HARGA TERBARU` : "MENUNGGU TICK MT5";
+    document.querySelector("#market-status").textContent = liveCount ? `${liveCount} / ${symbols.length} HARGA TERBARU` : "MENUNGGU TICK MT5";
   };
   async function refresh() {
     try {
@@ -264,7 +303,7 @@
         addText(equityBox, "p", "chart-empty", "Equity utama akan tampil setelah Telegram Signal EA mengirim laporan akun MT5.");
       }
       renderQuotes(data.market_quotes, data.market_quotes_online);
-      showEquityChart(data.equity_curve || []);
+      showEquityChart(data.equity_candles || [], master.online);
     } catch (_) {
       document.querySelector("#master-account-status").textContent = "DATA AKUN UTAMA TIDAK TERSEDIA";
       document.querySelector("#market-status").textContent = "DATA HARGA TIDAK TERSEDIA";
@@ -274,7 +313,7 @@
     }
   }
   refresh();
-  setInterval(() => { if (!document.hidden) refresh(); }, 10000);
+  setInterval(() => { if (!document.hidden) refresh(); }, 5000);
 })();
 </script>
 {% endblock %}
