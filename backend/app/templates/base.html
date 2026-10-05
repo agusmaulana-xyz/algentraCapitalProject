@@ -79,6 +79,7 @@
     :root[data-theme="light"] #theme-toggle .icon-moon { display:block; }
     .nav-toggle { display:none; width:44px; height:44px; padding:9px; color:var(--ink); background:var(--panel-raised); border-color:var(--control); }
     .nav-toggle svg { display:block; width:22px; height:22px; }
+    .mobile-client-logout { display:none; }
     .workspace-tag { padding: 6px 10px; border: 1px solid #94846155; border-radius: 999px; color: #d3c69f; background: #302b2055; font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
     .page-shell { position: relative; z-index: 1; width: min(1460px, 100%); margin: 0 auto; padding: 38px 28px 80px; }
     .page-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px; margin: 4px 0 24px; }
@@ -141,6 +142,10 @@
     .field-help { display: block; margin: 4px 0 7px; color: #9aa7a1; font-size: 11px; font-weight: 400; line-height: 1.4; }
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
     .form-grid label input, .form-grid label textarea { display: block; margin-top: 5px; }
+    .account-connect-form { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
+    .account-connect-form > div { display: flex; align-self: end; }
+    .account-connect-form button { min-width: 142px; white-space: nowrap; }
+    #account-message:empty { display: none; }
     .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
     .toolbar input, .toolbar select { width: auto; max-width: 210px; }
     .toolbar label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 500; }
@@ -212,6 +217,8 @@
       .site-nav { order: 3; width: 100%; overflow-x: auto; }
       .topbar-side { margin-left: auto; }
       .nav-link { flex: 1; min-width: 105px; }
+      .account-connect-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .account-connect-form > div { grid-column:1 / -1; }
     }
     @media (max-width: 600px) {
       .page-shell { padding: 26px 16px 56px; }
@@ -225,6 +232,17 @@
       .site-nav.is-open { display:grid; }
       .nav-link { min-width:0; min-height:48px; padding:10px 12px; }
       .nav-link small { margin-top:2px; font-size:10px; }
+      .account-connect-form { grid-template-columns: minmax(0, 1fr); }
+      .account-connect-form > div { grid-column:auto; }
+      .account-connect-form button { width:100%; }
+      .desktop-client-logout { display:none; }
+      .mobile-client-logout {
+        display:block; width:100%; min-height:48px; padding:10px 12px;
+        border:1px solid var(--glass-border); border-radius:10px;
+        color:var(--ink); background:transparent; box-shadow:none;
+        font-size:13px; font-weight:700; text-align:left;
+      }
+      .mobile-client-logout:hover { transform:none; color:var(--ink); background:var(--panel-raised); }
       .toolbar input, .toolbar select { max-width: none; }
       .row { flex-wrap: wrap; }
       .row .alias { width: 100%; margin-left: 28px; }
@@ -248,6 +266,7 @@
       {% elif request.session.get('client_user_id') %}
       <a class="nav-link {% if request.url.path == '/account' %}active{% endif %}" href="/account"><span>Akun Copy Trading</span><small>Status akun MT5</small></a>
       <a class="nav-link" href="/#performance"><span>Performa</span><small>Data agregat</small></a>
+      <button class="mobile-client-logout" type="button" data-workspace-logout>Keluar</button>
       {% elif request.url.path == '/login' %}
       <a class="nav-link" href="/"><span>Algentra Capital</span><small>Beranda</small></a>
       <a class="nav-link active" href="/login"><span>Portal klien</span><small>Masuk akun klien</small></a>
@@ -264,9 +283,9 @@
       <button class="secondary icon-button" id="theme-toggle" type="button" aria-label="Beralih ke tema terang" title="Beralih ke tema terang" aria-pressed="false"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 15.4A8.5 8.5 0 0 1 8.6 3.8 8.6 8.6 0 1 0 20.2 15.4Z"/><path d="M16.5 4.5v4M14.5 6.5h4"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg></button>
       <button class="secondary nav-toggle" id="nav-toggle" type="button" aria-label="Buka menu navigasi" aria-controls="site-nav" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       {% if request.session.get('admin_username') %}
-      <span class="workspace-tag">Private workspace</span><button class="secondary" id="logout" type="button">Logout</button>
+      <span class="workspace-tag">Private workspace</span><button class="secondary" id="logout" data-workspace-logout type="button">Logout</button>
       {% elif request.session.get('client_user_id') %}
-      <span class="workspace-tag">Portal klien</span><button class="secondary" id="logout" type="button">Keluar</button>
+      <span class="workspace-tag">Portal klien</span><button class="secondary desktop-client-logout" id="logout" data-workspace-logout type="button">Keluar</button>
       {% endif %}
     </div>
   </header>
@@ -389,8 +408,7 @@
     };
     syncPublicNav();
     window.addEventListener("hashchange", syncPublicNav);
-    const workspaceLogout = document.querySelector("#logout");
-    if (workspaceLogout) workspaceLogout.addEventListener("click", async () => {
+    for (const workspaceLogout of document.querySelectorAll("[data-workspace-logout]")) workspaceLogout.addEventListener("click", async () => {
       workspaceLogout.disabled = true;
       try {
         await fetch("/api/auth/logout", {
