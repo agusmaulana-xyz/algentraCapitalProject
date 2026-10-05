@@ -16,6 +16,7 @@ from ..models import (
     ClientUser,
     MasterCopyState,
     MT5MasterAccountState,
+    MT5MasterEquityCandle,
     MT5MasterEquityMinuteSample,
     MT5MasterEquitySample,
     MT5MasterMarketState,
