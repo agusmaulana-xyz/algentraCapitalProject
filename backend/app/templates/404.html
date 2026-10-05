@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Halaman tidak ditemukan | Algentra Capital{% endblock %}
 {% block extra_head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .not-found-shell { display: grid; min-height: min(720px, calc(100vh - 150px)); align-items: center; }
   .not-found-card {
     display: grid; width: min(100%, 980px); grid-template-columns: 1fr 1fr; align-items: center; gap: clamp(20px, 5vw, 58px);
@@ -20,6 +20,11 @@
   .not-found-actions a { border: 1px solid #a5c6b566; color: #101b17; background: linear-gradient(135deg, #b4cabb, #8eae9b); }
   .not-found-actions a:hover { color: #101b17; filter: brightness(1.07); }
   .not-found-actions button { margin: 0; }
+  :root[data-theme="light"] .not-found-card { color:var(--ink); border-color:var(--glass-border); background:var(--glass-surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+  :root[data-theme="light"] .not-found-code { color:var(--ink); border-color:var(--line); background:var(--glass-raised); }
+  :root[data-theme="light"] .not-found-path { color:var(--ink); border-color:var(--line); background:var(--panel-raised); }
+  :root[data-theme="light"] .not-found-actions a { color:var(--on-action); border-color:var(--action); background:var(--action); }
+  :root[data-theme="light"] .not-found-actions a:hover { color:var(--on-action); }
   .not-found-art { width: 100%; max-width: 420px; justify-self: center; overflow: visible; }
   .chart-grid { opacity: .72; }
   .chart-trace { stroke-dasharray: 430; stroke-dashoffset: 430; animation: chart-draw 3.2s ease-out forwards; }
@@ -54,7 +59,7 @@
 </style>
 {% endblock %}
 {% block content %}
-<main class="page-shell not-found-shell">
+<main id="main" tabindex="-1" class="page-shell not-found-shell">
   <section class="not-found-card" aria-labelledby="not-found-title">
     <div class="not-found-copy">
       <span class="eyebrow">ALGENTRA CAPITAL / 404</span>
@@ -67,7 +72,7 @@
           Kembali ke beranda
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
         </a>
-        <button class="secondary" type="button" onclick="history.back()">Kembali</button>
+        <a class="secondary" href="/login">Masuk</a>
       </div>
     </div>
 

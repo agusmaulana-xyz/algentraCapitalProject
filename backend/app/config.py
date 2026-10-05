@@ -1,4 +1,3 @@
-import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,7 +19,8 @@ class Settings(BaseSettings):
     app_secret_key: SecretStr = Field(validation_alias="APP_SECRET_KEY")
     admin_username: str = Field(default="admin", validation_alias="ADMIN_USERNAME")
     admin_password: SecretStr = Field(validation_alias="ADMIN_PASSWORD")
-    cookie_secure: bool = Field(default=False, validation_alias="COOKIE_SECURE")
+    app_env: str = Field(default="development", validation_alias="APP_ENV")
+    cookie_secure: bool = Field(default=True, validation_alias="COOKIE_SECURE")
     gemini_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-3.8-flash", validation_alias="GEMINI_MODEL")
     gemini_timeout_seconds: float = Field(default=25.0, validation_alias="GEMINI_TIMEOUT_SECONDS", gt=0, le=120)
@@ -51,6 +51,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_credentials(self) -> "Settings":
+        if self.app_env not in {"production", "development"}:
+            raise ValueError("APP_ENV harus production atau development")
+        if self.app_env == "production" and not self.cookie_secure:
+            raise ValueError("COOKIE_SECURE tidak boleh false di production")
+        if self.app_env == "production" and not self.database_url:
+            raise ValueError("DATABASE_URL wajib diisi di production")
         app_secret = self.app_secret_key.get_secret_value()
         admin_password = self.admin_password.get_secret_value()
         if len(app_secret) < 32:
@@ -69,6 +75,10 @@ class Settings(BaseSettings):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
         if self.database_url and not self.database_url.startswith("sqlite:"):
             raise ValueError("DATABASE_URL harus memakai SQLite, contoh: sqlite:///backend/data/app.db")
+        if self.app_env == "production" and self.database_url:
+            database_path = self.database_url.removeprefix("sqlite:///")
+            if not Path(database_path).is_absolute():
+                raise ValueError("DATABASE_URL production harus memakai jalur SQLite absolut")
         if self.ea_api_key is not None:
             ea_key = self.ea_api_key.get_secret_value()
             if len(ea_key) < 24:
@@ -88,9 +98,7 @@ class Settings(BaseSettings):
     def resolved_database_url(self) -> str:
         if self.database_url:
             return self.database_url
-        if os.getenv("VERCEL") == "1":
-            return "sqlite:////tmp/algentra-capital/app.db"
-        return "sqlite:///backend/data/app.db"
+        return f"sqlite:///{(PROJECT_ROOT / 'backend' / 'data' / 'app.db').as_posix()}"
 
 
 @lru_cache

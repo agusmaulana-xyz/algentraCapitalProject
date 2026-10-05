@@ -115,6 +115,23 @@ class ClientUser(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        Index("ix_auth_sessions_user", "user_type", "user_id", "revoked_at"),
+        Index("ix_auth_sessions_expiry", "expires_at"),
+    )
+
+    session_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    session_data: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class EmailVerification(Base):
     __tablename__ = "email_verifications"
 
@@ -247,6 +264,20 @@ class MT5MasterEquitySample(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     sample_hour: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    equity: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(16), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class MT5MasterEquityMinuteSample(Base):
+    __tablename__ = "mt5_master_equity_minute_samples"
+    __table_args__ = (
+        UniqueConstraint("sample_minute", name="ux_mt5_master_equity_minute"),
+        Index("ix_mt5_master_equity_minute", "sample_minute"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sample_minute: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     equity: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(String(16), nullable=False)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)

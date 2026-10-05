@@ -1,20 +1,22 @@
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.auth import seed_admin, verify_password
+from app.auth import hash_password, seed_admin, verify_password
 from app.config import Settings
 from app.database import Base, SessionLocal
-from app.models import AdminUser, Signal, Trade
+from app.models import AdminUser, AuthSession, ClientUser, EAExecution, MT5Account, MT5AccountState, PasswordResetCode, Signal, Trade, utc_now
 from app.routers.dashboard import _csv_text
+from app.routers import auth as auth_router
 from app.main import app
 
 
 def test_admin_login_protects_and_unlocks_dashboard_routes():
     with TestClient(app) as client:
         assert client.get("/api/stats").status_code == 401
-
         response = client.post(
             "/api/auth/login",
             json={"username": "admin", "password": "M1-Testing-Password-123"},
@@ -22,12 +24,110 @@ def test_admin_login_protects_and_unlocks_dashboard_routes():
         assert response.status_code == 200
         assert response.json()["status"] == "authenticated"
         csrf = response.json()["csrf_token"]
+        old_cookie = response.headers["set-cookie"].split(";", 1)[0]
+        cookie_value = old_cookie.split("=", 1)[1]
+        assert "admin" not in cookie_value
         assert client.get("/parser-test").status_code == 200
         assert client.get("/api/stats").json()["winrate"] == 0.0
-
         assert client.post("/api/auth/logout").status_code == 403
         assert client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 200
         assert client.get("/api/stats").status_code == 401
+        assert client.get("/api/stats", headers={"Cookie": old_cookie}).status_code == 401
+
+
+def test_password_reset_request_does_not_disclose_account_existence(monkeypatch):
+    monkeypatch.setattr(auth_router, "send_verification_code", lambda *_args, **_kwargs: None)
+    with TestClient(app) as client:
+        with SessionLocal() as db:
+            db.add(ClientUser(
+                email="privacy-check@example.com",
+                password_hash=hash_password("A-Strong-Test-Password-123"),
+                verified_at=utc_now(),
+            ))
+            db.commit()
+        known = client.post("/api/auth/password-reset/request", json={"email": "privacy-check@example.com"})
+        unknown = client.post("/api/auth/password-reset/request", json={"email": "not-registered@example.com"})
+        assert known.status_code == unknown.status_code == 202
+        assert known.json() == unknown.json()
+
+
+def test_password_reset_revokes_existing_client_session():
+    email = "session-revoke@example.com"
+    code = "654321"
+    with TestClient(app) as client:
+        with SessionLocal() as db:
+            db.add(ClientUser(email=email, password_hash=hash_password("Old-Test-Password-123"), verified_at=utc_now()))
+            db.commit()
+        login = client.post("/api/auth/client-login", json={"email": email, "password": "Old-Test-Password-123"})
+        assert login.status_code == 200
+        old_cookie = login.headers["set-cookie"].split(";", 1)[0]
+        now = utc_now()
+        with SessionLocal() as db:
+            db.add(PasswordResetCode(
+                email_hash=auth_router._password_reset_email_key(email),
+                code_hash=auth_router._password_reset_hash(email, code),
+                expires_at=now + timedelta(minutes=10),
+                resend_after=now,
+                attempts=0,
+                send_count=1,
+                last_activity_at=now,
+            ))
+            db.commit()
+        reset = client.post("/api/auth/password-reset/confirm", json={"email": email, "code": code, "password": "New-Test-Password-456"})
+        assert reset.status_code == 200
+        assert client.get("/api/mt5/accounts", headers={"Cookie": old_cookie}).status_code == 401
+        with SessionLocal() as db:
+            session = db.query(AuthSession).filter_by(user_type="client").one()
+            assert session.revoked_at is not None
+
+
+def test_public_performance_never_exposes_follower_balance():
+    email = "public-privacy-check@example.com"
+    with TestClient(app) as client:
+        with SessionLocal() as db:
+            user = ClientUser(email=email, password_hash=hash_password("A-Strong-Test-Password-789"), verified_at=utc_now())
+            db.add(user)
+            db.flush()
+            account = MT5Account(
+                owner_id=user.id,
+                label="private-follower",
+                server="PrivateBroker",
+                login="987654321",
+                role="follower",
+                token_hash="a" * 64,
+            )
+            db.add(account)
+            db.flush()
+            account_id = account.id
+            db.add(MT5AccountState(
+                account_id=account_id,
+                balance=91357.41,
+                equity=91357.41,
+                floating_profit=0.0,
+                margin=0.0,
+                free_margin=91357.41,
+                currency="USD",
+                trade_mode="real",
+                allow_live_trading=False,
+                terminal_trade_allowed=False,
+                expert_trade_allowed=False,
+                open_position_ids_json="[]",
+                history_cursor="0",
+                history_cursor_msc=0,
+                observed_at=utc_now(),
+            ))
+            db.commit()
+
+        response = client.get("/api/public/performance")
+        assert response.status_code == 200
+        assert "91357.41" not in response.text
+        assert "balance_groups" not in response.json()
+
+        with SessionLocal() as db:
+            db.query(MT5AccountState).filter_by(account_id=account_id).delete()
+            db.query(MT5Account).filter_by(id=account_id).delete()
+            db.query(ClientUser).filter_by(email=email).delete()
+            db.commit()
 
 
 def test_settings_endpoint_reads_and_updates_values_after_login():
@@ -172,9 +272,11 @@ def test_signal_endpoint_includes_execution_ticket_and_profit():
             assert item["profit"] == 12.5
     finally:
         with SessionLocal() as db:
+            db.query(EAExecution).filter_by(signal_id=signal_id).delete(synchronize_session=False)
             trade = db.query(Trade).filter_by(ticket="dashboard-route-ticket").one_or_none()
             if trade:
                 db.delete(trade)
+            db.flush()
             signal = db.get(Signal, signal_id)
             if signal:
                 db.delete(signal)

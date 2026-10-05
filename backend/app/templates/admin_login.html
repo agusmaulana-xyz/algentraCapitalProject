@@ -2,7 +2,7 @@
 {% block title %}Admin Login | Algentra Capital{% endblock %}
 {% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
-<main class="page-shell login-shell">
+<main id="main" tabindex="-1" class="page-shell login-shell">
   <section class="login-card">
     <span class="eyebrow">ALGENTRA CAPITAL / PRIVATE ACCESS</span>
     <h1>Admin Login</h1>
@@ -19,7 +19,7 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 document.querySelector("#admin-login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = document.querySelector("#admin-message");

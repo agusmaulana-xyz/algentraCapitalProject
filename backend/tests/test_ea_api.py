@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.database import SessionLocal
 from app.gemini_parser import SignalClassification
 from app.main import app
-from app.models import AppSetting, EAStatus, Signal, Trade, utc_now
+from app.models import AppSetting, EAExecution, EAStatus, Signal, Trade, utc_now
 
 
 API_KEY = "m4-test-ea-api-key-32-characters-long"
@@ -98,6 +98,11 @@ def test_ea_api_key_heartbeat_claim_report_and_trade_result():
             assert trade.result == "WIN"
             assert ea_status.active is True
             db.merge(AppSetting(key="demo_mode", value="true"))
+            db.commit()
+        with SessionLocal() as db:
+            db.query(EAExecution).filter_by(signal_id=signal_id).delete(synchronize_session=False)
+            db.query(Trade).filter_by(ticket="98765").delete(synchronize_session=False)
+            db.query(Signal).filter_by(id=signal_id).delete(synchronize_session=False)
             db.commit()
 
 

@@ -7,7 +7,7 @@ import smtplib
 from datetime import datetime, timedelta
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from ..auth import hash_password, verify_password
 from ..config import get_settings
 from ..database import get_db
 from ..email_service import send_verification_code
-from ..models import AdminUser, ClientUser, EmailVerification, PasswordResetCode, utc_now
+from ..models import AdminUser, AuthSession, ClientUser, EmailVerification, PasswordResetCode, utc_now
 from ..security import (
     AUTH_EXPIRES_SESSION_KEY,
     REMEMBER_CLIENT_MAX_AGE,
@@ -38,6 +38,8 @@ from ..schemas import (
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 logger = logging.getLogger(__name__)
+# Perform the same bcrypt work for unknown usernames and email addresses.
+DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
 RESEND_INTERVAL = timedelta(minutes=1)
 SEND_WINDOW = timedelta(hours=1)
 SEND_LIMIT = 3
@@ -121,10 +123,18 @@ def _attempts_exhausted(record: EmailVerification | PasswordResetCode, now: date
     )
 
 
+def _deliver_password_reset(settings, email: str, code: str) -> None:
+    try:
+        send_verification_code(settings, email, code, purpose="password_reset")
+    except (OSError, smtplib.SMTPException) as exc:
+        logger.warning("Password reset email delivery failed (%s)", type(exc).__name__)
+
+
 @router.post("/login")
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
     user = db.get(AdminUser, payload.username)
-    if user is None or not verify_password(payload.password, user.password_hash):
+    password_valid = verify_password(payload.password, user.password_hash if user else DUMMY_PASSWORD_HASH)
+    if user is None or not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Username atau password salah")
     request.session.clear()
     request.session["admin_username"] = user.username
@@ -281,7 +291,7 @@ def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = De
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
-def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)) -> dict[str, str | int]:
+def request_password_reset(payload: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)) -> dict[str, str | int]:
     email = _normalized_email(payload.email)
     settings = get_settings()
     email_hash = _password_reset_email_key(email)
@@ -289,18 +299,18 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
     now = utc_now()
     db.execute(delete(PasswordResetCode).where(PasswordResetCode.last_activity_at < now - timedelta(hours=2)))
     user = db.execute(select(ClientUser).where(ClientUser.email == email)).scalar_one_or_none()
-    if user is None:
-        db.rollback()
-        raise HTTPException(status_code=404, detail="Email tidak terdaftar.")
     if not settings.email_configured:
         db.rollback()
-        raise HTTPException(status_code=503, detail="Reset kata sandi belum tersedia karena email SMTP belum dikonfigurasi")
+        return {"status": "accepted", "retry_after_seconds": int(RESEND_INTERVAL.total_seconds())}
+    if user is None:
+        db.rollback()
+        return {"status": "accepted", "retry_after_seconds": int(RESEND_INTERVAL.total_seconds())}
 
     challenge = db.get(PasswordResetCode, email_hash)
     wait = _send_wait_seconds(challenge, now) if challenge else 0
     if wait:
         db.rollback()
-        return {"status": "accepted", "retry_after_seconds": wait}
+        return {"status": "accepted", "retry_after_seconds": int(RESEND_INTERVAL.total_seconds())}
 
     code = f"{secrets.randbelow(1_000_000):06d}"
     code_hash = _password_reset_hash(email, code)
@@ -314,14 +324,11 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
         db.add(challenge)
     else:
         challenge.code_hash = code_hash
-    retry_after = _record_code_send(challenge, now)
+    _record_code_send(challenge, now)
     db.commit()
 
-    try:
-        send_verification_code(settings, email, code, purpose="password_reset")
-    except (OSError, smtplib.SMTPException) as exc:
-        logger.warning("Password reset email delivery failed (%s)", type(exc).__name__)
-    return {"status": "accepted", "retry_after_seconds": retry_after}
+    background_tasks.add_task(_deliver_password_reset, settings, email, code)
+    return {"status": "accepted", "retry_after_seconds": int(RESEND_INTERVAL.total_seconds())}
 
 
 @router.post("/password-reset/confirm")
@@ -369,6 +376,11 @@ def confirm_password_reset(payload: PasswordResetConfirmRequest, db: Session = D
         raise HTTPException(status_code=400, detail="Kode tidak valid atau kedaluwarsa")
 
     user.password_hash = hash_password(payload.password)
+    db.query(AuthSession).filter(
+        AuthSession.user_type == "client",
+        AuthSession.user_id == str(user.id),
+        AuthSession.revoked_at.is_(None),
+    ).update({AuthSession.revoked_at: now}, synchronize_session=False)
     db.delete(challenge)
     db.commit()
     return {"status": "password_reset"}
@@ -378,7 +390,8 @@ def confirm_password_reset(payload: PasswordResetConfirmRequest, db: Session = D
 def client_login(payload: ClientLoginRequest, request: Request, db: Session = Depends(get_db)) -> dict[str, str | int]:
     email = _normalized_email(payload.email)
     user = db.execute(select(ClientUser).where(ClientUser.email == email)).scalar_one_or_none()
-    if user is None or not verify_password(payload.password, user.password_hash):
+    password_valid = verify_password(payload.password, user.password_hash if user else DUMMY_PASSWORD_HASH)
+    if user is None or not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email atau kata sandi salah")
     request.session.clear()
     request.session["client_user_id"] = user.id

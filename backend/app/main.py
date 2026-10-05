@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import asyncio
+import secrets
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
@@ -7,21 +8,19 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.middleware.sessions import SessionMiddleware
 from urllib.parse import urlsplit
 
 from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting, Signal, utc_now
+from .public_realtime import public_performance_hub
 from .routers import auth, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
 from .routers.mt5 import require_client_id
 from .signal_service import SignalService
 from .security import (
-    SESSION_COOKIE_NAME,
-    SESSION_SIGNER_MAX_AGE,
+    DatabaseSessionMiddleware,
     RateLimitMiddleware,
-    SessionCookiePolicyMiddleware,
     SessionExpiryMiddleware,
     csrf_token,
     require_csrf,
@@ -62,19 +61,56 @@ async def lifespan(_: FastAPI):
         await telegram_manager.shutdown()
 
 
-app = FastAPI(title="Algentra Capital", version="0.3.0", lifespan=lifespan)
+app = FastAPI(
+    title="Algentra Capital",
+    version="0.3.0",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 config = get_settings()
 app.add_middleware(SessionExpiryMiddleware)
 app.add_middleware(
-    SessionMiddleware,
+    DatabaseSessionMiddleware,
     secret_key=config.app_secret_key.get_secret_value(),
-    session_cookie=SESSION_COOKIE_NAME,
-    max_age=SESSION_SIGNER_MAX_AGE,
-    same_site="lax",
     https_only=config.cookie_secure,
 )
-app.add_middleware(SessionCookiePolicyMiddleware, session_cookie=SESSION_COOKIE_NAME)
 app.add_middleware(RateLimitMiddleware)
+
+
+class SecurityHeadersMiddleware:
+    """Add browser security protections to every HTTP response."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        nonce = secrets.token_urlsafe(18)
+        scope.setdefault("state", {})["csp_nonce"] = nonce
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.extend([
+                    (b"content-security-policy", f"default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: wss:; script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{nonce}'; form-action 'self'".encode("ascii")),
+                    (b"x-frame-options", b"DENY"),
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+                    (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
+                ])
+                if config.cookie_secure:
+                    headers.append((b"strict-transport-security", b"max-age=31536000; includeSubDomains"))
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.exception_handler(RequestValidationError)
@@ -232,3 +268,27 @@ async def dashboard_websocket(websocket: WebSocket) -> None:
             await asyncio.sleep(3)
     except WebSocketDisconnect:
         return
+
+
+@app.websocket("/ws/public/performance")
+async def public_performance_websocket(websocket: WebSocket) -> None:
+    origin = websocket.headers.get("origin")
+    host = websocket.headers.get("host")
+    if origin and host and urlsplit(origin).netloc.casefold() != host.casefold():
+        await websocket.close(code=1008)
+        return
+
+    await public_performance_hub.connect(websocket)
+    try:
+        with SessionLocal() as db:
+            initial_payload = public_router.public_performance_payload(db)
+        await websocket.send_json(initial_payload)
+        public_performance_hub.mark_history_published()
+        while True:
+            message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        public_performance_hub.disconnect(websocket)

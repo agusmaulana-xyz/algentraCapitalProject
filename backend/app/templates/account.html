@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Akun Copy Trading | Algentra Capital{% endblock %}
 {% block content %}
-<main class="page-shell">
+<main id="main" tabindex="-1" class="page-shell">
   <div class="page-heading">
     <div><span class="eyebrow">PORTAL KLIEN / COPY TRADING</span><h1>Akun Copy Trading MT5</h1>
       <p class="page-description">Hubungkan akun MT5 untuk menyalin posisi dari akun utama Algentra.</p>
@@ -26,7 +26,7 @@
     <h2>Saldo dan performa akun MT5</h2>
     <p class="section-help">Saldo setiap akun diperbarui dari terminal MT5. Performa dihitung dari riwayat transaksi MT5 yang sudah ditutup. Nilai dengan mata uang berbeda ditampilkan terpisah.</p>
     <div id="client-balance-groups" class="grid"></div>
-    <div id="client-performance-groups" class="grid" style="margin-top:14px"></div>
+    <div id="client-performance-groups" class="grid client-performance-groups"></div>
     <p id="client-performance-updated" class="muted" aria-live="polite"></p>
   </section>
 
@@ -60,7 +60,7 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 const accountsBox = document.querySelector("#accounts");
 const statusBox = document.querySelector("#account-message");
