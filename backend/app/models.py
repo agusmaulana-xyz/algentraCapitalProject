@@ -283,6 +283,24 @@ class MT5MasterEquityMinuteSample(Base):
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
 
 
+class MT5MasterEquityCandle(Base):
+    __tablename__ = "mt5_master_equity_candles"
+    __table_args__ = (
+        UniqueConstraint("account_key", "minute_start", name="ux_mt5_master_equity_candle_account_minute"),
+        Index("ix_mt5_master_equity_candle_account_minute", "account_key", "minute_start"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_key: Mapped[str] = mapped_column(String(192), nullable=False)
+    minute_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    open_equity: Mapped[float] = mapped_column(Float, nullable=False)
+    high_equity: Mapped[float] = mapped_column(Float, nullable=False)
+    low_equity: Mapped[float] = mapped_column(Float, nullable=False)
+    close_equity: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(16), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
 class MasterCopyPosition(Base):
     __tablename__ = "mt5_master_copy_positions"
     __table_args__ = (

@@ -9,10 +9,11 @@ input string AccountToken = "";
 input int PollIntervalMs = 1000;
 input long MagicNumber = 26100301;
 input double VolumeMultiplier = 1.0;
-input double MaxEntryDeviationPercent = 2.0;
+input double MaxEntryDeviationPercent = 0.0; // 0 disables the late-entry gate for existing master positions
 input int MaxSlippagePoints = 20;
 input int MaxPositions = 20;
 input string SymbolSuffix = "";
+input string SymbolMapCsv = ""; // Optional source-to-broker mapping, e.g. XAUUSDc=GOLD
 input bool AllowLiveTrading = false;
 
 CTrade g_trade;
@@ -176,6 +177,113 @@ string AccountTradeModeText()
    return "demo";
   }
 
+bool TradingOptInAllowsAccount()
+  {
+   return AccountInfoInteger(ACCOUNT_TRADE_MODE) != ACCOUNT_TRADE_MODE_REAL || AllowLiveTrading;
+  }
+
+bool TrySelectBrokerSymbol(const string candidate, string &resolved)
+  {
+   if(StringLen(candidate) == 0 || !SymbolSelect(candidate, true))
+      return false;
+   resolved = candidate;
+   return true;
+  }
+
+bool ResolveBrokerSymbol(const string requested, const string suffix, const string mapping_csv,
+                         string &resolved, string &reason)
+  {
+   resolved = "";
+   reason = "";
+   string source = requested;
+   StringTrimLeft(source);
+   StringTrimRight(source);
+   if(StringLen(source) == 0)
+     {
+      reason = "master symbol is empty";
+      return false;
+     }
+
+   string mapped = "";
+   string mappings[];
+   int mapping_count = StringSplit(mapping_csv, ',', mappings);
+   for(int i = 0; i < mapping_count; i++)
+     {
+      string item = mappings[i];
+      StringTrimLeft(item);
+      StringTrimRight(item);
+      int equal_at = StringFind(item, "=");
+      if(equal_at <= 0)
+         continue;
+      string from_symbol = StringSubstr(item, 0, equal_at);
+      string to_symbol = StringSubstr(item, equal_at + 1);
+      StringTrimLeft(from_symbol);
+      StringTrimRight(from_symbol);
+      StringTrimLeft(to_symbol);
+      StringTrimRight(to_symbol);
+      string from_upper = from_symbol;
+      string source_upper = source;
+      StringToUpper(from_upper);
+      StringToUpper(source_upper);
+      if(from_upper == source_upper && StringLen(to_symbol) > 0)
+        {
+         mapped = to_symbol;
+         break;
+        }
+     }
+
+   if(mapped != "")
+     {
+      if(TrySelectBrokerSymbol(mapped, resolved))
+         return true;
+      if(suffix != "" && TrySelectBrokerSymbol(mapped + suffix, resolved))
+         return true;
+     }
+   if(suffix != "" && TrySelectBrokerSymbol(source + suffix, resolved))
+      return true;
+   if(TrySelectBrokerSymbol(source, resolved))
+      return true;
+
+   string search_for = mapped != "" ? mapped : source;
+   string search_upper = search_for;
+   StringToUpper(search_upper);
+   int matches = 0;
+   string match = "";
+   string match_list = "";
+   int symbols_total = SymbolsTotal(false);
+   for(int i = 0; i < symbols_total; i++)
+     {
+      string candidate = SymbolName(i, false);
+      string candidate_upper = candidate;
+      StringToUpper(candidate_upper);
+      if(candidate_upper == search_upper)
+         continue;
+      bool candidate_has_suffix = StringFind(candidate_upper, search_upper) == 0;
+      bool candidate_is_base = StringLen(candidate_upper) >= 3 && StringFind(search_upper, candidate_upper) == 0;
+      if(!candidate_has_suffix && !candidate_is_base)
+         continue;
+      if(!SymbolSelect(candidate, true))
+         continue;
+      matches++;
+      match = candidate;
+      if(matches <= 3)
+         match_list += (matches == 1 ? "" : ", ") + candidate;
+     }
+
+   if(matches == 1)
+     {
+      resolved = match;
+      return true;
+     }
+   if(matches > 1)
+     {
+      reason = StringFormat("master symbol %s matches multiple follower instruments (%s); configure SymbolSuffix or SymbolMapCsv", source, match_list);
+      return false;
+     }
+   reason = StringFormat("no follower symbol matches master symbol %s; configure SymbolSuffix or SymbolMapCsv", source);
+   return false;
+  }
+
 string DealEntryText(const ENUM_DEAL_ENTRY entry)
   {
    if(entry == DEAL_ENTRY_IN) return "IN";
@@ -291,7 +399,7 @@ void ReportAccountState()
       DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 8),
       DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 8),
       currency, AccountTradeModeText(),
-      AllowLiveTrading ? "true" : "false",
+      TradingOptInAllowsAccount() ? "true" : "false",
       (TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && AccountInfoInteger(ACCOUNT_TRADE_ALLOWED)) ? "true" : "false",
       (MQLInfoInteger(MQL_TRADE_ALLOWED) && AccountInfoInteger(ACCOUNT_TRADE_EXPERT)) ? "true" : "false",
       CurrentOpenPositionIds(), deals_json);
@@ -335,10 +443,22 @@ double NormalizeLots(const string symbol, const double requested)
    double minimum = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
    double maximum = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
    double step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-   if(minimum <= 0.0 || maximum <= 0.0 || step <= 0.0 || requested < minimum || requested > maximum)
+   if(minimum <= 0.0 || maximum <= 0.0 || step <= 0.0 || requested < minimum)
       return 0.0;
-   double lots = minimum + MathFloor((requested - minimum + step * 0.000001) / step) * step;
+   double capped_request = MathMin(requested, maximum);
+   double lots = minimum + MathFloor((capped_request - minimum + step * 0.000001) / step) * step;
+   if(lots > maximum + step * 0.000001)
+      lots -= step;
    return NormalizeDouble(lots, VolumePrecision(step));
+  }
+
+int CountManagedPositions()
+  {
+   int count = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+      if(PositionGetTicket(i) > 0 && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+         count++;
+   return count;
   }
 
 bool IsSourceTicket(const string ticket, string &source_tickets[])
@@ -394,9 +514,6 @@ void ReconcileVolumeAndStops(const string source_ticket, const string symbol, co
    if(target_volume <= 0.0)
      {
       Print("[MT5FollowerCopyEA] source ", source_ticket, " skipped: Copy Trading lot is outside broker limits");
-      for(int i = 0; i < ArraySize(local_tickets); i++)
-         if(g_trade.PositionClose(local_tickets[i], MaxSlippagePoints))
-            Print("[MT5FollowerCopyEA] closed Copy Trading position because target lot is below broker minimum");
       return;
      }
    double step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
@@ -489,12 +606,13 @@ void PollAndCopy()
    for(int i = 0; i < total; i++)
       source_tickets[i] = JsonStringValue(objects[i], "ticket");
 
-   if(!AllowLiveTrading)
+   if(!TradingOptInAllowsAccount())
      {
-      g_connection_status = "connected / live copying disabled";
+      g_connection_status = "connected / live account copying disabled";
       return;
      }
-   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED) ||
+      !AccountInfoInteger(ACCOUNT_TRADE_ALLOWED) || !AccountInfoInteger(ACCOUNT_TRADE_EXPERT))
      {
       g_connection_status = "connected / trading not allowed by terminal";
       return;
@@ -512,7 +630,8 @@ void PollAndCopy()
       string object = objects[i];
       string source_ticket = JsonStringValue(object, "ticket");
       string source_symbol = JsonStringValue(object, "symbol");
-      string symbol = source_symbol + SymbolSuffix;
+      string symbol;
+      string symbol_error;
       string action = JsonStringValue(object, "action");
       double lots = JsonNumberValue(object, "lots");
       double entry = JsonNumberValue(object, "entry_price");
@@ -520,11 +639,20 @@ void PollAndCopy()
       double tp = JsonNumberValue(object, "tp");
       if(source_ticket == "" || source_symbol == "" || (action != "BUY" && action != "SELL") || lots <= 0.0)
          continue;
+      if(!ResolveBrokerSymbol(source_symbol, SymbolSuffix, SymbolMapCsv, symbol, symbol_error))
+        {
+         if(TimeCurrent() - g_last_log >= 15)
+           {
+            Print("[MT5FollowerCopyEA] source ", source_ticket, " waiting: ", symbol_error);
+            g_last_log = TimeCurrent();
+           }
+         continue;
+        }
 
       ulong local_tickets[];
       double local_volume = 0.0;
       bool already_copied = FindCopiedPositions(source_ticket, local_tickets, local_volume);
-      if(!already_copied && PositionsTotal() >= MaxPositions)
+      if(!already_copied && CountManagedPositions() >= MaxPositions)
         {
          if(TimeCurrent() - g_last_log >= 15)
            {
@@ -534,7 +662,15 @@ void PollAndCopy()
          continue;
         }
       MqlTick quote;
-      if(!SymbolSelect(symbol, true) || !SymbolInfoTick(symbol, quote)) continue;
+      if(!SymbolInfoTick(symbol, quote) || quote.ask <= 0.0 || quote.bid <= 0.0)
+        {
+         if(TimeCurrent() - g_last_log >= 15)
+           {
+            Print("[MT5FollowerCopyEA] source ", source_ticket, " waiting: no live quote for ", symbol);
+            g_last_log = TimeCurrent();
+           }
+         continue;
+        }
       double current_price = action == "BUY" ? quote.ask : quote.bid;
       if(!already_copied && MaxEntryDeviationPercent > 0.0 && entry > 0.0 &&
          MathAbs(current_price - entry) / entry * 100.0 > MaxEntryDeviationPercent)
@@ -560,7 +696,7 @@ int OnInit()
    EventSetMillisecondTimer(PollIntervalMs);
    ReportAccountState();
    PollAndCopy();
-   Print("[MT5FollowerCopyEA] initialized; live copying defaults to disabled. Allow ServerURL in MT5 WebRequest options.");
+   Print("[MT5FollowerCopyEA] initialized; demo/contest accounts can copy when MT5 trading is enabled. Real accounts require AllowLiveTrading=true. Allow ServerURL in MT5 WebRequest options.");
    return INIT_SUCCEEDED;
   }
 
@@ -576,8 +712,8 @@ void OnTimer()
    ReportAccountState();
    PollAndCopy();
    Comment("Algentra MT5 Copy Trading\nBackend: ", g_connection_status,
-           "\nPositions: ", PositionsTotal(), " / ", MaxPositions,
+           "\nManaged positions: ", CountManagedPositions(), " / ", MaxPositions,
            "\nSaldo: ", AccountInfoString(ACCOUNT_CURRENCY), " ", DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2),
-           "\nLive copying: ", AllowLiveTrading ? "ON" : "OFF",
+           "\nCopying permission: ", TradingOptInAllowsAccount() ? "ON" : "OFF",
            "\nLaporan akun: ", g_account_report_status);
   }

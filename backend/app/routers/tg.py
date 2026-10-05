@@ -123,6 +123,12 @@ async def select_groups(payload: GroupSelectionRequest, db: Session = Depends(ge
     allowed = {item["chat_id"]: item for item in available}
     if len({item.chat_id for item in payload.groups}) != len(payload.groups):
         raise HTTPException(status_code=422, detail="chat_id tidak boleh duplikat")
+    submitted_ids = {item.chat_id for item in payload.groups}
+    disabled = 0
+    for saved in db.query(ChatGroup).all():
+        if saved.enabled and saved.chat_id not in submitted_ids:
+            saved.enabled = False
+            disabled += 1
     for selection in payload.groups:
         if selection.chat_id not in allowed:
             raise HTTPException(status_code=422, detail="Grup harus dipilih dari daftar akun Telegram")
@@ -133,4 +139,4 @@ async def select_groups(payload: GroupSelectionRequest, db: Session = Depends(ge
         item.enabled = selection.enabled
         item.alias = selection.alias.strip()[:255] if selection.alias and selection.alias.strip() else None
     db.commit()
-    return {"saved": len(payload.groups)}
+    return {"saved": len(payload.groups), "disabled": disabled}

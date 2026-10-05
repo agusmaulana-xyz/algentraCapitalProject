@@ -129,7 +129,13 @@ def regex_fallback(message: str) -> SignalClassification:
     if re.search(r"\b(?:promo|promotion|join\s+vip|join\s+sekarang|profit\s+hari\s+ini)\b", text, re.IGNORECASE):
         return not_signal("Pesan promosi atau percakapan")
 
-    symbol_match = re.search(r"\b(XAUUSD(?:[A-Z]|\.[A-Z])?|GOLD|XAU|EMAS|[A-Z]{6}(?:[A-Z]|\.[A-Z])?)\b", text, re.IGNORECASE)
+    symbol_match = re.search(
+        r"\b(XAUUSD(?:[A-Z0-9]{1,8}|[._-][A-Z0-9]+)?|GOLD|XAU|EMAS|XAGUSD|SILVER|"
+        r"US30|NAS100|US100|US500|SPX500|GER40|DE40|UK100|USOIL|WTI|BRENT|"
+        r"BTCUSD|ETHUSD|DOGEUSD|SOLUSD|BNBUSD|XRPUSD|[A-Z]{6}(?:[A-Z0-9]{1,8}|[._-][A-Z0-9]+)?)\b",
+        text,
+        re.IGNORECASE,
+    )
     symbol = symbol_match.group(1).upper() if symbol_match else None
     if symbol and symbol in {"BUY", "SELL", "LONG", "SHORT"}:
         symbol = None

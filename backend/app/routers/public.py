@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
@@ -24,6 +25,7 @@ from ..time_utils import as_utc, wib_iso
 
 
 router = APIRouter(tags=["public"])
+MARKET_SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "backend" / "app" / "templates"))
 
 
@@ -100,14 +102,26 @@ def public_performance_payload(db: Session, *, include_equity_curve: bool = True
             decoded_quotes = json.loads(market_state.quotes_json)
             if isinstance(decoded_quotes, list):
                 for quote in decoded_quotes:
-                    if not isinstance(quote, dict) or quote.get("symbol") not in {"XAUUSD", "EURUSD", "USDJPY", "GBPUSD"}:
+                    if not isinstance(quote, dict):
                         continue
                     try:
+                        symbol = quote["symbol"]
+                        bid = float(quote["bid"])
+                        ask = float(quote["ask"])
+                        if (
+                            not isinstance(symbol, str)
+                            or not MARKET_SYMBOL_PATTERN.fullmatch(symbol)
+                            or not math.isfinite(bid)
+                            or not math.isfinite(ask)
+                            or bid <= 0
+                            or ask < bid
+                        ):
+                            continue
                         tick_time = datetime.fromtimestamp(int(quote["time_msc"]) / 1000, timezone.utc)
                         market_quotes.append({
-                            "symbol": quote["symbol"],
-                            "bid": float(quote["bid"]),
-                            "ask": float(quote["ask"]),
+                            "symbol": symbol,
+                            "bid": bid,
+                            "ask": ask,
                             "updated_at": wib_iso(tick_time),
                         })
                     except (KeyError, TypeError, ValueError, OverflowError, OSError):
@@ -171,7 +185,33 @@ def public_performance_payload(db: Session, *, include_equity_curve: bool = True
         "registered_clients": registered_clients,
     }
     if include_equity_curve:
+        latest_equity_account_key = db.execute(
+            select(MT5MasterEquityCandle.account_key)
+            .order_by(MT5MasterEquityCandle.observed_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        equity_candles = list(db.execute(
+            select(MT5MasterEquityCandle)
+            .where(
+                MT5MasterEquityCandle.account_key == latest_equity_account_key,
+                MT5MasterEquityCandle.minute_start >= now - timedelta(hours=5),
+            )
+            .order_by(MT5MasterEquityCandle.minute_start.desc())
+            .limit(300)
+        ).scalars()) if latest_equity_account_key else []
+        equity_candles.reverse()
+        current_minute = now.replace(second=0, microsecond=0)
         payload["equity_curve"] = equity_curve
+        payload["equity_candles"] = [{
+            "minute": wib_iso(candle.minute_start),
+            "open": round(candle.open_equity, 2),
+            "high": round(candle.high_equity, 2),
+            "low": round(candle.low_equity, 2),
+            "close": round(candle.close_equity, 2),
+            "currency": candle.currency,
+            "closed": as_utc(candle.minute_start) < current_minute,
+            "observed_at": wib_iso(candle.observed_at),
+        } for candle in equity_candles]
     return payload
 
 

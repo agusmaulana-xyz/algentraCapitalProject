@@ -20,17 +20,6 @@ _SIGNAL_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 _PRICE_RE = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?")
-_XAU_MENTION_RE = re.compile(r"\b(?:XAUUSD|XAU|GOLD|EMAS)(?:[._-]?[A-Z0-9]+)?\b", re.IGNORECASE)
-_FX_AND_METAL_PAIR_RE = re.compile(
-    r"\b(?:EUR|USD|GBP|JPY|AUD|NZD|CHF|CAD|SGD|HKD|NOK|SEK|CNH|TRY|ZAR|MXN|PLN|CZK|HUF|BTC|ETH|XAG)"
-    r"(?:EUR|USD|GBP|JPY|AUD|NZD|CHF|CAD|SGD|HKD|NOK|SEK|CNH|TRY|ZAR|MXN|PLN|CZK|HUF|XAU|XAG)\b",
-    re.IGNORECASE,
-)
-_OTHER_INSTRUMENT_RE = re.compile(
-    r"\b(?:US30|NAS100|US100|US500|SPX500|GER40|DE40|UK100|USOIL|WTI|BRENT|DOW|DJI|NASDAQ|"
-    r"BTC|BITCOIN|ETH|ETHEREUM|XAG|SILVER|DOGE|SOLANA|BNB|XRP)\b",
-    re.IGNORECASE,
-)
 _TRADE_RESULT_RE = re.compile(
     r"\b(?:TP\s*\d*|SL|STOP\s*LOSS)\s*(?:HIT|KEN[A]?|REACHED|TERCAPAI)\b|"
     r"\b(?:CLOSED|CLOSE|PROFIT|LOSS)\s+(?:TRADE|POSITION|POSISI)\b|"
@@ -40,8 +29,8 @@ _TRADE_RESULT_RE = re.compile(
 )
 
 
-def _xau_signal_candidate(raw_text: str, context: str | None, default_symbol: str) -> tuple[bool, str]:
-    """Keep obvious XAUUSD signal candidates on the Gemini path only."""
+def _signal_candidate(raw_text: str, context: str | None) -> tuple[bool, str]:
+    """Pass trade-shaped messages to the parser regardless of the instrument."""
     text = raw_text.strip()
     if not text:
         return False, "Pesan kosong"
@@ -49,20 +38,11 @@ def _xau_signal_candidate(raw_text: str, context: str | None, default_symbol: st
         return False, "Laporan hasil trade, bukan sinyal baru"
     if not _TRADE_ACTION_RE.search(text) and not (context and _TRADE_ACTION_RE.search(context)):
         return False, "Tidak ada arah BUY/SELL"
-    if not _PRICE_RE.search(text):
-        return False, "Tidak ada harga sinyal"
-    mentions_xau = bool(_XAU_MENTION_RE.search(text))
-    mentions_other = bool(_FX_AND_METAL_PAIR_RE.search(text) or _OTHER_INSTRUMENT_RE.search(text))
-    if not _SIGNAL_MARKER_RE.search(text) and not (mentions_xau and _TRADE_ACTION_RE.search(text)):
+    if not _PRICE_RE.search(text) and not re.search(r"\b(?:NOW|MARKET)\b", text, re.IGNORECASE):
+        return False, "Tidak ada harga atau instruksi market"
+    if not _SIGNAL_MARKER_RE.search(text) and not _TRADE_ACTION_RE.search(text):
         return False, "Tidak ada format harga/level sinyal"
-    if mentions_xau and mentions_other:
-        return False, "Pesan menyebut beberapa instrumen"
-    if mentions_other:
-        return False, "Instrumen bukan XAUUSD"
-    normalized_default = normalize_symbol(default_symbol).upper()
-    if not mentions_xau and not normalized_default.startswith("XAUUSD"):
-        return False, "Instrumen tidak disebut dan simbol default bukan XAUUSD"
-    return True, "Kandidat sinyal XAUUSD"
+    return True, "Kandidat sinyal trading"
 
 
 @dataclass
@@ -223,8 +203,7 @@ class SignalService:
         if duplicate:
             return ProcessResult(duplicate.status, duplicate.id, None, duplicate.normalized_text, "Signal identik dalam jendela waktu yang sama", True)
 
-        default_symbol_hint = str(_setting(db, "default_symbol", "XAUUSD"))
-        should_parse, filter_reason = _xau_signal_candidate(raw_text, context, default_symbol_hint)
+        should_parse, filter_reason = _signal_candidate(raw_text, context)
         if not should_parse:
             classification = not_signal(f"Gemini dilewati: {filter_reason}")
         else:
