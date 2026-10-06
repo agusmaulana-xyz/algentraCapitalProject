@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Riwayat Transaksi | Algentra Capital{% endblock %}
+{% block extra_head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .transaction-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:18px 0; }
+  .transaction-toolbar label { display:flex; align-items:center; gap:9px; }
+  .transaction-toolbar select { width:auto; min-width:210px; }
+  .transaction-card { align-self:start; }
+  .transaction-card__top { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:8px; }
+  .transaction-card__top h3 { margin-bottom:5px; }
+  .transaction-badge { display:inline-flex; align-items:center; min-height:25px; padding:3px 9px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:10px; font-weight:800; }
+  .transaction-badge--pending_payment, .transaction-badge--payment_submitted { color:#ead18f; }
+  .transaction-badge--approved { color:#83e3a8; }
+  .transaction-badge--rejected { color:#e8a2a2; }
+  .transaction-details { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:8px 14px; margin:14px 0; }
+  .transaction-details div { min-width:0; padding:9px 11px; border:1px solid var(--line); border-radius:10px; background:var(--glass-raised); }
+  .transaction-details dt { color:var(--muted); font-size:10px; }
+  .transaction-details dd { margin:2px 0 0; overflow-wrap:anywhere; font-size:12px; font-weight:700; }
+  .transaction-note { margin:12px 0; padding:12px; border-left:3px solid var(--gold); border-radius:8px; color:var(--ink); background:var(--glass-raised); font-size:11px; }
+  .transaction-qr { display:block; width:min(100%,260px); margin:14px auto; border-radius:12px; }
+  .transaction-proof-form { margin:12px 0; padding-top:12px; border-top:1px solid var(--line); }
+  .transaction-proof-form[hidden] { display:none; }
+  .transaction-proof-form button { margin-top:10px; }
+  .receipt-dialog { width:min(720px,calc(100vw - 28px)); max-height:min(90dvh,900px); padding:0; border:1px solid var(--glass-border); border-radius:18px; color:var(--ink); background:var(--panel); box-shadow:0 22px 60px #0009; }
+  .receipt-dialog::backdrop { background:#0009; backdrop-filter:blur(3px); }
+  .receipt-dialog__head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .receipt-dialog__body { max-height:calc(90dvh - 76px); overflow:auto; padding:20px; }
+  .receipt-dialog__body h2 { margin-bottom:4px; }
+  .receipt-proof { display:block; width:auto; max-width:100%; max-height:55dvh; margin:18px auto 0; object-fit:contain; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .receipt-empty { color:var(--muted); font-size:12px; }
+  @media (max-width:600px) {
+    .transaction-toolbar label { width:100%; align-items:flex-start; flex-direction:column; }
+    .transaction-toolbar select { width:100%; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<main id="main" tabindex="-1" class="page-shell">
+  <div class="page-heading">
+    <div><span class="eyebrow">PORTAL KLIEN / PEMBAYARAN</span><h1>Riwayat transaksi</h1>
+      <p class="page-description">Lihat status pesanan, lanjutkan pembayaran, dan buka nota beserta bukti transaksi dari halaman ini.</p>
+    </div>
+    <a class="workspace-tag" href="/account">Kembali ke akun MT5</a>
+  </div>
+  <section aria-labelledby="transactions-title">
+    <h2 id="transactions-title">Pesanan dan pembayaran</h2>
+    <div class="transaction-toolbar">
+      <p class="section-help">Nota hanya dapat dibuka oleh pemilik akun. Bukti pembayaran yang dikirim tersimpan privat.</p>
+      <label for="transaction-filter">Tampilkan
+        <select id="transaction-filter">
+          <option value="ALL">Semua transaksi</option>
+          <option value="PENDING_PAYMENT">Menunggu pembayaran</option>
+          <option value="PAYMENT_SUBMITTED">Sedang diproses</option>
+          <option value="APPROVED">Transaksi diterima</option>
+          <option value="REJECTED">Tidak valid</option>
+          <option value="CANCELLED">Dibatalkan</option>
+        </select>
+      </label>
+    </div>
+    <p id="transaction-message" class="status" role="status" aria-live="polite"></p>
+    <div id="transactions-list" class="grid" aria-live="polite"></div>
+  </section>
+</main>
+
+<dialog id="receipt-dialog" class="receipt-dialog" aria-labelledby="receipt-title">
+  <div class="receipt-dialog__head">
+    <strong>Nota pembayaran</strong>
+    <button id="receipt-close" class="secondary" type="button" aria-label="Tutup nota">Tutup</button>
+  </div>
+  <div id="receipt-content" class="receipt-dialog__body"></div>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+const transactionsList = document.querySelector("#transactions-list");
+const transactionMessage = document.querySelector("#transaction-message");
+const transactionFilter = document.querySelector("#transaction-filter");
+const receiptDialog = document.querySelector("#receipt-dialog");
+const receiptContent = document.querySelector("#receipt-content");
+const clientPlans = {{ client_plans | tojson }};
+const requestedOrderId = Number(new URLSearchParams(location.search).get("order")) || null;
+let orders = [];
+let expandedPaymentOrderId = requestedOrderId;
+let showProofFormForOrderId = null;
+let renderedFingerprint = "";
+
+async function api(path, options = {}) {
+  const headers = {...(options.headers || {})};
+  if (options.method && options.method !== "GET") headers["X-CSRF-Token"] = csrfToken;
+  if (options.body && !(options.body instanceof FormData)) headers["Content-Type"] = "application/json";
+  const response = await fetch(path, {...options, headers});
+  const result = await parseApiResponse(response);
+  if (!response.ok) throw new Error(result.detail || "Permintaan gagal.");
+  return result;
+}
+
+const money = (value) => `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+const statusNames = {
+  PENDING_PAYMENT: "Menunggu pembayaran",
+  PAYMENT_SUBMITTED: "Sedang diproses",
+  APPROVED: "Transaksi diterima",
+  REJECTED: "Transaksi tidak valid",
+  CANCELLED: "Dibatalkan"
+};
+const orderDate = (value) => value
+  ? new Date(value).toLocaleString("id-ID", {timeZone:"Asia/Jakarta", dateStyle:"medium", timeStyle:"short"}) + " WIB"
+  : "-";
+
+function addDetail(list, label, value) {
+  const item = document.createElement("div");
+  const term = document.createElement("dt"); term.textContent = label;
+  const detail = document.createElement("dd"); detail.textContent = value;
+  item.append(term, detail); list.append(item);
+}
+
+function detailsFor(order) {
+  const plan = clientPlans[order.plan] || {name:order.plan, vcpu:"-", ram:"-", disk:"-"};
+  const details = document.createElement("dl"); details.className = "transaction-details";
+  addDetail(details, "Nomor transaksi", `#${order.id}`);
+  addDetail(details, "Paket", `${plan.name} - ${plan.vcpu} - RAM ${plan.ram} - Disk ${plan.disk}`);
+  addDetail(details, "Total pembayaran", money(order.total_idr));
+  addDetail(details, "Nama akun", order.label);
+  addDetail(details, "Login MT5", `${order.login} - ${order.server}`);
+  addDetail(details, "Tanggal pesanan", orderDate(order.created_at));
+  return details;
+}
+
+function showReceipt(order) {
+  receiptContent.replaceChildren();
+  const title = document.createElement("h2"); title.id = "receipt-title"; title.textContent = `Nota transaksi #${order.id}`;
+  const state = document.createElement("p"); state.className = "transaction-note";
+  state.textContent = `Status: ${statusNames[order.status] || order.status}`;
+  receiptContent.append(title, state, detailsFor(order));
+  if (order.has_proof) {
+    const label = document.createElement("h3"); label.textContent = "Bukti pembayaran";
+    const proof = document.createElement("img"); proof.className = "receipt-proof";
+    proof.src = `/api/payments/orders/${order.id}/proof`;
+    proof.alt = `Bukti pembayaran untuk transaksi ${order.id}`;
+    receiptContent.append(label, proof);
+  } else {
+    const noProof = document.createElement("p"); noProof.className = "receipt-empty";
+    noProof.textContent = "Bukti transaksi belum diunggah untuk pesanan ini.";
+    receiptContent.append(noProof);
+  }
+  receiptDialog.showModal();
+}
+
+function addButton(parent, label, callback, secondary = false) {
+  const button = document.createElement("button");
+  button.type = "button"; button.textContent = label;
+  if (secondary) button.className = "secondary";
+  button.addEventListener("click", callback);
+  parent.append(button);
+  return button;
+}
+
+function renderOrders(force = false) {
+  const fingerprint = JSON.stringify([orders, transactionFilter.value, expandedPaymentOrderId, showProofFormForOrderId]);
+  if (!force && fingerprint === renderedFingerprint) return;
+  renderedFingerprint = fingerprint;
+  transactionsList.replaceChildren();
+  const visibleOrders = transactionFilter.value === "ALL" ? orders : orders.filter((order) => order.status === transactionFilter.value);
+  if (!visibleOrders.length) {
+    transactionsList.textContent = orders.length ? "Tidak ada transaksi untuk filter ini." : "Belum ada transaksi.";
+    return;
+  }
+
+  for (const order of visibleOrders) {
+    const card = document.createElement("article"); card.className = "card transaction-card";
+    const top = document.createElement("div"); top.className = "transaction-card__top";
+    const title = document.createElement("h3"); title.textContent = `${order.label} - Pesanan #${order.id}`;
+    const badge = document.createElement("span"); badge.className = `transaction-badge transaction-badge--${order.status.toLowerCase()}`;
+    badge.textContent = statusNames[order.status] || order.status;
+    top.append(title, badge);
+    card.append(top, detailsFor(order));
+
+    const actions = document.createElement("div"); actions.className = "toolbar";
+    if (order.has_proof) addButton(actions, "Lihat nota pembayaran", () => showReceipt(order), true);
+    if (order.status === "PENDING_PAYMENT") {
+      addButton(actions, expandedPaymentOrderId === order.id ? "Tutup pembayaran" : "Lanjutkan pembayaran", () => {
+        expandedPaymentOrderId = expandedPaymentOrderId === order.id ? null : order.id;
+        renderOrders(true);
+      });
+    } else if (order.status === "PAYMENT_SUBMITTED") {
+      const progress = document.createElement("p"); progress.className = "transaction-note";
+      progress.textContent = order.notification_sent
+        ? "Bukti sudah dikirim. Pembuatan akun sedang diproses dan menunggu pemeriksaan admin."
+        : "Bukti tersimpan, tetapi notifikasi ke admin belum terkirim.";
+      card.append(progress);
+      if (!order.notification_sent) {
+        const retry = addButton(actions, "Kirim ulang notifikasi admin", async (event) => {
+          retry.disabled = true;
+          try {
+            const result = await api(`/api/payments/orders/${order.id}/notify`, {method:"POST"});
+            transactionMessage.textContent = result.notification_sent
+              ? "Notifikasi transaksi terkirim ke admin."
+              : "Bot belum dapat menghubungi admin. Periksa konfigurasi Telegram.";
+            await loadOrders(true);
+          } catch (error) { transactionMessage.textContent = error.message; retry.disabled = false; }
+        }, true);
+      }
+    } else if (order.status === "APPROVED") {
+      const complete = document.createElement("p"); complete.className = "transaction-note";
+      complete.textContent = "Pembayaran diterima dan akun Copy Trading sudah dibuat.";
+      card.append(complete);
+      addButton(actions, "Buka akun Copy Trading", () => { window.location.assign("/account"); }, true);
+    } else if (order.status === "REJECTED") {
+      const rejected = document.createElement("p"); rejected.className = "transaction-note";
+      rejected.textContent = "Admin menandai pembayaran ini tidak valid. Hubungi admin untuk tindak lanjut.";
+      card.append(rejected);
+    }
+
+    if (["PENDING_PAYMENT", "PAYMENT_SUBMITTED"].includes(order.status)) {
+      addButton(actions, "Batalkan pesanan", async () => {
+        try {
+          await api(`/api/payments/orders/${order.id}/cancel`, {method:"POST"});
+          transactionMessage.textContent = "Pesanan dibatalkan.";
+          expandedPaymentOrderId = null; showProofFormForOrderId = null;
+          await loadOrders(true);
+        } catch (error) { transactionMessage.textContent = error.message; }
+      }, true);
+    }
+    if (actions.childElementCount) card.append(actions);
+
+    if (order.status === "PENDING_PAYMENT" && expandedPaymentOrderId === order.id) {
+      const qr = document.createElement("img"); qr.className = "transaction-qr"; qr.src = "/api/payments/qris-demo.svg";
+      qr.alt = "Gambar contoh QRIS DEMO, tidak dapat dipindai";
+      const warning = document.createElement("p"); warning.className = "transaction-note";
+      warning.textContent = "QR ini hanya contoh dan tidak dapat dipindai. Ganti dengan QRIS resmi sebelum menerima pembayaran.";
+      card.append(qr, warning);
+      if (showProofFormForOrderId !== order.id) {
+        addButton(card, "Saya sudah bayar", () => { showProofFormForOrderId = order.id; renderOrders(true); });
+      } else {
+        const form = document.createElement("form"); form.className = "transaction-proof-form";
+        const label = document.createElement("label"); label.textContent = "Unggah bukti transaksi (JPG, PNG, atau WebP, maksimal 5 MB)";
+        const input = document.createElement("input"); input.type = "file"; input.name = "file";
+        input.accept = "image/jpeg,image/png,image/webp"; input.required = true; label.append(input);
+        const submit = document.createElement("button"); submit.type = "submit"; submit.textContent = "Kirim bukti transaksi";
+        form.append(label, submit);
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault(); submit.disabled = true;
+          try {
+            const body = new FormData(); body.append("file", input.files[0]);
+            await api(`/api/payments/orders/${order.id}/proof`, {method:"POST", body});
+            transactionMessage.textContent = "Bukti terkirim. Pembuatan akun sedang diproses sambil menunggu pemeriksaan admin.";
+            showProofFormForOrderId = null; expandedPaymentOrderId = null;
+            await loadOrders(true);
+          } catch (error) { transactionMessage.textContent = error.message; submit.disabled = false; }
+        });
+        card.append(form);
+      }
+    }
+    transactionsList.append(card);
+  }
+}
+
+async function loadOrders(force = false) {
+  try {
+    orders = await api("/api/payments/orders", {cache:"no-store"});
+    renderOrders(force);
+  } catch (error) { transactionMessage.textContent = error.message; }
+}
+
+transactionFilter.addEventListener("change", () => renderOrders(true));
+document.querySelector("#receipt-close").addEventListener("click", () => receiptDialog.close());
+receiptDialog.addEventListener("click", (event) => {
+  if (event.target === receiptDialog) receiptDialog.close();
+});
+loadOrders();
+setInterval(() => { if (!document.hidden) loadOrders(); }, 7000);
+</script>
+{% endblock %}

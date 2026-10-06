@@ -18,7 +18,7 @@ from .client_plans import CLIENT_PLANS
 from .database import Base, SessionLocal, engine, get_db, migrate_schema
 from .models import AppSetting, Signal, utc_now
 from .public_realtime import public_performance_hub
-from .routers import auth, cs as cs_router, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
+from .routers import auth, cs as cs_router, dashboard, ea, mt5 as mt5_router, parser as parser_router, payments as payments_router, public as public_router, settings, tg as tg_router
 from .routers.mt5 import require_client_id
 from .registration import registration_is_open
 from .signal_service import SignalService
@@ -31,6 +31,7 @@ from .security import (
 )
 from .stats_service import get_dashboard_stats
 from .time_utils import wib_iso
+from .payment_bot import payment_review_bot
 
 
 @asynccontextmanager
@@ -64,6 +65,7 @@ async def lifespan(_: FastAPI):
     await asyncio.to_thread(purge_expired_conversations)
     cs_cleanup_task = asyncio.create_task(cleanup_expired_conversations_periodically())
     try:
+        await payment_review_bot.start()
         await telegram_manager.startup()
         yield
     finally:
@@ -72,6 +74,7 @@ async def lifespan(_: FastAPI):
             await cs_cleanup_task
         except asyncio.CancelledError:
             pass
+        await payment_review_bot.shutdown()
         await telegram_manager.shutdown()
 
 
@@ -179,6 +182,7 @@ app.include_router(parser_router.router, dependencies=[Depends(require_admin)])
 app.include_router(tg_router.router, dependencies=[Depends(require_admin)])
 app.include_router(ea.router)
 app.include_router(mt5_router.router)
+app.include_router(payments_router.router)
 
 
 @app.get("/health")
@@ -230,6 +234,18 @@ def client_account_page(
     return templates.TemplateResponse(
         request=request,
         name="account.html",
+        context={"csrf_token": request.session["csrf_token"], "client_plans": CLIENT_PLANS},
+    )
+
+
+@app.get("/transactions", response_class=HTMLResponse)
+def client_transactions_page(
+    request: Request,
+    _: int = Depends(require_client_id),
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="transactions.html",
         context={"csrf_token": request.session["csrf_token"], "client_plans": CLIENT_PLANS},
     )
 

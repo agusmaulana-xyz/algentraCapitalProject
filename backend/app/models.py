@@ -185,6 +185,30 @@ class MT5Account(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
+class PaymentOrder(Base):
+    __tablename__ = "payment_orders"
+    __table_args__ = (
+        Index("ix_payment_orders_owner_created", "owner_id", "created_at"),
+        Index("ix_payment_orders_status_created", "status", "created_at"),
+        UniqueConstraint("account_id", name="ux_payment_orders_account"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("client_users.id", ondelete="CASCADE"), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    server: Mapped[str] = mapped_column(String(128), nullable=False)
+    login: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan: Mapped[str] = mapped_column(String(16), nullable=False)
+    total_idr: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="PENDING_PAYMENT", nullable=False)
+    proof_filename: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("mt5_accounts.id", ondelete="SET NULL"), nullable=True)
+    admin_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
 class CSConversation(Base):
     __tablename__ = "cs_conversations"
     __table_args__ = (

@@ -179,7 +179,7 @@
     :root[data-theme="light"] .nav-link, :root[data-theme="light"] label, :root[data-theme="light"] .field-help, :root[data-theme="light"] footer { color:var(--muted); }
     :root[data-theme="light"] .nav-link:hover, :root[data-theme="light"] .nav-link.active { color:var(--ink); background:var(--panel-raised); border-color:var(--line); }
     :root[data-theme="light"] input, :root[data-theme="light"] select, :root[data-theme="light"] textarea { color:var(--ink); background:var(--surface, #fff); }
-    :root[data-theme="light"] button:not(.secondary):not(.danger):not(#theme-toggle):not(.nav-toggle):not(.music-toggle) { color:var(--on-action); background:var(--action); border-color:var(--action); }
+    :root[data-theme="light"] button:not(.secondary):not(.danger):not(#theme-toggle):not(.nav-toggle):not(.music-toggle):not(.cs-chat-launcher--icon) { color:var(--on-action); background:var(--action); border-color:var(--action); }
     :root[data-theme="light"] button.secondary { color:var(--ink); background:var(--panel-raised); border-color:var(--control); }
     :root[data-theme="light"] .workspace-tag { color:var(--ink); background:var(--panel-raised); border-color:var(--line); }
     @keyframes soft-enter { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -261,11 +261,17 @@
       .row .alias { width: 100%; margin-left: 28px; }
     }
     .cs-chat-widget { position:relative; z-index:25; min-width:0; font-family:var(--font-body); }
-    .cs-chat-widget--account { width:min(260px,100%); }
+    .cs-chat-widget--account { position:fixed; right:20px; bottom:78px; z-index:39; width:48px; height:48px; }
     .cs-chat-launcher { display:flex; width:100%; min-height:48px; align-items:center; gap:10px; padding:0 14px; border:1px solid var(--glass-border); border-radius:12px; color:var(--ink); background:var(--glass-surface); box-shadow:none; font-size:13px; font-weight:750; text-align:left; }
     .cs-chat-launcher:hover { transform:translateY(-1px); border-color:var(--control); }
     .cs-chat-launcher svg { width:36px; height:36px; flex:none; }
+    .cs-chat-launcher--icon { display:grid; width:48px; height:48px; min-height:48px; place-items:center; padding:10px; border:1px solid var(--glass-border); border-radius:50%; color:var(--ink); background:var(--glass-surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+    .cs-chat-launcher--icon:hover { transform:translateY(-2px); border-color:var(--control); color:var(--ink); }
+    .cs-chat-launcher--icon svg { display:block; width:24px; height:24px; }
+    .cs-chat-launcher__label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+    :root[data-theme="light"] .cs-chat-launcher--icon { color:var(--ink); background:var(--glass-raised); border-color:var(--line); }
     .cs-chat-panel { position:fixed; right:20px; bottom:76px; z-index:40; display:flex; width:min(370px,calc(100vw - 28px)); height:min(540px,calc(100dvh - 150px)); min-height:330px; flex-direction:column; overflow:hidden; border:1px solid var(--glass-border); border-radius:18px; color:var(--ink); background:var(--glass-menu); box-shadow:0 22px 60px #0007; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+    .cs-chat-panel--floating { bottom:138px; }
     .cs-chat-panel[hidden] { display:none; }
     .cs-chat-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); background:var(--glass-raised); }
     .cs-chat-brand { display:flex; align-items:center; gap:10px; min-width:0; }
@@ -292,6 +298,7 @@
     :root[data-theme="light"] .cs-chat-bubble--user { color:#fff; background:#15527c; }
     @media (max-width:600px) {
       .cs-chat-panel { position:fixed; right:10px; bottom:72px; width:calc(100vw - 20px); height:min(72dvh,600px); }
+      .cs-chat-panel--floating { right:10px; bottom:138px; width:calc(100vw - 20px); height:min(72dvh,600px); }
     }
   </style>
   {% block extra_head %}{% endblock %}
@@ -311,6 +318,7 @@
       <a class="nav-link {% if request.url.path == '/dashboard' and request.url.fragment == 'settings' %}active{% endif %}" href="/dashboard#settings"><span>Controls</span><small>Risk & configuration</small></a>
       {% elif request.session.get('client_user_id') %}
       <a class="nav-link {% if request.url.path == '/account' %}active{% endif %}" href="/account"><span>Akun Copy Trading</span><small>Status akun MT5</small></a>
+      <a class="nav-link {% if request.url.path.startswith('/transactions') %}active{% endif %}" href="/transactions"><span>Riwayat transaksi</span><small>Nota & pembayaran</small></a>
       <a class="nav-link" href="/#performance"><span>Performa</span><small>Data agregat</small></a>
       <button class="mobile-client-logout" type="button" data-workspace-logout>Keluar</button>
       {% elif request.url.path == '/login' %}
@@ -525,6 +533,7 @@
       const csrfMeta = document.querySelector('meta[name="csrf-token"]');
       let csrfToken = csrfMeta?.content || "";
       if (!widget || !panel) return;
+      if (widget.classList.contains("cs-chat-widget--account")) panel.classList.add("cs-chat-panel--floating");
       document.body.append(panel);
 
       const scrollBottom = () => { messagesBox.scrollTop = messagesBox.scrollHeight; };

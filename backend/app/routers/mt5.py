@@ -19,14 +19,13 @@ from ..models import (
     utc_now,
 )
 from ..mt5_performance import get_mt5_performance
-from ..schemas import FollowerAccountReport, MT5AccountActive, MT5AccountCreate, MT5AccountUpdate
+from ..schemas import FollowerAccountReport, MT5AccountActive, MT5AccountUpdate
 from ..security import csrf_token, require_csrf
 from ..token_crypto import encrypt_account_token
 from ..time_utils import wib_iso
 
 
 router = APIRouter(prefix="/api/mt5", tags=["mt5"])
-MAX_ACCOUNTS_PER_USER = 10
 MASTER_SNAPSHOT_MAX_AGE = timedelta(seconds=20)
 FOLLOWER_ONLINE_MAX_AGE = timedelta(seconds=30)
 
@@ -159,34 +158,12 @@ def client_mt5_performance(
 
 
 @router.post("/accounts")
-def create_account(payload: MT5AccountCreate, owner_id: int = Depends(require_client_id), db: Session = Depends(get_db)) -> dict[str, object]:
-    count = db.execute(select(MT5Account.id).where(MT5Account.owner_id == owner_id)).all()
-    if len(count) >= MAX_ACCOUNTS_PER_USER:
-        raise HTTPException(status_code=409, detail=f"Maksimal {MAX_ACCOUNTS_PER_USER} akun MT5 per pengguna")
-    token = secrets.token_urlsafe(32)
-    label = payload.label.strip()
-    server = payload.server.strip()
-    login = payload.login.strip()
-    if not label or not server or not login:
-        raise HTTPException(status_code=422, detail="Nama, server, dan nomor login wajib diisi")
-    account = MT5Account(
-        owner_id=owner_id,
-        label=label,
-        server=server,
-        login=login,
-        plan=payload.plan,
-        role=payload.role,
-        token_hash=_token_hash(token),
-        token_ciphertext=encrypt_account_token(token),
+def create_account(_owner_id: int = Depends(require_client_id)) -> dict[str, object]:
+    # Client accounts are provisioned only by the approved payment review flow.
+    raise HTTPException(
+        status_code=409,
+        detail="Akun dibuat setelah admin menyetujui pembayaran. Buat pesanan melalui alur pembayaran.",
     )
-    db.add(account)
-    try:
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Server dan nomor akun tersebut sudah terdaftar") from exc
-    db.refresh(account)
-    return {"account": _account_payload(account, _master_source_is_online(db)), "token": token}
 
 
 @router.post("/accounts/{account_id}/rotate-token")

@@ -90,10 +90,10 @@ Jika tombol daftar tidak tersedia dan beranda menampilkan hitung mundur, pendaft
 ### B. Menambahkan akun follower MT5
 
 1. Masuk, lalu buka **Akun Copy Trading MT5** (`/account`).
-2. Saat menambahkan akun dan membuat token, pilih level untuk akun MT5 tersebut: **ZERO** (1 vCPU, RAM 1 GB, disk 20 GB) seharga **Rp 150.000**; **PRO** (2 vCPU, RAM 4 GB, disk 40 GB) seharga **Rp 200.000**; atau **EXPERT** (4 vCPU, RAM 8 GB, disk 80 GB) seharga **Rp 300.000**. Harga ditampilkan sebagai informasi paket; aplikasi belum memproses pembayaran. Periode penagihan tidak ditentukan pada informasi yang tersedia.
-3. Isi nama akun (label), nama server broker persis seperti yang terlihat di terminal MT5, dan nomor login MT5.
-4. Pilih **Tambahkan akun & buat token**. Maksimal 10 akun follower per akun portal. Paket tersimpan pada akun MT5 yang baru dibuat.
-5. Salin token yang ditampilkan saat itu dan simpan secara aman. Token tidak akan ditampilkan lagi setelah panel ditutup.
+2. Saat menambahkan akun, pilih level untuk akun MT5 tersebut: **ZERO** (1 vCPU, RAM 1 GB, disk 20 GB) seharga **Rp 150.000**; **PRO** (2 vCPU, RAM 4 GB, disk 40 GB) seharga **Rp 200.000**; atau **EXPERT** (4 vCPU, RAM 8 GB, disk 80 GB) seharga **Rp 300.000**. Periode penagihan tidak ditentukan pada informasi yang tersedia.
+3. Isi nama akun (label), nama server broker persis seperti yang terlihat di terminal MT5, dan nomor login MT5. Setelah membuat pesanan, portal membuka **Riwayat transaksi** (`/transactions`); di sana client dapat melihat total pembayaran dan melanjutkan unggah bukti.
+4. QR pada tampilan sekarang hanya gambar DEMO dan tidak bisa dipindai; minta admin QRIS resmi sebelum melakukan pembayaran. Riwayat transaksi menyimpan status pesanan serta nota dan bukti pembayaran. Pesanan menunggu pemeriksaan admin. Jika transaksi diterima, akun MT5 akan dibuat dan tampil di portal. Client dapat memilih **Rotasi token** pada akun untuk melihat token EA.
+5. Maksimal 10 akun/pesanan aktif per akun portal.
 
 Jangan memasukkan atau mengirim kata sandi broker kepada customer service.
 
@@ -142,7 +142,7 @@ Jika perlu mengirim tangkapan layar, minta pelanggan menyamarkan token, email, n
 2. Jangan pernah meminta kata sandi portal, kata sandi broker, kode OTP, token EA, API key, atau file `.env`. Jangan meminta pelanggan menempelkan token ke chat. Jika token hilang/terbuka, arahkan pelanggan untuk merotasi token dan memperbarui nilai di EA.
 3. Jangan memberi sinyal trading, saran beli/jual, rekomendasi risiko/lot/multiplier, prediksi harga, atau instruksi untuk menahan/menutup posisi tertentu. Jelaskan fitur teknis secara netral.
 4. Trading dapat menyebabkan kerugian. Equity, win rate, histori, atau hasil masa lalu tidak menjamin hasil masa depan. Data publik merepresentasikan akun utama dan dapat terlambat.
-5. Harga paket yang diketahui saat membuat akun MT5/token adalah ZERO Rp 150.000, PRO Rp 200.000, dan EXPERT Rp 300.000. Pilihan berlaku untuk akun MT5 yang dibuat dan tampil di dashboard client. Jangan menebak periode penagihan atau detail pembayaran karena aplikasi belum memproses pembayaran dan periode tidak ditentukan. Deposit/withdrawal, modal trading minimum, broker tertentu yang direkomendasikan, target/garansi profit, waktu respons dukungan, dan status lisensi juga tidak ditetapkan; rujuk pertanyaan tersebut ke kanal resmi pada bagian Kontak.
+5. Harga paket akun MT5: ZERO Rp 150.000, PRO Rp 200.000, dan EXPERT Rp 300.000. Periode penagihan tidak ditentukan. Gambar QR pada aplikasi adalah DEMO dan bukan sarana pembayaran; arahkan klien untuk meminta QRIS resmi dari admin. Bukti transaksi diperiksa admin sebelum akun dibuat. Deposit/withdrawal, modal trading minimum, broker tertentu yang direkomendasikan, target/garansi profit, waktu respons dukungan, dan status lisensi tidak ditetapkan; rujuk pertanyaan tersebut ke kanal resmi pada bagian Kontak.
 6. Untuk transaksi yang masih terbuka, jelaskan bahwa menghentikan EA, menonaktifkan/menghapus akun portal, atau putus koneksi tidak otomatis menutup posisi broker. Pelanggan perlu memeriksa dan mengelolanya langsung di MT5; customer service tidak menentukan apakah posisi harus ditutup.
 7. Untuk masalah koneksi yang belum teratasi, arahkan ke kanal yang tercantum saat itu pada **Beranda → Kontak**. Jangan membuat alamat kontak atau tautan sosial sendiri.
 
@@ -152,5 +152,5 @@ Jika perlu mengirim tangkapan layar, minta pelanggan menyamarkan token, email, n
 - **“Apakah Anda perlu password MT5 saya?”** — “Tidak. Portal hanya meminta nama server dan nomor login MT5 untuk pendaftaran; jangan kirim password broker atau token EA ke chat.”
 - **“Kenapa posisi belum tersalin?”** — “Periksa status EA di portal, koneksi terminal, token, URL WebRequest, Algo Trading, izin akun, mode hedging, dan apakah EA utama masih mengirim snapshot. Jika masih bermasalah, kirim status/error dari tab Experts setelah menyamarkan data sensitif.”
 - **“Kalau saya stop EA, posisi tertutup?”** — “Tidak otomatis. Posisi yang sudah terbuka tetap berada di terminal MT5 dan perlu dikelola langsung di akun broker.”
-- **“Berapa harga level akun?”** — “Saat menambahkan akun MT5 dan membuat token, pilihannya ZERO Rp 150.000, PRO Rp 200.000, atau EXPERT Rp 300.000. Periode penagihan tidak ditentukan pada informasi yang tersedia dan pembayaran belum diproses melalui aplikasi.”
+- **“Berapa harga level akun?”** — “Paket ZERO Rp 150.000, PRO Rp 200.000, atau EXPERT Rp 300.000. Periode penagihan tidak ditentukan. QR pada aplikasi masih DEMO; silakan minta QRIS resmi dan unggah bukti transaksi untuk diperiksa admin.”
 - **“Berapa modal trading minimumnya?”** — “Informasi modal trading minimum belum ditetapkan pada panduan yang tersedia. Silakan konfirmasi melalui kanal resmi di bagian Kontak pada situs.”

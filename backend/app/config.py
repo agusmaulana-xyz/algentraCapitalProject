@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     enable_regex_fallback: bool = Field(default=False, validation_alias="ENABLE_REGEX_FALLBACK")
     telegram_api_id: int | None = Field(default=None, validation_alias="TELEGRAM_API_ID", gt=0)
     telegram_api_hash: SecretStr | None = Field(default=None, validation_alias="TELEGRAM_API_HASH")
+    telegram_bot_token: SecretStr | None = Field(default=None, validation_alias="TELEGRAM_BOT_TOKEN")
+    telegram_admin_chat_id: str | None = Field(default=None, validation_alias="TELEGRAM_ADMIN_CHAT_ID")
     ea_api_key: SecretStr | None = Field(default=None, validation_alias="EA_API_KEY")
     email_smtp_host: str | None = Field(default=None, validation_alias="EMAIL_SMTP_HOST")
     email_smtp_port: int = Field(default=587, validation_alias="EMAIL_SMTP_PORT", ge=1, le=65535)
@@ -78,6 +80,12 @@ class Settings(BaseSettings):
             raise ValueError("GEMINI_CS_MODEL cannot be empty")
         if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
+        if (self.telegram_bot_token is None) != (self.telegram_admin_chat_id is None):
+            raise ValueError("TELEGRAM_BOT_TOKEN dan TELEGRAM_ADMIN_CHAT_ID harus diisi bersamaan")
+        if self.telegram_admin_chat_id is not None:
+            chat_id = self.telegram_admin_chat_id.strip()
+            if not chat_id.isdigit() or int(chat_id) < 1:
+                raise ValueError("TELEGRAM_ADMIN_CHAT_ID harus berupa ID chat pribadi admin yang positif")
         if self.database_url and not self.database_url.startswith("sqlite:"):
             raise ValueError("DATABASE_URL harus memakai SQLite, contoh: sqlite:///backend/data/app.db")
         if self.app_env == "production" and self.database_url:

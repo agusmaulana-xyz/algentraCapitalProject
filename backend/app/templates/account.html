@@ -10,32 +10,9 @@
     <p class="heading-aside">Token EA hanya terlihat saat dibuat atau dirotasi.</p>
   </div>
 
-  <section aria-labelledby="account-help-title">
-    <h2 id="account-help-title">Butuh bantuan?</h2>
-    <p class="section-help">Tanya ALGENTRA seputar akun, token EA, atau cara memasang EA Copy Trading.</p>
-    <div class="cs-chat-widget cs-chat-widget--account" id="cs-chat-widget" data-cs-mode="client">
-      <section class="cs-chat-panel" id="cs-chat-panel" aria-label="Chat ALGENTRA" hidden>
-        <header class="cs-chat-head">
-          <div class="cs-chat-brand"><span class="cs-chat-avatar">{{ algentra_mascot("cs-panel-mascot") }}</span><span><span class="cs-chat-title">ALGENTRA</span><span class="cs-chat-mode" id="cs-chat-mode">Asisten akun klien</span></span></div>
-          <button class="secondary cs-chat-close" id="cs-chat-close" type="button" aria-label="Tutup chat">&times;</button>
-        </header>
-        <div class="cs-chat-messages" id="cs-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
-        <p class="cs-chat-footnote">Riwayat chat dihapus setelah 24 jam. Jangan kirim kata sandi atau OTP.</p>
-        <p class="cs-chat-status" id="cs-chat-status" role="status"></p>
-        <form class="cs-chat-form" id="cs-chat-form">
-          <textarea class="cs-chat-input" id="cs-chat-input" rows="1" maxlength="2000" placeholder="Tulis pesan..." aria-label="Pesan untuk ALGENTRA" required></textarea>
-          <button class="cs-chat-send" id="cs-chat-send" type="submit">Kirim</button>
-        </form>
-      </section>
-      <button class="cs-chat-launcher" id="cs-chat-open" type="button" aria-expanded="false" aria-controls="cs-chat-panel">
-        {{ algentra_mascot("cs-contact-mascot") }}<span>Chat dengan ALGENTRA<small>Asisten akun klien</small></span>
-      </button>
-    </div>
-  </section>
-
   <section>
     <h2>Hubungkan akun Copy Trading</h2>
-    <p class="section-help">Pilih level untuk akun MT5 ini, lalu masukkan nama server broker dan nomor login. Token dibuat setelah akun ditambahkan. Kami tidak meminta atau menyimpan kata sandi broker.</p>
+    <p class="section-help">Pilih paket, isi detail akun MT5, lalu lanjutkan ke pembayaran. Akun Copy Trading dibuat setelah admin menyetujui bukti transaksi. Kami tidak meminta atau menyimpan kata sandi broker.</p>
     <form id="account-form" class="form-grid account-connect-form">
       <fieldset class="plan-picker">
         <legend>Pilih level akun MT5</legend>
@@ -51,15 +28,16 @@
           </label>
           {% endfor %}
         </div>
-        <p class="field-help">Pembayaran belum tersedia di aplikasi. Level ini akan tersimpan pada akun dan token yang dibuat.</p>
+        <p class="field-help">Total pembayaran mengikuti harga paket yang dipilih. QRIS di halaman berikut adalah gambar contoh sampai diganti dengan QRIS resmi.</p>
       </fieldset>
       <label>Nama akun<input name="label" maxlength="80" placeholder="Copy Trading 1" required></label>
       <label>Broker server<input name="server" maxlength="128" placeholder="BrokerName-Live" required></label>
       <label>Nomor login MT5<input name="login" maxlength="32" inputmode="numeric" required></label>
-      <div><button type="submit">Tambahkan akun &amp; buat token</button></div>
+      <div><button type="submit">Lanjutkan ke pembayaran</button></div>
     </form>
     <p id="account-message" class="status" role="status"></p>
     <div id="new-token" hidden></div>
+    <div class="toolbar"><a class="workspace-tag" href="/transactions">Buka riwayat transaksi dan nota</a></div>
   </section>
 
   <section>
@@ -98,6 +76,25 @@
     <p class="section-help">Jangan bagikan token EA. Jika token hilang atau terekspos, pilih <strong>Rotasi token</strong> dan perbarui token di EA Copy Trading.</p>
   </section>
 </main>
+<div class="cs-chat-widget cs-chat-widget--account" id="cs-chat-widget" data-cs-mode="client">
+  <section class="cs-chat-panel" id="cs-chat-panel" aria-label="Chat ALGENTRA" hidden>
+    <header class="cs-chat-head">
+      <div class="cs-chat-brand"><span class="cs-chat-avatar">{{ algentra_mascot("cs-panel-mascot") }}</span><span><span class="cs-chat-title">ALGENTRA</span><span class="cs-chat-mode" id="cs-chat-mode">Asisten akun klien</span></span></div>
+      <button class="secondary cs-chat-close" id="cs-chat-close" type="button" aria-label="Tutup chat">&times;</button>
+    </header>
+    <div class="cs-chat-messages" id="cs-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <p class="cs-chat-footnote">Riwayat chat dihapus setelah 24 jam. Jangan kirim kata sandi atau OTP.</p>
+    <p class="cs-chat-status" id="cs-chat-status" role="status"></p>
+    <form class="cs-chat-form" id="cs-chat-form">
+      <textarea class="cs-chat-input" id="cs-chat-input" rows="1" maxlength="2000" placeholder="Tulis pesan..." aria-label="Pesan untuk ALGENTRA" required></textarea>
+      <button class="cs-chat-send" id="cs-chat-send" type="submit">Kirim</button>
+    </form>
+  </section>
+  <button class="cs-chat-launcher cs-chat-launcher--icon" id="cs-chat-open" type="button" aria-label="Buka chat dengan ALGENTRA" title="Chat dengan ALGENTRA" aria-expanded="false" aria-controls="cs-chat-panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5 8 8 0 0 1-3.6-.85L4 19l.9-4A7.5 7.5 0 1 1 20 11.5Z"></path><path d="M8.5 11.5h7M12 8v7"></path></svg>
+    <span class="cs-chat-launcher__label">Chat dengan ALGENTRA, asisten akun klien</span>
+  </button>
+</div>
 {% endblock %}
 {% block scripts %}
 <script nonce="{{ request.state.csp_nonce }}">
@@ -116,7 +113,7 @@ const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mod
 async function api(path, options = {}) {
   const headers = {...(options.headers || {})};
   if (options.method && options.method !== "GET") headers["X-CSRF-Token"] = csrfToken;
-  if (options.body) headers["Content-Type"] = "application/json";
+  if (options.body && !(options.body instanceof FormData)) headers["Content-Type"] = "application/json";
   const response = await fetch(path, {...options, headers});
   const result = await parseApiResponse(response);
   if (!response.ok) throw new Error(result.detail || "Permintaan gagal.");
@@ -238,12 +235,10 @@ document.querySelector("#account-form").addEventListener("submit", async (event)
   event.preventDefault(); statusBox.textContent = "";
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  payload.role = "follower";
   try {
-    const result = await api("/api/mt5/accounts", {method:"POST", body:JSON.stringify(payload)});
-    showToken(`Token baru: ${result.account.label}`, result.token, result.account.id);
+    const order = await api("/api/payments/orders", {method:"POST", body:JSON.stringify(payload)});
     event.currentTarget.reset();
-    await loadAccounts();
+    window.location.assign(`/transactions?order=${encodeURIComponent(order.id)}`);
   } catch (error) { statusBox.textContent = error.message; }
 });
 
