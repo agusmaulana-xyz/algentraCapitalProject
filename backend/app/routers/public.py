@@ -21,6 +21,7 @@ from ..models import (
     utc_now,
 )
 from ..time_utils import as_utc, wib_iso
+from ..registration import LAUNCH_AT, registration_is_open, registration_launch_pending
 
 
 router = APIRouter(tags=["public"])
@@ -28,7 +29,7 @@ MARKET_SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "backend" / "app" / "templates"))
 
 
-def _public_contact_context() -> dict[str, object]:
+def _public_contact_context(db: Session) -> dict[str, object]:
     settings = get_settings()
     whatsapp_digits = re.sub(r"\D", "", settings.contact_whatsapp or "")
     whatsapp = whatsapp_digits if 8 <= len(whatsapp_digits) <= 15 else None
@@ -79,6 +80,9 @@ def _public_contact_context() -> dict[str, object]:
         "contact_whatsapp": whatsapp,
         "contact_email": email,
         "contact_socials": socials,
+        "registration_open": registration_is_open(db),
+        "registration_launch_pending": registration_launch_pending(db),
+        "registration_launch_at": LAUNCH_AT.isoformat(),
     }
 
 
@@ -191,16 +195,21 @@ def public_performance(db: Session = Depends(get_db)) -> dict[str, object]:
     return public_performance_payload(db)
 
 
+@router.get("/api/public/registration-status")
+def public_registration_status(db: Session = Depends(get_db)) -> dict[str, bool]:
+    return {"registration_open": registration_is_open(db)}
+
+
 @router.get("/musik.mp3", include_in_schema=False)
 def site_music() -> FileResponse:
     return FileResponse(PROJECT_ROOT / "musik.mp3", media_type="audio/mpeg")
 
 
 @router.get("/", response_class=HTMLResponse)
-def public_home(request: Request):
-    return templates.TemplateResponse(request=request, name="public.html", context=_public_contact_context())
+def public_home(request: Request, db: Session = Depends(get_db)):
+    return templates.TemplateResponse(request=request, name="public.html", context=_public_contact_context(db))
 
 
 @router.get("/performance", response_class=HTMLResponse)
-def public_performance_page(request: Request):
-    return templates.TemplateResponse(request=request, name="public.html", context=_public_contact_context())
+def public_performance_page(request: Request, db: Session = Depends(get_db)):
+    return templates.TemplateResponse(request=request, name="public.html", context=_public_contact_context(db))

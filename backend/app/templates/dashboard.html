@@ -6,6 +6,16 @@
 {% block content %}
 <main id="main" tabindex="-1" class="page-shell dashboard-page">
     <div class="page-heading"><div><span class="eyebrow">Algentra Capital / Operations</span><h1>Operations workspace</h1><p class="page-description">Pantau sinyal, hasil eksekusi, performa trade, dan batas risiko dalam satu tampilan.</p></div><div class="heading-aside">Internal workspace · access controlled</div></div>
+    <section id="registration-controls" aria-labelledby="registration-controls-heading">
+      <span class="eyebrow">Public site</span><h2 id="registration-controls-heading">Pendaftaran client</h2>
+      <p id="registration-state" class="section-help" role="status">Memuat status pendaftaran...</p>
+      <p class="muted">Jika ditutup sebelum launching, pendaftaran akan otomatis terbuka pada 16 Januari 2027 pukul 09.00 WIB.</p>
+      <div class="toolbar">
+        <button id="registration-open" type="button">Buka pendaftaran</button>
+        <button id="registration-close" class="secondary" type="button">Tutup pendaftaran</button>
+      </div>
+      <p id="registration-message" class="status" role="status"></p>
+    </section>
     <div class="cards">
       <div class="card"><span>Total signal</span><b id="signals-total">&mdash;</b><small>Semua sinyal yang tercatat.</small></div>
       <div class="card"><span>Tereksekusi</span><b id="signals-executed">&mdash;</b><small>Order yang diterima terminal MT5.</small></div>
@@ -160,8 +170,14 @@ const $ = (selector) => document.querySelector(selector);
       if(profitChart){profitChart.data=data;profitChart.update();}
       else profitChart=new Chart($("#profit-chart"),{type:"line",data,options:{responsive:true,scales:{y:{beginAtZero:false}}}});
     }
+    function renderRegistrationState(registrationOpen) {
+      $("#registration-state").textContent=registrationOpen ? "Pendaftaran terbuka. Form daftar terlihat di situs publik." : "Pendaftaran ditutup. Situs publik menampilkan hitung mundur launching.";
+      $("#registration-open").disabled=registrationOpen;
+      $("#registration-close").disabled=!registrationOpen;
+    }
     async function loadSettings() {
       const settings=await api("/api/settings");
+      renderRegistrationState(settings.registration_open ?? true);
       $("#confidence-threshold").value=settings.confidence_threshold ?? 0.75;
       $("#default-symbol").value=settings.default_symbol ?? "XAUUSD";
       $("#symbol-mapping").value=JSON.stringify(settings.symbol_mapping ?? {GOLD:"XAUUSD",XAU:"XAUUSD",EMAS:"XAUUSD"},null,2);
@@ -176,12 +192,32 @@ const $ = (selector) => document.querySelector(selector);
       $("#kill-switch").checked=settings.kill_switch ?? false;
       $("#gemini-model-input").value=settings.gemini_model || "";
     }
+    async function setRegistrationOpen(isOpen) {
+      const message=$("#registration-message");
+      const buttons=[$("#registration-open"),$("#registration-close")];
+      buttons.forEach((button)=>button.disabled=true);
+      message.textContent="Menyimpan status pendaftaran...";
+      try {
+        await api("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({values:{registration_open:isOpen}})});
+        message.textContent=isOpen ? "Pendaftaran dibuka." : "Pendaftaran ditutup.";
+        await loadSettings();
+      } catch(error) {
+        message.textContent=`Gagal mengubah status: ${error.message}`;
+        buttons.forEach((button)=>button.disabled=false);
+      }
+    }
+    setInterval(async()=>{
+      try { const status=await api("/api/public/registration-status"); renderRegistrationState(status.registration_open); }
+      catch(_) {}
+    },10000);
     async function refresh() {
       try { await Promise.all([loadStatsAndSignals(),loadGroups(),loadLogs(),loadTrades()]); }
       catch(error) { $("#connection").textContent=`Gagal memuat: ${error.message}`; }
     }
     $("#filter-logs").addEventListener("click",loadLogs);
     $("#filter-trades").addEventListener("click",loadTrades);
+    $("#registration-open").addEventListener("click",()=>setRegistrationOpen(true));
+    $("#registration-close").addEventListener("click",()=>setRegistrationOpen(false));
     $("#settings-form").addEventListener("submit",async(event)=>{
       event.preventDefault(); const message=$("#settings-message");
       try {

@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from urllib.parse import urlsplit
 
@@ -14,11 +15,12 @@ from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
 from .cs_service import cleanup_expired_conversations_periodically, purge_expired_conversations
 from .client_plans import CLIENT_PLANS
-from .database import Base, SessionLocal, engine, migrate_schema
+from .database import Base, SessionLocal, engine, get_db, migrate_schema
 from .models import AppSetting, Signal, utc_now
 from .public_realtime import public_performance_hub
 from .routers import auth, cs as cs_router, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
 from .routers.mt5 import require_client_id
+from .registration import registration_is_open
 from .signal_service import SignalService
 from .security import (
     DatabaseSessionMiddleware,
@@ -50,6 +52,7 @@ async def lifespan(_: FastAPI):
             ("max_market_deviation_pct", "5.0"),
             ("allowed_symbols", '["XAUUSD"]'),
             ("allow_updates", "false"),
+            ("registration_open", "true"),
             ("symbol_mapping", '{"GOLD":"XAUUSD","XAU":"XAUUSD","EMAS":"XAUUSD"}'),
         )
         for key, value in defaults:
@@ -184,12 +187,16 @@ def health() -> dict[str, str]:
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
+def login_page(request: Request, db: Session = Depends(get_db)):
     if isinstance(request.session.get("client_user_id"), int):
         return RedirectResponse("/account", status_code=303)
     if request.session.get("admin_username"):
         return RedirectResponse("/dashboard", status_code=303)
-    return templates.TemplateResponse(request=request, name="login.html", context={})
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"registration_open": registration_is_open(db)},
+    )
 
 
 @app.get("/loginAdmin", response_class=HTMLResponse, include_in_schema=False)
@@ -200,8 +207,14 @@ def admin_login_page(request: Request):
 
 
 @app.get("/register", response_class=HTMLResponse)
-def register_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="register.html", context={})
+def register_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    if not registration_is_open(db):
+        return RedirectResponse("/#registration-launch", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"registration_open": True},
+    )
 
 
 @app.get("/forgot-password", response_class=HTMLResponse)

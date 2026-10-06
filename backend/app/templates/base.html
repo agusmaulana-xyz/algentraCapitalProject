@@ -261,6 +261,7 @@
       .row .alias { width: 100%; margin-left: 28px; }
     }
     .cs-chat-widget { position:relative; z-index:25; min-width:0; font-family:var(--font-body); }
+    .cs-chat-widget--account { width:min(260px,100%); }
     .cs-chat-launcher { display:flex; width:100%; min-height:48px; align-items:center; gap:10px; padding:0 14px; border:1px solid var(--glass-border); border-radius:12px; color:var(--ink); background:var(--glass-surface); box-shadow:none; font-size:13px; font-weight:750; text-align:left; }
     .cs-chat-launcher:hover { transform:translateY(-1px); border-color:var(--control); }
     .cs-chat-launcher svg { width:36px; height:36px; flex:none; }
@@ -315,13 +316,13 @@
       {% elif request.url.path == '/login' %}
       <a class="nav-link" href="/"><span>Algentra Capital</span><small>Beranda</small></a>
       <a class="nav-link active" href="/login"><span>Portal klien</span><small>Masuk akun klien</small></a>
-      <a class="nav-link" href="/register"><span>Daftar</span><small>Akun klien</small></a>
+      {% if registration_open is not defined or registration_open %}<a class="nav-link" href="/register"><span>Daftar</span><small>Akun klien</small></a>{% else %}<a class="nav-link" href="/#registration-launch"><span>Menunggu launching</span><small>Pendaftaran client</small></a>{% endif %}
       {% else %}
       <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/"><span>Beranda</span><small>Algentra Capital</small></a>
       <a class="nav-link" href="/#performance"><span>Performa</span><small>Data agregat</small></a>
       <a class="nav-link" href="/#approach"><span>Cara kerja</span><small>AI & kontrol risiko</small></a>
       <a class="nav-link" href="/#contact"><span>Kontak</span><small>Hubungi kami</small></a>
-      <a class="nav-link" href="/login"><span>Portal klien</span><small>Masuk atau daftar</small></a>
+      <a class="nav-link" href="/login"><span>Portal klien</span><small>{% if registration_open is not defined or registration_open %}Masuk atau daftar{% else %}Masuk client{% endif %}</small></a>
       {% endif %}
     </nav>
     <div class="topbar-side">

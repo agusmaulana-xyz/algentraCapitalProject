@@ -11,6 +11,7 @@ from ..config import PROJECT_ROOT, get_settings
 from ..database import get_db
 from ..gemini_parser import GeminiParser
 from ..models import AppSetting
+from ..registration import REGISTRATION_AUTO_OPEN_KEY, REGISTRATION_OPEN_KEY, registration_is_open, set_registration_open
 from ..schemas import SettingsUpdate
 
 
@@ -18,13 +19,13 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 ALLOWED_SETTINGS = {
     "confidence_threshold", "default_symbol", "symbol_mapping", "demo_mode", "allow_updates",
     "kill_switch", "max_daily_loss_money", "max_lot", "max_open_trades",
-    "max_signal_age_seconds", "max_market_deviation_pct", "allowed_symbols",
+    "max_signal_age_seconds", "max_market_deviation_pct", "allowed_symbols", "registration_open",
 }
 SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9._]{1,32}$")
 
 
 def _validate_setting(key: str, value: object) -> object:
-    if key in {"demo_mode", "allow_updates", "kill_switch"}:
+    if key in {"demo_mode", "allow_updates", "kill_switch", "registration_open"}:
         if not isinstance(value, bool):
             raise HTTPException(status_code=422, detail=f"Setting '{key}' harus boolean")
         return value
@@ -85,11 +86,14 @@ class GeminiConfigUpdate(BaseModel):
 def read_settings(db: Session = Depends(get_db)) -> dict[str, object]:
     values = {}
     for item in db.query(AppSetting).all():
+        if item.key == REGISTRATION_AUTO_OPEN_KEY:
+            continue
         try:
             values[item.key] = json.loads(item.value)
         except (TypeError, json.JSONDecodeError):
             continue
     config = get_settings()
+    values[REGISTRATION_OPEN_KEY] = registration_is_open(db)
     values["gemini_configured"] = bool(config.gemini_api_key and config.gemini_api_key.get_secret_value())
     values["gemini_model"] = config.gemini_model
     return values
@@ -126,10 +130,13 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> d
         encoded = json.dumps(normalized, ensure_ascii=False, allow_nan=False)
         if len(encoded) > 10_000:
             raise HTTPException(status_code=422, detail=f"Nilai setting '{key}' terlalu besar")
-        item = db.get(AppSetting, key)
-        if item is None:
-            db.add(AppSetting(key=key, value=encoded))
+        if key == REGISTRATION_OPEN_KEY:
+            set_registration_open(db, normalized)
         else:
-            item.value = encoded
+            item = db.get(AppSetting, key)
+            if item is None:
+                db.add(AppSetting(key=key, value=encoded))
+            else:
+                item.value = encoded
     db.commit()
     return {key: _validate_setting(key, value) for key, value in payload.values.items()}

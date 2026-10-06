@@ -85,6 +85,7 @@ Situs juga menampilkan jumlah akun klien yang telah menyelesaikan verifikasi ema
 5. Setelah verifikasi, masuk melalui `/login`. Pilihan “Biarkan saya tetap masuk selama 30 hari” bersifat opsional.
 
 Pendaftaran dan reset kata sandi memerlukan layanan pengiriman email yang aktif. Jika halaman menyatakan pendaftaran tidak tersedia, atau verifikasi tetap tidak diterima setelah masa tunggu, gunakan kanal resmi di bagian Kontak pada situs.
+Jika tombol daftar tidak tersedia dan beranda menampilkan hitung mundur, pendaftaran sedang menunggu launching pada **16 Januari 2027 pukul 09.00 WIB**. Pendaftaran dibuka otomatis saat waktu tersebut tiba.
 
 ### B. Menambahkan akun follower MT5
 

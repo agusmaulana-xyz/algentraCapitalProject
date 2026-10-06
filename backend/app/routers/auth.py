@@ -17,6 +17,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..email_service import send_verification_code
 from ..models import AdminUser, AuthSession, ClientUser, EmailVerification, PasswordResetCode, utc_now
+from ..registration import registration_is_open
 from ..security import (
     AUTH_EXPIRES_SESSION_KEY,
     REMEMBER_CLIENT_MAX_AGE,
@@ -146,6 +147,8 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 @router.post("/register", status_code=status.HTTP_202_ACCEPTED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, str | int]:
+    if not registration_is_open(db):
+        raise HTTPException(status_code=403, detail="Pendaftaran client sedang ditutup. Silakan tunggu pengumuman launching.")
     email = _normalized_email(payload.email)
     if len(payload.password.encode("utf-8")) > 72:
         raise HTTPException(status_code=422, detail="Kata sandi maksimal 72 byte")
