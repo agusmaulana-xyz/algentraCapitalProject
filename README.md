@@ -31,6 +31,8 @@ Gunakan satu Windows Server dengan Cloudflare Tunnel. Simpan `.env`, SQLite, ses
 
 Pasang aplikasi sebagai Windows Service melalui NSSM atau Task Scheduler saat boot. Jalankan `run-service.bat` sebagai perintah layanan; ia bind ke `127.0.0.1:8000`, memakai satu worker, dan tidak mengaktifkan reload. Atur Cloudflare Tunnel ingress ke `http://127.0.0.1:8000`; jangan buka port 8000 ke jaringan. Aktifkan HSTS pada Cloudflare SSL/TLS Edge Certificates. Konfigurasikan rotasi log pada service manager.
 
+Jika situs mengembalikan halaman Cloudflare **502**, uji origin langsung dari VPS dengan `Invoke-WebRequest http://127.0.0.1:8000/health` sebelum memeriksa Tunnel. Jika gagal, lihat log service dan pastikan dependency terbaru sudah terpasang dengan `.venv\Scripts\python.exe -m pip install -r backend\requirements.txt`, lalu restart service. Jika health lokal berhasil tetapi domain tetap 502, periksa log `cloudflared` dan pastikan hostname diarahkan ke `http://127.0.0.1:8000`. Setelah pembaruan fitur pembayaran, pastikan `.env` tidak mengisi hanya salah satu dari `TELEGRAM_BOT_TOKEN` atau `TELEGRAM_ADMIN_CHAT_ID`; keduanya harus diisi bersama atau dibiarkan kosong.
+
 Database SQLite dibuat otomatis pada jalur yang ditentukan. Atur `BACKUP_DIR` pada environment layanan ke folder backup di disk/lokasi terpisah. Buat task harian Windows Task Scheduler yang menjalankan `run-backup.bat`; skrip menggunakan SQLite online backup API dan mempertahankan 14 salinan terakhir. Pulihkan dengan menyalin file backup saat aplikasi berhenti, lalu mulai ulang layanan. Uji restore sebelum peluncuran. Perubahan Gemini hanya menerima nama model dari dashboard; simpan API key di environment layanan.
 
 ## Endpoint M1

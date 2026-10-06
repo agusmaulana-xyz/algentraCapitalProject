@@ -385,6 +385,17 @@
       if (!raw.trim()) return {};
       try { return JSON.parse(raw); }
       catch {
+        if (response.status === 502) {
+          const errorType = response.headers.get("cf-error-type");
+          const errorOrigin = response.headers.get("cf-error-origin");
+          const rayId = response.headers.get("cf-ray");
+          const diagnostics = [
+            errorType && `Cloudflare ${errorType}`,
+            errorOrigin && `origin ${errorOrigin}`,
+            rayId && `Ray ID ${rayId}`
+          ].filter(Boolean).join(" · ");
+          throw new Error(`HTTP 502 Bad Gateway${diagnostics ? ` (${diagnostics})` : ""}. Server VPS atau koneksi Cloudflare Tunnel tidak merespons. Periksa layanan backend pada port 8000 dan log cloudflared.`);
+        }
         const message = raw.replace(/\s+/g, " ").trim().slice(0, 240);
         throw new Error(`Server membalas HTTP ${response.status} dengan format non-JSON: ${message}`);
       }

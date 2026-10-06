@@ -233,11 +233,12 @@ async function loadAccounts() {
 
 document.querySelector("#account-form").addEventListener("submit", async (event) => {
   event.preventDefault(); statusBox.textContent = "";
-  const form = new FormData(event.currentTarget);
-  const payload = Object.fromEntries(form.entries());
+  const accountForm = event.currentTarget;
+  const formData = new FormData(accountForm);
+  const payload = Object.fromEntries(formData.entries());
   try {
     const order = await api("/api/payments/orders", {method:"POST", body:JSON.stringify(payload)});
-    event.currentTarget.reset();
+    accountForm.reset();
     window.location.assign(`/transactions?order=${encodeURIComponent(order.id)}`);
   } catch (error) { statusBox.textContent = error.message; }
 });
