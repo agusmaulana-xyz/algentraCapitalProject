@@ -1,4 +1,22 @@
 {% extends "base.html" %}
+{% macro algentra_mascot(class_name) -%}
+<svg class="{{ class_name }}" viewBox="0 0 48 48" focusable="false" aria-hidden="true">
+  <path d="M24 11V8" stroke="#24493e" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M24 9c-1-4-5-5-7-3-1.5 2.3 1 4.1 7 4m0-1c1-4 5-5 7-3 1.5 2.3-1 4.1-7 4" fill="#9bdc8c" stroke="#24493e" stroke-width="1.1" stroke-linejoin="round"/>
+  <path d="M8 24H5m38 0h-3" stroke="#24493e" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="4.5" cy="24" r="2.2" fill="#f3c96a" stroke="#24493e" stroke-width="1"/>
+  <circle cx="43.5" cy="24" r="2.2" fill="#f3c96a" stroke="#24493e" stroke-width="1"/>
+  <rect x="8" y="12" width="32" height="29" rx="12" fill="#dff4e5" stroke="#24493e" stroke-width="1.6"/>
+  <rect x="13" y="17" width="22" height="16" rx="7" fill="#24493e"/>
+  <circle cx="20" cy="23" r="2" fill="#c1f58e"/>
+  <circle cx="28" cy="23" r="2" fill="#c1f58e"/>
+  <path d="M20 28c1.1 1.2 2.4 1.8 4 1.8s2.9-.6 4-1.8" fill="none" stroke="#c1f58e" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="14.5" cy="29" r="1.7" fill="#f3a6a0" opacity=".8"/>
+  <circle cx="33.5" cy="29" r="1.7" fill="#f3a6a0" opacity=".8"/>
+  <path d="M18 41v2m12-2v2m-14 1h16" stroke="#24493e" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="m36 9 1-2m2 4 2-1" stroke="#f3c96a" stroke-width="1.6" stroke-linecap="round"/>
+</svg>
+{%- endmacro %}
 {% block title %}Algentra Capital | Copy Trading Otomatis Berbasis AI{% endblock %}
 {% block extra_head %}
 <style nonce="{{ request.state.csp_nonce }}">
@@ -150,6 +168,12 @@
   .contact-card p { margin: 0 0 16px; color: var(--text-2); font-size: 14px; }
   .contact-card p.contact-person { color: var(--text); font-size: 16px; font-weight: 600; }
   .contact-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
+  .contact-email-cs { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .contact-email-cs .contact-link { width: 100%; }
+  .contact-email-cs .cs-chat-widget--only { grid-column: 1 / -1; }
+  .cs-chat-launcher.contact-link { min-height: 62px; justify-content: flex-start; padding: 10px 14px; border-color: var(--border); border-radius: 12px; color: var(--text); background: var(--surface); box-shadow: none; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .cs-chat-launcher.contact-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .cs-chat-launcher.contact-link svg.cs-contact-mascot { width: 36px; height: 36px; }
   .contact-link { display: flex; min-width: 0; min-height: 62px; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; color: var(--text); background: var(--surface); font-size: 14px; font-weight: 600; transition: border-color .2s ease, transform .2s ease; }
   .contact-link:hover { border-color: var(--accent); transform: translateY(-1px); }
   .contact-link svg { width: 22px; height: 22px; flex: none; color: var(--accent); }
@@ -323,7 +347,29 @@
         {% if contact_person %}<p class="contact-person">{{ contact_person }}</p>{% endif %}
         <div class="contact-links">
           {% if contact_whatsapp %}<a class="contact-link" href="https://wa.me/{{ contact_whatsapp }}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-.8.8c-.9-.4-1.6-1.1-2-2l.8-.8-1-2z"/></svg><span>WhatsApp<small>+{{ contact_whatsapp }}</small></span></a>{% endif %}
-          {% if contact_email %}<a class="contact-link" href="mailto:{{ contact_email }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>Email<small>{{ contact_email }}</small></span></a>{% endif %}
+          {% if not request.session.get('admin_username') %}
+          <div class="contact-email-cs">
+            {% if contact_email %}<a class="contact-link" href="mailto:{{ contact_email }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>Email<small>{{ contact_email }}</small></span></a>{% endif %}
+            <div class="cs-chat-widget{% if not contact_email %} cs-chat-widget--only{% endif %}" id="cs-chat-widget" data-cs-mode="{{ 'client' if request.session.get('client_user_id') else 'public' }}">
+              <section class="cs-chat-panel" id="cs-chat-panel" aria-label="Chat ALGENTRA" hidden>
+                <header class="cs-chat-head">
+                  <div class="cs-chat-brand"><span class="cs-chat-avatar">{{ algentra_mascot("cs-panel-mascot") }}</span><span><span class="cs-chat-title">ALGENTRA</span><span class="cs-chat-mode" id="cs-chat-mode">Asisten publik</span></span></div>
+                  <button class="secondary cs-chat-close" id="cs-chat-close" type="button" aria-label="Tutup chat">×</button>
+                </header>
+                <div class="cs-chat-messages" id="cs-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+                <p class="cs-chat-footnote">Chat diproses Gemini; riwayat dihapus setelah 24 jam. Jangan kirim kata sandi atau OTP.</p>
+                <p class="cs-chat-status" id="cs-chat-status" role="status"></p>
+                <form class="cs-chat-form" id="cs-chat-form">
+                  <textarea class="cs-chat-input" id="cs-chat-input" rows="1" maxlength="2000" placeholder="Tulis pesan..." aria-label="Pesan untuk ALGENTRA" required></textarea>
+                  <button class="cs-chat-send" id="cs-chat-send" type="submit">Kirim</button>
+                </form>
+              </section>
+              <button class="contact-link cs-chat-launcher" id="cs-chat-open" type="button" aria-expanded="false" aria-controls="cs-chat-panel">
+                {{ algentra_mascot("cs-contact-mascot") }}<span>Chat CS<small>ALGENTRA siap membantu</small></span>
+              </button>
+            </div>
+          </div>
+          {% elif contact_email %}<a class="contact-link" href="mailto:{{ contact_email }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>Email<small>{{ contact_email }}</small></span></a>{% endif %}
           {% if not contact_whatsapp and not contact_email %}<a class="contact-link" href="/register">Buat akun klien</a><a class="contact-link" href="/login">Masuk</a>{% endif %}
         </div>
       </article>

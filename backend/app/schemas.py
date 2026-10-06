@@ -20,6 +20,11 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=12, max_length=72)
 
 
+class ResendCodeRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=12, max_length=72)
+
+
 class VerifyEmailRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     code: str = Field(pattern=r"^\d{6}$")
@@ -39,6 +44,7 @@ class MT5AccountCreate(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     server: str = Field(min_length=1, max_length=128)
     login: str = Field(min_length=1, max_length=32)
+    plan: Literal["ZERO", "PRO", "EXPERT"]
     role: Literal["follower"] = "follower"
 
 
@@ -50,6 +56,10 @@ class MT5AccountUpdate(BaseModel):
 
 class MT5AccountActive(BaseModel):
     active: bool
+
+
+class CSChatMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
 
 
 class MT5HistoryDealInput(BaseModel):

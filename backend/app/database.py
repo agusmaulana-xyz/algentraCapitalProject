@@ -83,6 +83,17 @@ def migrate_schema() -> None:
                         "DEFAULT '1970-01-01 00:00:00'"
                     )
                 )
+    if "mt5_accounts" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("mt5_accounts")}
+        additions = {
+            "token_ciphertext": "TEXT",
+            "plan": "VARCHAR(16) NOT NULL DEFAULT 'ZERO'",
+        }
+        missing = {name: sql_type for name, sql_type in additions.items() if name not in columns}
+        if missing:
+            with engine.begin() as connection:
+                for name, sql_type in missing.items():
+                    connection.execute(text(f"ALTER TABLE mt5_accounts ADD COLUMN {name} {sql_type}"))
 
 
 def get_db() -> Generator[Session, None, None]:

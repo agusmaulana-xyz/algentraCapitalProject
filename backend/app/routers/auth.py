@@ -31,6 +31,7 @@ from ..schemas import (
     PasswordResetConfirmRequest,
     PasswordResetRequest,
     RegisterRequest,
+    ResendCodeRequest,
     VerifyEmailRequest,
 )
 
@@ -201,7 +202,7 @@ def _utc(value):
 
 
 @router.post("/resend-code", status_code=status.HTTP_202_ACCEPTED)
-def resend_code(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, str | int]:
+def resend_code(payload: ResendCodeRequest, db: Session = Depends(get_db)) -> dict[str, str | int]:
     email = _normalized_email(payload.email)
     if len(payload.password.encode("utf-8")) > 72:
         raise HTTPException(status_code=422, detail="Kata sandi maksimal 72 byte")

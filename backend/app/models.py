@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -176,10 +176,42 @@ class MT5Account(Base):
     label: Mapped[str] = mapped_column(String(80), nullable=False)
     server: Mapped[str] = mapped_column(String(128), nullable=False)
     login: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan: Mapped[str] = mapped_column(String(16), default="ZERO", nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class CSConversation(Base):
+    __tablename__ = "cs_conversations"
+    __table_args__ = (
+        CheckConstraint(
+            "(client_user_id IS NOT NULL AND public_visitor_hash IS NULL) OR "
+            "(client_user_id IS NULL AND public_visitor_hash IS NOT NULL)",
+            name="ck_cs_conversation_identity",
+        ),
+        Index("ix_cs_conversations_client_expiry", "client_user_id", "expires_at"),
+        Index("ix_cs_conversations_visitor_expiry", "public_visitor_hash", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_user_id: Mapped[int | None] = mapped_column(ForeignKey("client_users.id", ondelete="CASCADE"), nullable=True)
+    public_visitor_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CSChatMessage(Base):
+    __tablename__ = "cs_chat_messages"
+    __table_args__ = (Index("ix_cs_chat_messages_conversation_created", "conversation_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("cs_conversations.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 

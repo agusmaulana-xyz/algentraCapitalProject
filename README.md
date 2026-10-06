@@ -8,8 +8,8 @@ Layanan copy trading berbasis AI dengan FastAPI, SQLite, parser Gemini, koneksi 
 2. Dari folder proyek, salin `.env.example` menjadi `.env`, lalu ganti `APP_SECRET_KEY` dengan nilai acak minimal 32 karakter, `ADMIN_PASSWORD` dengan password minimal 12 karakter, dan `EA_API_KEY` dengan nilai acak. Isi konfigurasi SMTP untuk mengaktifkan pendaftaran klien dan reset kata sandi melalui email.
 3. Buat virtual environment (`python -m venv .venv` di Windows atau `python3 -m venv .venv` di Linux/macOS), lalu pasang dependensi dengan `.venv\Scripts\python -m pip install -r backend/requirements.txt` di Windows atau `.venv/bin/python -m pip install -r backend/requirements.txt` di Linux/macOS.
 4. Jalankan `run.bat` untuk pengembangan. Backend bind ke `127.0.0.1:8000` dan memuat ulang saat kode berubah.
-5. Buka `http://127.0.0.1:8000/loginAdmin` untuk masuk sebagai admin. Klien masuk melalui `/login`, mendaftar dari `/register`, dan mereset kata sandi melalui `/forgot-password` setelah SMTP diisi.
-6. Isi `GEMINI_API_KEY` di `.env` untuk mengaktifkan Gemini. Model default `gemini-3.8-flash` dapat diganti lewat `GEMINI_MODEL`; regex fallback mati kecuali `ENABLE_REGEX_FALLBACK=true`.
+5. Buka `http://127.0.0.1:8000/loginAdmin` untuk masuk sebagai admin. Klien mendaftar dari `/register`, memverifikasi email, lalu masuk melalui `/login`. Di `/account`, client memilih level ZERO/PRO/EXPERT saat menambahkan akun MT5 dan membuat token. Harga paket ditampilkan sebagai informasi; aplikasi belum memproses pembayaran. Reset kata sandi tersedia melalui `/forgot-password` setelah SMTP diisi.
+6. Isi `GEMINI_API_KEY` di `.env` untuk Gemini parser sinyal. Chat customer service **ALGENTRA** memakai key terpisah `GEMINI_CS_API_KEY`; isi dengan API key CS yang berbeda. Model dan batas waktu CS dapat diatur lewat `GEMINI_CS_MODEL` dan `GEMINI_CS_TIMEOUT_SECONDS` (default 60 detik), terpisah dari parser sinyal. Kedua fitur tetap nonaktif sampai key masing-masing diisi.
 7. Untuk Telegram, isi `TELEGRAM_API_ID` dan `TELEGRAM_API_HASH` dari [my.telegram.org](https://my.telegram.org), lalu restart backend dan buka `/telegram-setup` setelah login admin.
 
 Kontak publik pada beranda diatur melalui variabel `CONTACT_*` di `.env.example` dan `.env`. Tautan email, Instagram, TikTok, grup/admin Telegram, dan website ditampilkan dengan ikon; alamat sosial harus berupa URL HTTPS.
@@ -52,6 +52,14 @@ Database SQLite dibuat otomatis pada jalur yang ditentukan. Atur `BACKUP_DIR` pa
 Beranda publik Algentra Capital tersedia di `/`; bagian performa menampilkan P&L agregat aktual dari trade tertutup. Database saat ini belum mengaitkan trade dengan akun klien terpisah, jadi angka publik tidak diklaim sebagai hasil beberapa akun. Workspace privat tetap tersedia di `/dashboard` setelah login admin. Tabel signal terbaru dan log sistem menampilkan paling banyak lima baris.
 
 Grafik Indeks Equity publik membentuk candle M1 dari laporan equity akun utama MT5: open pertama, high/low selama menit berjalan, dan close terakhir. Halaman menampilkan hingga 60 candle dan memperbarui candle berjalan dari laporan EA. Grafik mulai terisi setelah EA mengirim data; data per jam lama tidak diubah menjadi candle menit sintetis.
+
+## Chat AI customer service ALGENTRA
+
+Tombol chat ALGENTRA tampil pada halaman publik dan portal klien, tetapi tidak pada workspace admin. Server menentukan mode dari sesi login: pengunjung mendapat jawaban umum, sedangkan klien hanya mendapat ringkasan akun miliknya. Riwayat publik memakai cookie pengunjung bertanda tangan; percakapan publik dan klien disimpan terpisah. Riwayat tidak dapat dibaca lagi setelah 24 jam dari awal percakapan. Pesan yang kedaluwarsa dihapus saat endpoint chat dipanggil dan oleh pembersih berkala setiap 15 menit.
+
+Chat memakai `GEMINI_CS_API_KEY` dan `GEMINI_CS_MODEL`; key parser sinyal `GEMINI_API_KEY` tidak digunakan oleh layanan CS. Pesan dan ringkasan label/status akun milik klien dikirim ke Gemini untuk menjawab pertanyaan. Token EA tidak dimasukkan ke prompt Gemini. Token baru dan token hasil rotasi disimpan terenkripsi menggunakan key yang diturunkan dari `APP_SECRET_KEY`, lalu hanya disisipkan dalam jawaban API untuk pemilik akun yang sedang login bila pelanggan meminta kode/token. Kode/token tetap tidak muncul dalam log percakapan tersimpan; pelanggan harus menghindari membagikannya. Akun yang dibuat sebelum fitur ini menyimpan token satu-arah saja; untuk menampilkannya lewat chat, pelanggan harus merotasi token sekali dari portal.
+
+Jaga `APP_SECRET_KEY` tetap stabil selama token terenkripsi diperlukan. Jika nilainya diganti, token lama tidak bisa dibuka oleh chat dan pelanggan perlu melakukan rotasi token dari portal; token MT5 yang sudah aktif tetap dapat dicabut/dirotasi.
 
 ## Dashboard admin
 

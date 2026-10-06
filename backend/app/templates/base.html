@@ -198,6 +198,17 @@
     .login-card form { margin-top: 20px; }
     .login-card form label { margin: 13px 0; }
     .login-card button { width: 100%; margin-top: 10px; }
+    .plan-picker { min-width:0; margin:0 0 18px; padding:0; border:0; }
+    .account-connect-form .plan-picker { grid-column:1 / -1; margin:0 0 4px; }
+    .plan-picker legend { margin-bottom:10px; color:var(--ink); font-size:13px; font-weight:750; }
+    .plan-options { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+    .plan-option { display:flex; min-height:180px; flex-direction:column; align-items:flex-start; gap:5px; padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius-control); background:var(--glass-raised); cursor:pointer; }
+    .plan-option:has(input:checked) { border-color:var(--action); box-shadow:0 0 0 2px color-mix(in srgb,var(--action) 28%,transparent); }
+    .plan-option input[type=radio] { width:18px; min-height:18px; margin:0 0 3px; accent-color:var(--action); }
+    .plan-option span { color:var(--muted); font-size:11px; font-weight:500; }
+    .plan-option .plan-option__name { color:var(--ink); font-size:15px; font-weight:800; }
+    .plan-option strong { margin-top:auto; padding-top:8px; color:var(--ink); font-size:15px; }
+    .plan-picker > .field-help { margin-bottom:0; }
     #message { min-height: 1.4em; color: var(--danger); }
     .music-toggle { position:fixed; right:20px; bottom:18px; z-index:20; display:flex; min-height:46px; align-items:center; gap:10px; padding:0 15px; border:1px solid var(--glass-border); border-radius:999px; color:var(--ink); background:var(--glass-surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); font-size:11px; font-weight:750; letter-spacing:.02em; }
     .music-toggle:hover { border-color:#bdd6c0; color:#eff8f0; }
@@ -223,6 +234,8 @@
     @media (max-width: 600px) {
       .page-shell { padding: 26px 16px 56px; }
       section { padding:18px; border-radius:var(--radius-panel); }
+      .plan-options { grid-template-columns:1fr; }
+      .plan-option { min-height:0; }
       .workspace-tag { display: none; }
       .topbar { position:sticky; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
       .brand { min-width:0; }
@@ -246,6 +259,38 @@
       .toolbar input, .toolbar select { max-width: none; }
       .row { flex-wrap: wrap; }
       .row .alias { width: 100%; margin-left: 28px; }
+    }
+    .cs-chat-widget { position:relative; z-index:25; min-width:0; font-family:var(--font-body); }
+    .cs-chat-launcher { display:flex; width:100%; min-height:48px; align-items:center; gap:10px; padding:0 14px; border:1px solid var(--glass-border); border-radius:12px; color:var(--ink); background:var(--glass-surface); box-shadow:none; font-size:13px; font-weight:750; text-align:left; }
+    .cs-chat-launcher:hover { transform:translateY(-1px); border-color:var(--control); }
+    .cs-chat-launcher svg { width:36px; height:36px; flex:none; }
+    .cs-chat-panel { position:fixed; right:20px; bottom:76px; z-index:40; display:flex; width:min(370px,calc(100vw - 28px)); height:min(540px,calc(100dvh - 150px)); min-height:330px; flex-direction:column; overflow:hidden; border:1px solid var(--glass-border); border-radius:18px; color:var(--ink); background:var(--glass-menu); box-shadow:0 22px 60px #0007; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+    .cs-chat-panel[hidden] { display:none; }
+    .cs-chat-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); background:var(--glass-raised); }
+    .cs-chat-brand { display:flex; align-items:center; gap:10px; min-width:0; }
+    .cs-chat-avatar { display:grid; width:44px; height:44px; flex:none; place-items:center; border-radius:12px; }
+    .cs-chat-avatar svg { display:block; width:44px; height:44px; }
+    .cs-chat-title { display:block; font-size:14px; font-weight:850; line-height:1.25; }
+    .cs-chat-mode { display:block; color:var(--muted); font-size:10px; }
+    .cs-chat-close { width:36px; min-height:36px; padding:0; border-radius:10px; }
+    .cs-chat-messages { display:flex; flex:1; flex-direction:column; gap:10px; overflow:auto; padding:15px 12px; scroll-behavior:smooth; }
+    .cs-chat-bubble { max-width:88%; padding:10px 12px; border:1px solid var(--line); border-radius:14px 14px 14px 4px; color:var(--ink); background:var(--panel-raised); font-size:12px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .cs-chat-bubble--user { align-self:flex-end; border-color:#75b8ee70; border-radius:14px 14px 4px 14px; background:#15527c; color:#f2f8fc; }
+    .cs-chat-bubble--typing { display:inline-flex; min-width:54px; align-items:center; gap:4px; padding:12px 14px; }
+    .cs-chat-typing-dot { width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.48; animation:cs-chat-dot .9s ease-in-out infinite; }
+    .cs-chat-typing-dot:nth-child(2) { animation-delay:.12s; }
+    .cs-chat-typing-dot:nth-child(3) { animation-delay:.24s; }
+    @keyframes cs-chat-dot { 0%,60%,100% { transform:translateY(0); opacity:.42; } 30% { transform:translateY(-4px); opacity:1; } }
+    .cs-chat-welcome { color:var(--muted); font-size:11px; }
+    .cs-chat-footnote { margin:0; padding:0 13px 8px; color:var(--muted); font-size:10px; line-height:1.4; }
+    .cs-chat-form { display:flex; align-items:flex-end; gap:8px; padding:10px; border-top:1px solid var(--line); background:var(--glass-raised); }
+    .cs-chat-input { min-height:42px; max-height:100px; flex:1; resize:vertical; margin:0; padding:10px 12px; border:1px solid var(--control); border-radius:12px; color:var(--ink); background:var(--surface); font:inherit; font-size:12px; line-height:1.4; }
+    .cs-chat-send { min-height:42px; padding:0 14px; border-radius:12px; font-size:12px; }
+    .cs-chat-send:disabled { opacity:.55; cursor:wait; }
+    .cs-chat-status { min-height:18px; margin:0; padding:0 12px 7px; color:var(--muted); font-size:10px; }
+    :root[data-theme="light"] .cs-chat-bubble--user { color:#fff; background:#15527c; }
+    @media (max-width:600px) {
+      .cs-chat-panel { position:fixed; right:10px; bottom:72px; width:calc(100vw - 20px); height:min(72dvh,600px); }
     }
   </style>
   {% block extra_head %}{% endblock %}
@@ -291,6 +336,7 @@
   </header>
   {% block content %}{% endblock %}
   <footer>{% if request.session.get('admin_username') %}Algentra Capital Workspace <span aria-hidden="true">·</span> Review risk controls before enabling live orders{% else %}Algentra Capital <span aria-hidden="true">·</span> Trading memiliki risiko; hasil historis bukan jaminan kinerja mendatang.{% endif %}</footer>
+
   <audio id="site-music" preload="auto" loop>
     <source src="/musik.mp3" type="audio/mpeg">
   </audio>
@@ -462,5 +508,128 @@
       }
     })();
   </script>
+  {% if not request.session.get('admin_username') %}
+  <script nonce="{{ request.state.csp_nonce }}">
+    (() => {
+      const widget = document.querySelector("#cs-chat-widget");
+      const panel = document.querySelector("#cs-chat-panel");
+      const openButton = document.querySelector("#cs-chat-open");
+      const closeButton = document.querySelector("#cs-chat-close");
+      const messagesBox = document.querySelector("#cs-chat-messages");
+      const form = document.querySelector("#cs-chat-form");
+      const input = document.querySelector("#cs-chat-input");
+      const sendButton = document.querySelector("#cs-chat-send");
+      const modeLabel = document.querySelector("#cs-chat-mode");
+      const status = document.querySelector("#cs-chat-status");
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      let csrfToken = csrfMeta?.content || "";
+      if (!widget || !panel) return;
+      document.body.append(panel);
+
+      const scrollBottom = () => { messagesBox.scrollTop = messagesBox.scrollHeight; };
+      const addMessage = (role, content) => {
+        const bubble = document.createElement("div");
+        bubble.className = `cs-chat-bubble${role === "user" ? " cs-chat-bubble--user" : ""}`;
+        bubble.textContent = content;
+        messagesBox.append(bubble);
+        scrollBottom();
+        return bubble;
+      };
+      const addTypingIndicator = () => {
+        const bubble = document.createElement("div");
+        bubble.className = "cs-chat-bubble cs-chat-bubble--typing";
+        bubble.setAttribute("role", "status");
+        bubble.setAttribute("aria-label", "ALGENTRA sedang mengetik");
+        const dots = document.createElement("span");
+        dots.setAttribute("aria-hidden", "true");
+        for (let index = 0; index < 3; index += 1) {
+          const dot = document.createElement("i");
+          dot.className = "cs-chat-typing-dot";
+          dots.append(dot);
+        }
+        bubble.append(dots);
+        messagesBox.append(bubble);
+        scrollBottom();
+        return bubble;
+      };
+      const showWelcome = (mode) => {
+        messagesBox.replaceChildren();
+        const welcome = document.createElement("p");
+        welcome.className = "cs-chat-welcome";
+        welcome.textContent = mode === "client"
+          ? "Halo kak, saya ALGENTRA. Saya bisa bantu fitur portal dan pemasangan EA akun Anda."
+          : "Halo, saya ALGENTRA. Tanya seputar fitur dan cara menggunakan layanan kami.";
+        messagesBox.append(welcome);
+      };
+      const setOpen = (opened) => {
+        panel.hidden = !opened;
+        openButton.setAttribute("aria-expanded", String(opened));
+        if (opened) input.focus();
+      };
+      openButton.addEventListener("click", () => setOpen(panel.hidden));
+      closeButton.addEventListener("click", () => setOpen(false));
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !panel.hidden) setOpen(false); });
+
+      const loadHistory = async () => {
+        try {
+          const response = await fetch("/api/cs/chat/history", {cache:"no-store"});
+          const data = await parseApiResponse(response);
+          if (!response.ok) throw new Error(data.detail || "Riwayat chat tidak dapat dimuat.");
+          widget.dataset.csMode = data.mode;
+          modeLabel.textContent = data.mode === "client" ? "Asisten akun klien" : "Asisten publik";
+          if (data.csrf_token) csrfToken = data.csrf_token;
+          if (!data.messages?.length) showWelcome(data.mode);
+          else {
+            messagesBox.replaceChildren();
+            for (const item of data.messages) addMessage(item.role, item.content);
+          }
+        } catch (error) {
+          showWelcome(widget.dataset.csMode);
+          status.textContent = error.message || "Chat belum dapat dimuat.";
+        }
+      };
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const message = input.value.trim();
+        if (!message || sendButton.disabled) return;
+        sendButton.disabled = true;
+        input.disabled = true;
+        const userBubble = addMessage("user", message);
+        input.value = "";
+        status.textContent = "";
+        if (document.visibilityState === "visible") {
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }
+        const typingBubble = addTypingIndicator();
+        const headers = {"Content-Type":"application/json"};
+        if (widget.dataset.csMode === "client" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
+        try {
+          const response = await fetch("/api/cs/chat/message", {
+            method:"POST", headers, body:JSON.stringify({message})
+          });
+          const data = await parseApiResponse(response);
+          if (!response.ok) throw new Error(data.detail || "Pesan belum terkirim. Coba lagi.");
+          widget.dataset.csMode = data.mode;
+          modeLabel.textContent = data.mode === "client" ? "Asisten akun klien" : "Asisten publik";
+          typingBubble.remove();
+          addMessage("assistant", data.message);
+          status.textContent = "";
+        } catch (error) {
+          typingBubble.remove();
+          userBubble.remove();
+          input.value = message;
+          status.textContent = error.message || "Chat ALGENTRA sedang tidak tersedia.";
+        } finally {
+          sendButton.disabled = false;
+          input.disabled = false;
+          input.focus();
+        }
+      });
+
+      loadHistory();
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>

@@ -12,10 +12,12 @@ from urllib.parse import urlsplit
 
 from .auth import seed_admin
 from .config import PROJECT_ROOT, get_settings
+from .cs_service import cleanup_expired_conversations_periodically, purge_expired_conversations
+from .client_plans import CLIENT_PLANS
 from .database import Base, SessionLocal, engine, migrate_schema
 from .models import AppSetting, Signal, utc_now
 from .public_realtime import public_performance_hub
-from .routers import auth, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
+from .routers import auth, cs as cs_router, dashboard, ea, mt5 as mt5_router, parser as parser_router, public as public_router, settings, tg as tg_router
 from .routers.mt5 import require_client_id
 from .signal_service import SignalService
 from .security import (
@@ -56,10 +58,17 @@ async def lifespan(_: FastAPI):
             elif key == "allowed_symbols" and db.get(AppSetting, key).value.strip() == "[]":
                 db.get(AppSetting, key).value = '["XAUUSD"]'
         db.commit()
-    await telegram_manager.startup()
+    await asyncio.to_thread(purge_expired_conversations)
+    cs_cleanup_task = asyncio.create_task(cleanup_expired_conversations_periodically())
     try:
+        await telegram_manager.startup()
         yield
     finally:
+        cs_cleanup_task.cancel()
+        try:
+            await cs_cleanup_task
+        except asyncio.CancelledError:
+            pass
         await telegram_manager.shutdown()
 
 
@@ -159,6 +168,7 @@ def require_admin(request: Request) -> str:
 
 
 app.include_router(auth.router)
+app.include_router(cs_router.router)
 app.include_router(public_router.router)
 app.include_router(dashboard.router, dependencies=[Depends(require_admin)])
 app.include_router(settings.router, dependencies=[Depends(require_admin)])
@@ -200,11 +210,14 @@ def forgot_password_page(request: Request) -> HTMLResponse:
 
 
 @app.get("/account", response_class=HTMLResponse)
-def client_account_page(request: Request, _: int = Depends(require_client_id)) -> HTMLResponse:
+def client_account_page(
+    request: Request,
+    _: int = Depends(require_client_id),
+) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
         name="account.html",
-        context={"csrf_token": request.session["csrf_token"]},
+        context={"csrf_token": request.session["csrf_token"], "client_plans": CLIENT_PLANS},
     )
 
 

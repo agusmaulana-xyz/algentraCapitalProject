@@ -11,12 +11,28 @@
 
   <section>
     <h2>Hubungkan akun Copy Trading</h2>
-    <p class="section-help">Masukkan nama server broker dan nomor login MT5. Kami tidak meminta atau menyimpan kata sandi broker.</p>
+    <p class="section-help">Pilih level untuk akun MT5 ini, lalu masukkan nama server broker dan nomor login. Token dibuat setelah akun ditambahkan. Kami tidak meminta atau menyimpan kata sandi broker.</p>
     <form id="account-form" class="form-grid account-connect-form">
+      <fieldset class="plan-picker">
+        <legend>Pilih level akun MT5</legend>
+        <div class="plan-options">
+          {% for code, plan in client_plans.items() %}
+          <label class="plan-option" for="plan-{{ code }}">
+            <input id="plan-{{ code }}" type="radio" name="plan" value="{{ code }}" required>
+            <span class="plan-option__name">{{ plan.name }}</span>
+            <span>vCPU: {{ plan.vcpu }}</span>
+            <span>RAM: {{ plan.ram }}</span>
+            <span>Disk: {{ plan.disk }}</span>
+            <strong>Rp {{ "{:,.0f}".format(plan.price_idr).replace(",", ".") }}</strong>
+          </label>
+          {% endfor %}
+        </div>
+        <p class="field-help">Pembayaran belum tersedia di aplikasi. Level ini akan tersimpan pada akun dan token yang dibuat.</p>
+      </fieldset>
       <label>Nama akun<input name="label" maxlength="80" placeholder="Copy Trading 1" required></label>
       <label>Broker server<input name="server" maxlength="128" placeholder="BrokerName-Live" required></label>
       <label>Nomor login MT5<input name="login" maxlength="32" inputmode="numeric" required></label>
-      <div><button type="submit">Tambahkan akun</button></div>
+      <div><button type="submit">Tambahkan akun &amp; buat token</button></div>
     </form>
     <p id="account-message" class="status" role="status"></p>
     <div id="new-token" hidden></div>
@@ -68,6 +84,7 @@ const tokenBox = document.querySelector("#new-token");
 const balanceGroupsBox = document.querySelector("#client-balance-groups");
 const performanceGroupsBox = document.querySelector("#client-performance-groups");
 const performanceUpdated = document.querySelector("#client-performance-updated");
+const clientPlans = {{ client_plans | tojson }};
 
 const formatMoney = (value, currency) => `${Number(value || 0).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2})} ${currency || ""}`.trim();
 const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mode] || mode || "MT5");
@@ -97,7 +114,8 @@ function showToken(title, token, accountId) {
 function addAccountCard(account) {
   const card = document.createElement("article"); card.className = "card";
   const title = document.createElement("h3"); title.textContent = account.label;
-  const detail = document.createElement("p"); detail.textContent = `Akun Copy Trading · ${account.login} · ${account.server}`;
+  const plan = clientPlans[account.plan] || clientPlans.ZERO;
+  const detail = document.createElement("p"); detail.textContent = `Akun Copy Trading · ${account.login} · ${account.server} · ${plan.name} (${plan.vcpu}, RAM ${plan.ram}, Disk ${plan.disk}) · Rp ${Number(plan.price_idr).toLocaleString("id-ID")}`;
   const state = document.createElement("p"); state.className = "muted";
   state.textContent = `${account.active ? "Aktif" : "Nonaktif"} · Terakhir terhubung: ${account.last_seen_at ? new Date(account.last_seen_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) : "belum ada koneksi"}`;
   const accountBalance = document.createElement("p"); accountBalance.className = "account-balance";

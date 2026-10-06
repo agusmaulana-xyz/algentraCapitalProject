@@ -219,6 +219,8 @@ class RateLimitMiddleware:
             return 12, 60
         if path == "/api/parser/test":
             return 20, 60
+        if path == "/api/cs/chat/message":
+            return 12, 60
         return 120, 60
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     cookie_secure: bool = Field(default=True, validation_alias="COOKIE_SECURE")
     gemini_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-3.8-flash", validation_alias="GEMINI_MODEL")
+    gemini_cs_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_CS_API_KEY")
+    gemini_cs_model: str = Field(default="gemini-3.8-flash", validation_alias="GEMINI_CS_MODEL")
     gemini_timeout_seconds: float = Field(default=25.0, validation_alias="GEMINI_TIMEOUT_SECONDS", gt=0, le=120)
+    gemini_cs_timeout_seconds: float = Field(default=60.0, validation_alias="GEMINI_CS_TIMEOUT_SECONDS", ge=15, le=180)
     gemini_retry_attempts: int = Field(default=3, validation_alias="GEMINI_RETRY_ATTEMPTS", ge=1, le=6)
     enable_regex_fallback: bool = Field(default=False, validation_alias="ENABLE_REGEX_FALLBACK")
     telegram_api_id: int | None = Field(default=None, validation_alias="TELEGRAM_API_ID", gt=0)
@@ -71,6 +74,8 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_USERNAME cannot be empty")
         if not self.gemini_model.strip():
             raise ValueError("GEMINI_MODEL cannot be empty")
+        if not self.gemini_cs_model.strip():
+            raise ValueError("GEMINI_CS_MODEL cannot be empty")
         if (self.telegram_api_id is None) != (self.telegram_api_hash is None):
             raise ValueError("TELEGRAM_API_ID dan TELEGRAM_API_HASH harus diisi bersamaan")
         if self.database_url and not self.database_url.startswith("sqlite:"):

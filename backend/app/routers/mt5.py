@@ -21,6 +21,7 @@ from ..models import (
 from ..mt5_performance import get_mt5_performance
 from ..schemas import FollowerAccountReport, MT5AccountActive, MT5AccountCreate, MT5AccountUpdate
 from ..security import csrf_token, require_csrf
+from ..token_crypto import encrypt_account_token
 from ..time_utils import wib_iso
 
 
@@ -74,6 +75,7 @@ def _account_payload(
         "label": account.label,
         "server": account.server,
         "login": account.login,
+        "plan": account.plan,
         "role": "follower",
         "active": account.active,
         "last_seen_at": wib_iso(account.last_seen_at),
@@ -172,8 +174,10 @@ def create_account(payload: MT5AccountCreate, owner_id: int = Depends(require_cl
         label=label,
         server=server,
         login=login,
+        plan=payload.plan,
         role=payload.role,
         token_hash=_token_hash(token),
+        token_ciphertext=encrypt_account_token(token),
     )
     db.add(account)
     try:
@@ -190,6 +194,7 @@ def rotate_token(account_id: int, owner_id: int = Depends(require_client_id), db
     account = _owned_account(db, owner_id, account_id)
     token = secrets.token_urlsafe(32)
     account.token_hash = _token_hash(token)
+    account.token_ciphertext = encrypt_account_token(token)
     account.last_seen_at = None
     db.commit()
     return {"token": token}
