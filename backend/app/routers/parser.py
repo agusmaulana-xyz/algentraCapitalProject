@@ -38,7 +38,7 @@ async def test_parser(payload: ParserTestRequest, db: Session = Depends(get_db))
     mapping = _setting(db, "symbol_mapping", {})
     result = validate_classification(
         classification,
-        default_symbol=str(_setting(db, "default_symbol", "XAUUSD")),
+        default_symbol="XAUUSD",
         confidence_threshold=float(_setting(db, "confidence_threshold", 0.75)),
         symbol_mapping=mapping if isinstance(mapping, dict) else {},
         allow_updates=bool(_setting(db, "allow_updates", False)),

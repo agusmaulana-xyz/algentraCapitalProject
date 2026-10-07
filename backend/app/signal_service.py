@@ -90,6 +90,17 @@ def normalize_symbol(symbol: str | None, mapping: dict[str, str] | None = None, 
     return candidate
 
 
+def _is_xauusd_symbol(symbol: str) -> bool:
+    return symbol.upper().startswith("XAUUSD")
+
+
+def _is_gold_symbol_alias(symbol: str | None) -> bool:
+    if not symbol:
+        return True
+    candidate = re.sub(r"\s+", "", symbol).upper()
+    return candidate.startswith(("XAUUSD", "GOLD", "XAU", "EMAS"))
+
+
 def validate_classification(
     classification: SignalClassification,
     *,
@@ -154,7 +165,22 @@ def validate_classification(
         if action == "SELL" and max(take_profits) >= stop_loss:
             return ValidationResult("REJECTED", classification, None, None, "SELL mensyaratkan TP di bawah SL")
 
+    if not _is_gold_symbol_alias(classification.symbol):
+        return ValidationResult("REJECTED", classification, classification.symbol, None, "Hanya signal XAUUSD yang diterima")
     symbol = normalize_symbol(classification.symbol, symbol_mapping, default_symbol)
+    if not _is_xauusd_symbol(symbol):
+        return ValidationResult("REJECTED", classification, symbol, None, "Hanya signal XAUUSD yang diterima")
+
+    if stop_loss is not None and take_profits:
+        reference = entry_high if action == "BUY" and entry_high is not None else (
+            entry_low if action == "SELL" and entry_low is not None else entry
+        )
+        if reference is not None:
+            risk_distance = abs(reference - stop_loss)
+            reward_distance = min(abs(target - reference) for target in take_profits)
+            if risk_distance > reward_distance:
+                return ValidationResult("REJECTED", classification, symbol, None, "Jarak SL lebih besar daripada jarak TP")
+
     levels = []
     if entry_low is not None and entry_high is not None:
         levels.append(f"ENTRY ZONE : {entry_low:g}–{entry_high:g}")
@@ -230,13 +256,12 @@ class SignalService:
         mapping = _setting(db, "symbol_mapping", {})
         if not isinstance(mapping, dict):
             mapping = {}
-        default_symbol = str(_setting(db, "default_symbol", "XAUUSD"))
         confidence_threshold = float(_setting(db, "confidence_threshold", 0.75))
         allow_updates = bool(_setting(db, "allow_updates", False))
         max_deviation = float(_setting(db, "max_market_deviation_pct", 5.0))
         validation = validate_classification(
             classification,
-            default_symbol=default_symbol,
+            default_symbol="XAUUSD",
             confidence_threshold=confidence_threshold,
             symbol_mapping=mapping,
             allow_updates=allow_updates,

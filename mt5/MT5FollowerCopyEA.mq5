@@ -1,5 +1,5 @@
 #property strict
-#property version   "1.100"
+#property version   "1.101"
 #property description "Copies all published Algentra positions and reports MT5 account history"
 
 #include <Trade/Trade.mqh>
@@ -11,7 +11,6 @@ input long MagicNumber = 26100301;
 input double VolumeMultiplier = 1.0;
 input double MaxEntryDeviationPercent = 0.0; // 0 disables the late-entry gate for existing master positions
 input int MaxSlippagePoints = 20;
-input int MaxPositions = 20;
 input string SymbolSuffix = "";
 input string SymbolMapCsv = ""; // Optional source-to-broker mapping, e.g. XAUUSDc=GOLD
 input bool AllowLiveTrading = false;
@@ -652,15 +651,6 @@ void PollAndCopy()
       ulong local_tickets[];
       double local_volume = 0.0;
       bool already_copied = FindCopiedPositions(source_ticket, local_tickets, local_volume);
-      if(!already_copied && CountManagedPositions() >= MaxPositions)
-        {
-         if(TimeCurrent() - g_last_log >= 15)
-           {
-            Print("[MT5FollowerCopyEA] copy skipped: MaxPositions reached");
-            g_last_log = TimeCurrent();
-           }
-         continue;
-        }
       MqlTick quote;
       if(!SymbolInfoTick(symbol, quote) || quote.ask <= 0.0 || quote.bid <= 0.0)
         {
@@ -691,7 +681,7 @@ void PollAndCopy()
 int OnInit()
   {
    if(PollIntervalMs < 500 || StringLen(AccountToken) < 32 || VolumeMultiplier <= 0.0 ||
-      MaxEntryDeviationPercent < 0.0 || MaxPositions < 1)
+      MaxEntryDeviationPercent < 0.0)
       return INIT_PARAMETERS_INCORRECT;
    EventSetMillisecondTimer(PollIntervalMs);
    ReportAccountState();
@@ -712,7 +702,7 @@ void OnTimer()
    ReportAccountState();
    PollAndCopy();
    Comment("Algentra MT5 Copy Trading\nBackend: ", g_connection_status,
-           "\nManaged positions: ", CountManagedPositions(), " / ", MaxPositions,
+           "\nManaged positions: ", CountManagedPositions(),
            "\nSaldo: ", AccountInfoString(ACCOUNT_CURRENCY), " ", DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2),
            "\nCopying permission: ", TradingOptInAllowsAccount() ? "ON" : "OFF",
            "\nLaporan akun: ", g_account_report_status);

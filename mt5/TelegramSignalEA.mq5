@@ -1,8 +1,10 @@
 #property strict
-#property version   "1.100"
+#property version   "1.101"
 #property description "Executes Telegram signals, reports master MT5 balance, and publishes all open positions"
 
 #define MAX_SIGNAL_TARGETS 20
+#define SIGNAL_EXPIRY_SECONDS 3600
+#define PENDING_ORDER_EXPIRY_MINUTES 60
 
 #include <Trade/Trade.mqh>
 
@@ -21,7 +23,6 @@ input double FixedLot = 0.01;
 input double RiskPercent = 1.0; // Total risk budget per signal, split across its entries
 input int MaxSlippage = 20;
 input int MaxSpreadPoints = 80;
-input int MaxOpenTrades = 20;
 input bool AllowBuy = true;
 input bool AllowSell = true;
 input bool UseDefaultSLTP = true;
@@ -30,12 +31,7 @@ input int DefaultTPPoints = 1000;
 input string SymbolSuffix = "";
 input string SymbolMapCsv = ""; // Optional source-to-broker mapping, e.g. XAUUSD=XAUUSDc,US30=US30.cash
 input string MarketWatchlistCsv = "XAUUSD,EURUSD,USDJPY,GBPUSD";
-input int MaxSignalAgeSeconds = 120;
-input int PendingOrderExpiryMinutes = 60;
-input bool TradeOnlyAllowedSymbols = false;
-input string AllowedSymbolsCsv = "XAUUSD,EURUSD,GBPUSD,USDJPY,AUDUSD";
 input bool DemoMode = true;
-input double MaxLot = 5.0;
 input double MaxMarketDeviationPct = 5.0;
 input int MaxRetries = 3;
 
@@ -586,44 +582,11 @@ bool FindExistingSignalOrder(const long signal_id, long &ticket_out, double &lot
    return false;
   }
 
-bool SymbolAllowed(const string symbol)
+bool IsXauUsdSymbol(const string symbol)
   {
-   if(!TradeOnlyAllowedSymbols)
-      return true;
-   string allowed[];
-   int count = StringSplit(AllowedSymbolsCsv, ',', allowed);
-   for(int i = 0; i < count; i++)
-     {
-      string item = allowed[i];
-      StringTrimLeft(item);
-      StringTrimRight(item);
-      if(item == "")
-         continue;
-      StringToUpper(item);
-      string test = symbol;
-      StringTrimLeft(test);
-      StringTrimRight(test);
-      StringToUpper(test);
-      if(item == test || StringFind(test, item) == 0 || (SymbolSuffix != "" && item + SymbolSuffix == test))
-         return true;
-     }
-   return false;
-  }
-
-int CountOpenTrades()
-  {
-   int count = 0;
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-     {
-      if(PositionGetTicket(i) > 0 && (long)PositionGetInteger(POSITION_MAGIC) == MagicNumber)
-         count++;
-     }
-   for(int i = OrdersTotal() - 1; i >= 0; i--)
-     {
-      if(OrderGetTicket(i) > 0 && (long)OrderGetInteger(ORDER_MAGIC) == MagicNumber)
-         count++;
-     }
-   return count;
+   string normalized = symbol;
+   StringToUpper(normalized);
+   return StringFind(normalized, "XAUUSD") == 0;
   }
 
 double NormalizePrice(const string symbol, const double price)
@@ -670,7 +633,7 @@ int VolumePrecision(const double step)
 double NormalizeLots(const string symbol, double lots)
   {
    double min_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-   double max_lot = MathMin(SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX), MaxLot);
+   double max_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
    double step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
    if(step <= 0.0 || min_lot <= 0.0 || max_lot < min_lot || lots < min_lot)
       return 0.0;
@@ -750,7 +713,7 @@ bool PlaceOrder(const string action, const string order_type, const string symbo
    bool placed = false;
    int expiration_modes = (int)SymbolInfoInteger(symbol, SYMBOL_EXPIRATION_MODE);
    ENUM_ORDER_TYPE_TIME time_type = (expiration_modes & SYMBOL_EXPIRATION_SPECIFIED) != 0 ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
-   datetime expiration = TimeCurrent() + PendingOrderExpiryMinutes * 60;
+   datetime expiration = TimeCurrent() + PENDING_ORDER_EXPIRY_MINUTES * 60;
    for(int attempt = 0; attempt < MathMax(1, MaxRetries); attempt++)
      {
       if(order_type == "MARKET")
@@ -796,10 +759,8 @@ void ReportExpiredOrder(const ulong ticket)
 
 void ExpirePendingOrders()
   {
-   if(PendingOrderExpiryMinutes <= 0)
-      return;
    datetime now = TimeCurrent();
-   int lifetime = PendingOrderExpiryMinutes * 60;
+   int lifetime = PENDING_ORDER_EXPIRY_MINUTES * 60;
    for(int i = OrdersTotal() - 1; i >= 0; i--)
      {
       ulong ticket = OrderGetTicket(i);
@@ -813,7 +774,7 @@ void ExpirePendingOrders()
       long position_id = OrderGetInteger(ORDER_POSITION_ID);
       if(g_trade.OrderDelete(ticket) && g_trade.ResultRetcode() == TRADE_RETCODE_DONE)
         {
-         Print("[TelegramSignalEA] pending order ", ticket, " expired after ", PendingOrderExpiryMinutes, " minutes");
+         Print("[TelegramSignalEA] pending order ", ticket, " expired after ", PENDING_ORDER_EXPIRY_MINUTES, " minutes");
          if(position_id <= 0)
             ReportExpiredOrder(ticket);
         }
@@ -844,10 +805,15 @@ void ReportExpiredOrdersFromHistory()
      }
   }
 
-void RejectSignal(const long signal_id, const string symbol, const string action, const string reason)
+void RejectSignal(const long signal_id, const string symbol, const string action, const string reason, const int leg_count=1)
   {
-   SaveReport(signal_id, 2, 0, 0.0, 0.0);
-   SendReport(signal_id, "REJECTED", 0, symbol, action, 0.0, 0.0, reason);
+   int count = MathMax(1, leg_count);
+   for(int i = 0; i < count; i++)
+     {
+      int leg = count > 1 ? i + 1 : 0;
+      SaveReport(signal_id, 2, 0, 0.0, 0.0, leg);
+      SendReport(signal_id, "REJECTED", 0, symbol, action, 0.0, 0.0, reason, leg);
+     }
    Print("[TelegramSignalEA] signal ", signal_id, " rejected: ", reason);
   }
 
@@ -879,6 +845,164 @@ string ZoneOrderType(const string action, const double entry, const double bid, 
    if(entry > bid + tolerance) return "LIMIT";
    if(entry < bid - tolerance) return "STOP";
    return "MARKET";
+  }
+
+bool CheckRewardRisk(const string symbol, const double reference, const double sl, const double tp)
+  {
+   if(reference <= 0.0 || sl <= 0.0 || tp <= 0.0)
+      return true;
+   double tick = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+   if(tick <= 0.0)
+      tick = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   return MathAbs(reference - sl) <= MathAbs(tp - reference) + tick * 0.5;
+  }
+
+bool ValidateSignalPlan(const string symbol, const string action, const string requested_type,
+                        const bool zone_order, const double requested_entry,
+                        const double entry_low, const double entry_high, const double sl_input,
+                        const string tp_array, const int tp_count, const int order_count,
+                        const double bid, const double ask, string &reason)
+  {
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double tick = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+   if(tick <= 0.0)
+      tick = point;
+
+   for(int i = 0; i < order_count; i++)
+     {
+      double leg_entry = requested_entry;
+      double tp = tp_count > 0 ? ArrayNumberAt(tp_array, i) : 0.0;
+      string order_type = requested_type;
+      if(zone_order)
+        {
+         if(tp_count == 0)
+            leg_entry = i == 0 ? entry_low : entry_high;
+         else if(order_count == 1)
+            leg_entry = (entry_low + entry_high) / 2.0;
+         else if(action == "BUY")
+            leg_entry = entry_low + (entry_high - entry_low) * (double)i / (order_count - 1);
+         else
+            leg_entry = entry_high - (entry_high - entry_low) * (double)i / (order_count - 1);
+         leg_entry = NormalizePriceInRange(symbol, leg_entry, entry_low, entry_high);
+         order_type = ZoneOrderType(action, leg_entry, bid, ask, tick);
+        }
+
+      if(order_type != "MARKET" && order_type != "LIMIT" && order_type != "STOP")
+        {
+         reason = "Order type tidak valid";
+         return false;
+        }
+      bool market = order_type == "MARKET";
+      double reference = market ? (action == "BUY" ? ask : bid) : leg_entry;
+      if(reference <= 0.0)
+        {
+         reason = "Quote atau harga entry tidak tersedia";
+         return false;
+        }
+
+      double sl = sl_input;
+      if(UseDefaultSLTP && sl <= 0.0 && DefaultSLPoints > 0 && point > 0.0)
+         sl = action == "BUY" ? reference - DefaultSLPoints * point : reference + DefaultSLPoints * point;
+      if(UseDefaultSLTP && tp <= 0.0 && DefaultTPPoints > 0 && point > 0.0)
+         tp = action == "BUY" ? reference + DefaultTPPoints * point : reference - DefaultTPPoints * point;
+      sl = NormalizePrice(symbol, sl);
+      tp = NormalizePrice(symbol, tp);
+      if(!CheckPriceLevels(symbol, action, reference, sl, tp))
+        {
+         reason = "SL/TP invalid or inside broker stops level";
+         return false;
+        }
+      if(!CheckRewardRisk(symbol, reference, sl, tp))
+        {
+         reason = "Jarak SL lebih besar daripada jarak TP";
+         return false;
+        }
+     }
+   return true;
+  }
+
+bool IsOppositePendingOrder(const ENUM_ORDER_TYPE type, const string action)
+  {
+   if(action == "BUY")
+      return type == ORDER_TYPE_SELL_LIMIT || type == ORDER_TYPE_SELL_STOP || type == ORDER_TYPE_SELL_STOP_LIMIT;
+   return type == ORDER_TYPE_BUY_LIMIT || type == ORDER_TYPE_BUY_STOP || type == ORDER_TYPE_BUY_STOP_LIMIT;
+  }
+
+int CountOpposingPositions(const string symbol, const string action, double &floating_profit)
+  {
+   int count = 0;
+   floating_profit = 0.0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0 || (long)PositionGetInteger(POSITION_MAGIC) != MagicNumber ||
+         PositionGetString(POSITION_SYMBOL) != symbol)
+         continue;
+      ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+      bool opposite = (action == "BUY" && type == POSITION_TYPE_SELL) ||
+                      (action == "SELL" && type == POSITION_TYPE_BUY);
+      if(!opposite)
+         continue;
+      count++;
+      floating_profit += PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+     }
+   return count;
+  }
+
+bool ResolveOpposingExposure(const long signal_id, const string symbol, const string action, const int leg_count)
+  {
+   double floating_profit = 0.0;
+   int opposing = CountOpposingPositions(symbol, action, floating_profit);
+   if(opposing > 0 && floating_profit > 0.0)
+     {
+      string held_action = action == "BUY" ? "SELL" : "BUY";
+      RejectSignal(signal_id, symbol, action,
+                   StringFormat("Signal %s diabaikan karena %d posisi %s masih floating profit", action, opposing, held_action),
+                   leg_count);
+      return false;
+     }
+
+   if(opposing > 0)
+     {
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+        {
+         ulong ticket = PositionGetTicket(i);
+         if(ticket == 0 || (long)PositionGetInteger(POSITION_MAGIC) != MagicNumber ||
+            PositionGetString(POSITION_SYMBOL) != symbol)
+            continue;
+         ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+         bool opposite = (action == "BUY" && type == POSITION_TYPE_SELL) ||
+                         (action == "SELL" && type == POSITION_TYPE_BUY);
+         if(!opposite)
+            continue;
+         if(!g_trade.PositionClose(ticket, (ulong)MaxSlippage) ||
+            (g_trade.ResultRetcode() != TRADE_RETCODE_DONE && g_trade.ResultRetcode() != TRADE_RETCODE_DONE_PARTIAL))
+            Print("[TelegramSignalEA] could not close opposing position ", ticket, ": ", g_trade.ResultRetcodeDescription());
+        }
+      floating_profit = 0.0;
+      if(CountOpposingPositions(symbol, action, floating_profit) > 0)
+        {
+         DeferSignal(signal_id, symbol, "opposing EA positions remain open; retrying before sending the new signal");
+         return false;
+        }
+     }
+
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = OrderGetTicket(i);
+      if(ticket == 0 || (long)OrderGetInteger(ORDER_MAGIC) != MagicNumber ||
+         OrderGetString(ORDER_SYMBOL) != symbol)
+         continue;
+      ENUM_ORDER_TYPE type = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+      if(!IsOppositePendingOrder(type, action))
+         continue;
+      if(!g_trade.OrderDelete(ticket) || g_trade.ResultRetcode() != TRADE_RETCODE_DONE)
+        {
+         DeferSignal(signal_id, symbol, "opposing pending EA order could not be canceled; retrying");
+         return false;
+        }
+     }
+   return true;
   }
 
 bool ProcessOrderLeg(const long signal_id, const string symbol, const string action,
@@ -949,6 +1073,11 @@ bool ProcessOrderLeg(const long signal_id, const string symbol, const string act
       ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "SL/TP invalid or inside broker stops level");
       return false;
      }
+   if(!CheckRewardRisk(symbol, reference, sl, tp))
+     {
+      ReportLegOutcome(signal_id, symbol, action, leg, "REJECTED", 0.0, "Jarak SL lebih besar daripada jarak TP");
+      return false;
+     }
 
    double lots = CalculateLots(symbol, action, reference, sl, risk_money);
    if(lots <= 0.0)
@@ -1007,9 +1136,16 @@ void ProcessSignal(const string item)
    string action = JsonValue(item, "action");
    string order_type = JsonValue(item, "order_type");
    string requested_symbol = JsonValue(item, "symbol");
+   if(requested_symbol == "")
+      requested_symbol = "XAUUSD";
    if(SavedState(signal_id, 0) != 0)
      {
       RepeatSavedReport(signal_id, requested_symbol, action, 0);
+      return;
+     }
+   if(!IsXauUsdSymbol(requested_symbol))
+     {
+      RejectSignal(signal_id, requested_symbol, action, "Only XAUUSD signals are accepted");
       return;
      }
    string symbol;
@@ -1052,7 +1188,7 @@ void ProcessSignal(const string item)
      }
 
    long created_epoch = JsonLong(item, "created_epoch");
-   if(MaxSignalAgeSeconds > 0 && created_epoch > 0 && TimeGMT() - created_epoch > MaxSignalAgeSeconds)
+   if(created_epoch > 0 && TimeGMT() - created_epoch > SIGNAL_EXPIRY_SECONDS)
      {
       RejectSignal(signal_id, symbol, action, "Signal expired");
       return;
@@ -1062,9 +1198,21 @@ void ProcessSignal(const string item)
       RejectSignal(signal_id, symbol, action, "Action disabled or invalid");
       return;
      }
-   if(!SymbolAllowed(symbol))
+
+   double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+   double sl = JsonNumber(item, "sl");
+   string tp_array = JsonValue(item, "tp");
+   int tp_count = ArrayNumberCount(tp_array);
+   int order_count = tp_count > 0 ? tp_count : (zone_order ? 2 : 1);
+   string plan_error = "";
+   double requested_entry = zone_order ? 0.0 : JsonNumber(item, "entry");
+   if(bid > 0.0 && ask > 0.0 &&
+      !ValidateSignalPlan(symbol, action, order_type, zone_order, requested_entry,
+                          entry_low, entry_high, sl, tp_array, tp_count, order_count,
+                          bid, ask, plan_error))
      {
-      DeferSignal(signal_id, symbol, "symbol is outside AllowedSymbolsCsv; update the input and retry");
+      RejectSignal(signal_id, symbol, action, plan_error, order_count);
       return;
      }
    if(DemoMode)
@@ -1086,12 +1234,6 @@ void ProcessSignal(const string item)
       return;
      }
 
-   double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-   double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double sl = JsonNumber(item, "sl");
-   string tp_array = JsonValue(item, "tp");
-   int tp_count = ArrayNumberCount(tp_array);
-   int order_count = tp_count > 0 ? tp_count : (zone_order ? 2 : 1);
    double risk_money_per_leg = 0.0;
    if(LotMode == LOT_RISK_PERCENT && RiskPercent > 0.0)
      {
@@ -1106,24 +1248,8 @@ void ProcessSignal(const string item)
       return;
      }
 
-   int needed_orders = 0;
-   for(int i = 0; i < order_count; i++)
-     {
-      int leg = order_count > 1 ? i + 1 : 0;
-      if(SavedState(signal_id, leg) == 0)
-        {
-         long existing_ticket = 0;
-         double existing_lots = 0.0;
-         double existing_price = 0.0;
-         if(!FindExistingSignalOrder(signal_id, existing_ticket, existing_lots, existing_price, leg))
-            needed_orders++;
-        }
-     }
-   if(MaxOpenTrades > 0 && CountOpenTrades() + needed_orders > MaxOpenTrades)
-     {
-      DeferSignal(signal_id, symbol, "MaxOpenTrades limit is full; close an EA-managed position to retry");
+   if(!ResolveOpposingExposure(signal_id, symbol, action, order_count))
       return;
-     }
 
    for(int i = 0; i < order_count; i++)
      {
@@ -1165,7 +1291,7 @@ void SendHeartbeat()
   {
    string symbol = JsonEscape(_Symbol);
    string body = StringFormat(
-      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"1.100\",\"symbol\":\"%s\"}",
+      "{\"active\":true,\"terminal\":\"%s\",\"version\":\"1.101\",\"symbol\":\"%s\"}",
       JsonEscape(TerminalInfoString(TERMINAL_NAME)), symbol);
    string response;
    HttpRequest("POST", "/api/ea/heartbeat", body, response);
@@ -1250,7 +1376,7 @@ void UpdatePanel()
   {
    int closed = g_wins + g_losses;
    double winrate = closed > 0 ? (double)g_wins / closed * 100.0 : 0.0;
-    Comment("TelegramSignalEA 1.100\n",
+    Comment("TelegramSignalEA 1.101\n",
            "Backend: ", g_connection_status, "\n",
            "Mode: ", DemoMode ? "DEMO / DRY RUN" : "LIVE", "\n",
            "Signals this session: ", g_signal_count, "\n",
@@ -1265,11 +1391,8 @@ int OnInit()
       Print("[TelegramSignalEA] PollIntervalMs must be >= 100");
       return INIT_PARAMETERS_INCORRECT;
      }
-   if(PendingOrderExpiryMinutes < 1)
-     {
-      Print("[TelegramSignalEA] PendingOrderExpiryMinutes must be >= 1");
-      return INIT_PARAMETERS_INCORRECT;
-     }
+   g_trade.SetExpertMagicNumber((ulong)MagicNumber);
+   g_trade.SetDeviationInPoints((ulong)MaxSlippage);
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
       Print("[TelegramSignalEA] AutoTrading is off; live signals will wait and retry when MT5 trading is enabled.");
    EventSetMillisecondTimer(PollIntervalMs);

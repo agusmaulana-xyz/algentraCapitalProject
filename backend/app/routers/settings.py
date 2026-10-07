@@ -17,9 +17,8 @@ from ..schemas import SettingsUpdate
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 ALLOWED_SETTINGS = {
-    "confidence_threshold", "default_symbol", "symbol_mapping", "demo_mode", "allow_updates",
-    "kill_switch", "max_daily_loss_money", "max_lot", "max_open_trades",
-    "max_signal_age_seconds", "max_market_deviation_pct", "allowed_symbols", "registration_open",
+    "confidence_threshold", "symbol_mapping", "demo_mode", "allow_updates",
+    "kill_switch", "max_market_deviation_pct", "registration_open",
 }
 SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9._]{1,32}$")
 
@@ -29,30 +28,17 @@ def _validate_setting(key: str, value: object) -> object:
         if not isinstance(value, bool):
             raise HTTPException(status_code=422, detail=f"Setting '{key}' harus boolean")
         return value
-    if key in {"confidence_threshold", "max_daily_loss_money", "max_lot", "max_market_deviation_pct"}:
+    if key in {"confidence_threshold", "max_market_deviation_pct"}:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise HTTPException(status_code=422, detail=f"Setting '{key}' harus angka valid")
         ranges = {
             "confidence_threshold": (0.0, 1.0),
-            "max_daily_loss_money": (0.0, 10_000_000.0),
-            "max_lot": (0.01, 1000.0),
             "max_market_deviation_pct": (0.1, 100.0),
         }
         lower, upper = ranges[key]
         if not lower <= value <= upper:
             raise HTTPException(status_code=422, detail=f"Setting '{key}' di luar rentang {lower} sampai {upper}")
         return float(value)
-    if key in {"max_open_trades", "max_signal_age_seconds"}:
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise HTTPException(status_code=422, detail=f"Setting '{key}' harus bilangan bulat")
-        lower, upper = (1, 100) if key == "max_open_trades" else (0, 86400)
-        if not lower <= value <= upper:
-            raise HTTPException(status_code=422, detail=f"Setting '{key}' di luar rentang {lower} sampai {upper}")
-        return value
-    if key == "default_symbol":
-        if not isinstance(value, str) or not SYMBOL_PATTERN.fullmatch(value):
-            raise HTTPException(status_code=422, detail="default_symbol tidak valid")
-        return value.upper()
     if key == "symbol_mapping":
         if not isinstance(value, dict) or len(value) > 100:
             raise HTTPException(status_code=422, detail="symbol_mapping harus objek maksimal 100 pasangan")
@@ -62,10 +48,6 @@ def _validate_setting(key: str, value: object) -> object:
                 raise HTTPException(status_code=422, detail="Semua symbol mapping harus berupa symbol valid")
             normalized[source.upper()] = target.upper()
         return normalized
-    if key == "allowed_symbols":
-        if not isinstance(value, list) or len(value) > 100 or any(not isinstance(symbol, str) or not SYMBOL_PATTERN.fullmatch(symbol) for symbol in value):
-            raise HTTPException(status_code=422, detail="allowed_symbols harus berupa daftar maksimal 100 symbol")
-        return sorted({symbol.upper() for symbol in value})
     raise HTTPException(status_code=422, detail=f"Setting '{key}' tidak dikenal")
 
 
@@ -86,7 +68,10 @@ class GeminiConfigUpdate(BaseModel):
 def read_settings(db: Session = Depends(get_db)) -> dict[str, object]:
     values = {}
     for item in db.query(AppSetting).all():
-        if item.key == REGISTRATION_AUTO_OPEN_KEY:
+        if item.key == REGISTRATION_AUTO_OPEN_KEY or item.key in {
+            "default_symbol", "max_daily_loss_money", "max_lot", "max_open_trades",
+            "max_signal_age_seconds", "allowed_symbols",
+        }:
             continue
         try:
             values[item.key] = json.loads(item.value)

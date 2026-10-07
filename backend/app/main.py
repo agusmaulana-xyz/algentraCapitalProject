@@ -44,23 +44,23 @@ async def lifespan(_: FastAPI):
         defaults = (
             ("demo_mode", "true"),
             ("confidence_threshold", "0.75"),
-            ("default_symbol", '"XAUUSD"'),
             ("kill_switch", "false"),
-            ("max_daily_loss_money", "100.0"),
-            ("max_lot", "5.0"),
-            ("max_open_trades", "3"),
-            ("max_signal_age_seconds", "120"),
             ("max_market_deviation_pct", "5.0"),
-            ("allowed_symbols", '["XAUUSD"]'),
             ("allow_updates", "false"),
             ("registration_open", "true"),
             ("symbol_mapping", '{"GOLD":"XAUUSD","XAU":"XAUUSD","EMAS":"XAUUSD"}'),
         )
+        retired_controls = (
+            "default_symbol", "max_daily_loss_money", "max_lot", "max_open_trades",
+            "max_signal_age_seconds", "allowed_symbols",
+        )
+        for key in retired_controls:
+            item = db.get(AppSetting, key)
+            if item is not None:
+                db.delete(item)
         for key, value in defaults:
             if db.get(AppSetting, key) is None:
                 db.add(AppSetting(key=key, value=value))
-            elif key == "allowed_symbols" and db.get(AppSetting, key).value.strip() == "[]":
-                db.get(AppSetting, key).value = '["XAUUSD"]'
         db.commit()
     await asyncio.to_thread(purge_expired_conversations)
     cs_cleanup_task = asyncio.create_task(cleanup_expired_conversations_periodically())

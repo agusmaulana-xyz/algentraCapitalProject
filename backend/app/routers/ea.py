@@ -39,6 +39,7 @@ router = APIRouter(prefix="/api/ea", tags=["ea"])
 FINAL_SIGNAL_STATES = {"EXECUTED", "REJECTED", "FAILED", "DRY_RUN", "EXPIRED"}
 CLAIM_LEASE_SECONDS = 90
 MAX_SIGNAL_TARGETS = 20
+SIGNAL_EXPIRY_SECONDS = 3600
 
 
 def require_ea_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
@@ -323,9 +324,8 @@ def pending(
     response_controls = {
         key: controls[key]
         for key in (
-            "demo_mode", "kill_switch", "daily_loss", "max_daily_loss_money", "daily_loss_reached",
-            "max_lot", "max_open_trades", "open_trades", "max_open_reached",
-            "max_signal_age_seconds", "max_market_deviation_pct",
+            "demo_mode", "kill_switch", "daily_loss", "open_trades",
+            "max_market_deviation_pct",
         )
     }
     if controls["trading_paused"]:
@@ -353,8 +353,7 @@ def pending(
         created_at = row.created_at
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=now.tzinfo)
-        max_age = int(controls["max_signal_age_seconds"])
-        if max_age > 0 and (now - created_at).total_seconds() > max_age:
+        if (now - created_at).total_seconds() > SIGNAL_EXPIRY_SECONDS:
             row.status = "REJECTED"
             db.add(SystemLog(level="WARN", source="EA", message=f"Signal {row.id} ditolak karena kedaluwarsa"))
             continue
@@ -364,17 +363,11 @@ def pending(
             row.status = "FAILED"
             db.add(SystemLog(level="ERROR", source="EA", message=f"Signal {row.id} memiliki parsed_json tidak valid"))
             continue
-        allowed_symbols = controls["allowed_symbols"]
-        if allowed_symbols:
-            symbol = (parsed.symbol or "").upper()
-            symbol_allowed = any(
-                symbol == allowed or (symbol.startswith(allowed) and len(symbol) > len(allowed) and symbol[len(allowed)] in ".0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-                for allowed in allowed_symbols
-            )
-            if not symbol_allowed:
-                row.status = "REJECTED"
-                db.add(SystemLog(level="WARN", source="EA", message=f"Signal {row.id} ditolak karena symbol tidak diizinkan"))
-                continue
+        symbol = (parsed.symbol or "XAUUSD").upper()
+        if not symbol.startswith("XAUUSD"):
+            row.status = "REJECTED"
+            db.add(SystemLog(level="WARN", source="EA", message=f"Signal {row.id} ditolak karena hanya XAUUSD yang diproses"))
+            continue
         items.append({
             "signal_id": row.id,
             "group_id": row.group_id,
@@ -382,7 +375,7 @@ def pending(
             "raw_text": row.raw_text,
             "action": parsed.action,
             "order_type": parsed.order_type,
-            "symbol": parsed.symbol,
+            "symbol": parsed.symbol or "XAUUSD",
             "entry": parsed.entry,
             "entry_low": parsed.entry_low,
             "entry_high": parsed.entry_high,
