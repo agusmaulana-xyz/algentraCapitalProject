@@ -1,7 +1,7 @@
 import json
 import math
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
@@ -20,13 +20,19 @@ from ..models import (
     MT5MasterMarketState,
     utc_now,
 )
-from ..time_utils import as_utc, wib_iso
+from ..time_utils import WIB, as_utc, wib_iso
 from ..registration import LAUNCH_AT, registration_is_open, registration_launch_pending
 
 
 router = APIRouter(tags=["public"])
 MARKET_SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "backend" / "app" / "templates"))
+
+
+def equity_session_start(now: datetime) -> datetime:
+    wib_now = as_utc(now).astimezone(WIB)
+    session_date = wib_now.date() if wib_now.hour >= 7 else wib_now.date() - timedelta(days=1)
+    return datetime.combine(session_date, time(hour=7), tzinfo=WIB).astimezone(timezone.utc)
 
 
 def _public_contact_context(db: Session) -> dict[str, object]:
@@ -139,6 +145,7 @@ def public_performance_payload(db: Session, *, include_equity_curve: bool = True
     equity_curve: list[dict[str, object]] = []
     equity_candles: list[MT5MasterEquityCandle] = []
     if include_equity_curve:
+        session_start = equity_session_start(now)
         latest_equity_account_key = db.execute(
             select(MT5MasterEquityCandle.account_key)
             .order_by(MT5MasterEquityCandle.observed_at.desc())
@@ -148,7 +155,7 @@ def public_performance_payload(db: Session, *, include_equity_curve: bool = True
             select(MT5MasterEquityCandle)
             .where(
                 MT5MasterEquityCandle.account_key == latest_equity_account_key,
-                MT5MasterEquityCandle.minute_start >= now - timedelta(hours=24),
+                MT5MasterEquityCandle.minute_start >= session_start,
             )
             .order_by(MT5MasterEquityCandle.minute_start.asc())
         ).scalars()) if latest_equity_account_key else []

@@ -54,7 +54,7 @@ Database SQLite dibuat otomatis pada jalur yang ditentukan. Atur `BACKUP_DIR` pa
 
 Beranda publik Algentra Capital tersedia di `/`; bagian performa menampilkan P&L agregat aktual dari trade tertutup. Database saat ini belum mengaitkan trade dengan akun klien terpisah, jadi angka publik tidak diklaim sebagai hasil beberapa akun. Workspace privat tetap tersedia di `/dashboard` setelah login admin. Tabel signal terbaru dan log sistem menampilkan paling banyak lima baris.
 
-Grafik Indeks Equity publik membentuk candle M1 dari laporan equity akun utama MT5: open pertama, high/low selama menit berjalan, dan close terakhir. Pilihan M1, M5, M15, dan H1 mengelompokkan candle menit yang sama pada rentang 24 jam; pergantian timeframe tidak mengambil atau membuat data historis baru. Candle berjalan diperbarui dari laporan EA. Grafik mulai terisi setelah EA mengirim data, dan celah riwayat tetap ditampilkan tanpa membuat candle sintetis.
+Grafik Indeks Equity publik membentuk candle M1 dari laporan equity akun utama MT5: open pertama, high/low selama menit berjalan, dan close terakhir. Pilihan M1, M5, M15, dan H1 mengelompokkan candle menit yang sama dari sesi harian pukul 07.00 WIB; riwayat dimulai ulang pada pukul tersebut. Candle memiliki skala rentang equity di sisi kanan dan garis harga equity terakhir. Candle berjalan diperbarui dari laporan EA, dan celah riwayat tetap ditampilkan tanpa membuat candle sintetis.
 
 ## Chat AI customer service ALGENTRA
 
