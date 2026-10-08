@@ -63,7 +63,7 @@ def _account_payload(
         connection_status = "disabled"
     elif not follower_online or not state_online:
         connection_status = "offline"
-    elif not state.allow_live_trading or not state.terminal_trade_allowed or not state.expert_trade_allowed:
+    elif not state.terminal_trade_allowed or not state.expert_trade_allowed:
         connection_status = "trading_disabled"
     elif not master_online:
         connection_status = "waiting_for_source"

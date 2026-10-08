@@ -49,7 +49,6 @@ def get_dashboard_stats(db: Session) -> dict[str, int | float]:
     return {
         "signals_total": sum(status_counts.values()),
         "signals_executed": status_counts["EXECUTED"],
-        "signals_simulated": status_counts["DRY_RUN"],
         "signals_pending": status_counts["PENDING"] + status_counts["CLAIMED"],
         "signals_rejected": status_counts["REJECTED"] + status_counts["FAILED"],
         "signals_ignored": status_counts["IGNORED"],

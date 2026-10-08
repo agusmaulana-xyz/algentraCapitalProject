@@ -14,6 +14,14 @@ from app.routers import auth as auth_router
 from app.main import app
 
 
+def test_qris_endpoint_serves_current_payment_image():
+    with TestClient(app) as client:
+        response = client.get("/api/payments/qris.jpeg")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("image/jpeg")
+        assert response.content.startswith(b"\xff\xd8\xff")
+
+
 def test_admin_login_protects_and_unlocks_dashboard_routes():
     with TestClient(app) as client:
         assert client.get("/api/stats").status_code == 401
@@ -137,11 +145,60 @@ def test_settings_endpoint_reads_and_updates_values_after_login():
             json={"username": "admin", "password": "M1-Testing-Password-123"},
         )
         assert login.status_code == 200
+        stale_binary = client.get("/downloads/TelegramSignalEA.ex5")
+        assert stale_binary.status_code == 410
+        current_source = client.get("/downloads/TelegramSignalEA.mq5")
+        assert current_source.status_code == 200
+        assert "DemoMode" not in current_source.text
 
-        assert client.get("/api/settings").json()["demo_mode"] is True
+        settings = client.get("/api/settings").json()
+        assert "demo_mode" not in settings
+        invalid_demo_setting = client.put(
+            "/api/settings",
+            headers={"X-CSRF-Token": login.json()["csrf_token"]},
+            json={"values": {"demo_mode": True}},
+        )
+        assert invalid_demo_setting.status_code == 422
         update = client.put("/api/settings", headers={"X-CSRF-Token": login.json()["csrf_token"]}, json={"values": {"confidence_threshold": 0.8}})
         assert update.status_code == 200
         assert client.get("/api/settings").json()["confidence_threshold"] == 0.8
+
+
+def test_settings_endpoint_validates_entry_mode():
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "M1-Testing-Password-123"},
+        )
+        assert login.status_code == 200
+        csrf = login.json()["csrf_token"]
+        reset = client.put(
+            "/api/settings",
+            headers={"X-CSRF-Token": csrf},
+            json={"values": {"entry_mode": "PARTIAL"}},
+        )
+        assert reset.status_code == 200
+
+        settings = client.get("/api/settings")
+        assert settings.json()["entry_mode"] == "PARTIAL"
+        update = client.put(
+            "/api/settings",
+            headers={"X-CSRF-Token": csrf},
+            json={"values": {"entry_mode": "SINGLE"}},
+        )
+        assert update.status_code == 200
+        assert client.get("/api/settings").json()["entry_mode"] == "SINGLE"
+        invalid = client.put(
+            "/api/settings",
+            headers={"X-CSRF-Token": csrf},
+            json={"values": {"entry_mode": "MULTI"}},
+        )
+        assert invalid.status_code == 422
+        client.put(
+            "/api/settings",
+            headers={"X-CSRF-Token": csrf},
+            json={"values": {"entry_mode": "PARTIAL"}},
+        )
 
 
 def test_dashboard_mutations_require_csrf_and_validate_risk_settings():
@@ -152,7 +209,7 @@ def test_dashboard_mutations_require_csrf_and_validate_risk_settings():
         )
         assert login.status_code == 200
         csrf = login.json()["csrf_token"]
-        payload = {"values": {"demo_mode": False, "max_daily_loss_money": 50, "max_lot": 0.5, "max_open_trades": 2, "allowed_symbols": ["XAUUSD", "EURUSDm"]}}
+        payload = {"values": {"max_daily_loss_money": 50, "max_lot": 0.5, "max_open_trades": 2, "allowed_symbols": ["XAUUSD", "EURUSDm"]}}
         assert client.put("/api/settings", json=payload).status_code == 403
         response = client.put("/api/settings", headers={"X-CSRF-Token": csrf}, json=payload)
         assert response.status_code == 200
@@ -162,7 +219,7 @@ def test_dashboard_mutations_require_csrf_and_validate_risk_settings():
         restored = client.put(
             "/api/settings",
             headers={"X-CSRF-Token": csrf},
-            json={"values": {"demo_mode": True, "kill_switch": False, "max_daily_loss_money": 100, "max_lot": 5, "max_open_trades": 3, "max_signal_age_seconds": 120, "max_market_deviation_pct": 5, "allowed_symbols": []}},
+            json={"values": {"kill_switch": False, "max_daily_loss_money": 100, "max_lot": 5, "max_open_trades": 3, "max_signal_age_seconds": 120, "max_market_deviation_pct": 5, "allowed_symbols": []}},
         )
         assert restored.status_code == 200
 

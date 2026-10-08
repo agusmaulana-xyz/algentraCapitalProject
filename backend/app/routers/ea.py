@@ -36,7 +36,7 @@ from ..time_utils import wib_iso
 
 
 router = APIRouter(prefix="/api/ea", tags=["ea"])
-FINAL_SIGNAL_STATES = {"EXECUTED", "REJECTED", "FAILED", "DRY_RUN", "EXPIRED"}
+FINAL_SIGNAL_STATES = {"EXECUTED", "REJECTED", "FAILED", "EXPIRED"}
 CLAIM_LEASE_SECONDS = 90
 MAX_SIGNAL_TARGETS = 20
 SIGNAL_EXPIRY_SECONDS = 3600
@@ -194,7 +194,7 @@ def publish_master_snapshot(payload: CopySnapshotInput, db: Session = Depends(ge
 
 class ExecutionReport(BaseModel):
     signal_id: int = Field(gt=0)
-    status: Literal["EXECUTED", "REJECTED", "FAILED", "DRY_RUN"]
+    status: Literal["EXECUTED", "REJECTED", "FAILED"]
     ticket: str | int | None = None
     symbol: str | None = Field(default=None, max_length=64)
     action: Literal["BUY", "SELL"] | None = None
@@ -248,14 +248,15 @@ class HeartbeatReport(BaseModel):
     symbol: str | None = Field(default=None, max_length=64)
 
 
-def _demo_mode(db: Session) -> bool:
-    setting = db.get(AppSetting, "demo_mode")
+def _entry_mode(db: Session) -> str:
+    setting = db.get(AppSetting, "entry_mode")
     if setting is None:
-        return True
+        return "PARTIAL"
     try:
-        return bool(json.loads(setting.value))
+        value = json.loads(setting.value)
     except (TypeError, json.JSONDecodeError):
-        return True
+        return "PARTIAL"
+    return value if isinstance(value, str) and value in {"SINGLE", "PARTIAL"} else "PARTIAL"
 
 
 def _take_profit_prices(parsed: dict) -> list[float]:
@@ -271,6 +272,8 @@ def _take_profit_prices(parsed: dict) -> list[float]:
 
 
 def _expected_signal_legs(parsed: dict) -> int:
+    if parsed.get("execution_mode") == "SINGLE":
+        return 1
     targets = _take_profit_prices(parsed)
     if targets:
         return len(targets)
@@ -324,7 +327,7 @@ def pending(
     response_controls = {
         key: controls[key]
         for key in (
-            "demo_mode", "kill_switch", "daily_loss", "open_trades",
+            "kill_switch", "daily_loss", "open_trades",
             "max_market_deviation_pct",
         )
     }
@@ -358,7 +361,8 @@ def pending(
             db.add(SystemLog(level="WARN", source="EA", message=f"Signal {row.id} ditolak karena kedaluwarsa"))
             continue
         try:
-            parsed = SignalClassification.model_validate_json(row.parsed_json or "{}")
+            parsed_data = json.loads(row.parsed_json or "{}")
+            parsed = SignalClassification.model_validate(parsed_data)
         except Exception:
             row.status = "FAILED"
             db.add(SystemLog(level="ERROR", source="EA", message=f"Signal {row.id} memiliki parsed_json tidak valid"))
@@ -368,6 +372,11 @@ def pending(
             row.status = "REJECTED"
             db.add(SystemLog(level="WARN", source="EA", message=f"Signal {row.id} ditolak karena hanya XAUUSD yang diproses"))
             continue
+        execution_mode = parsed_data.get("execution_mode")
+        if not isinstance(execution_mode, str) or execution_mode not in {"SINGLE", "PARTIAL"}:
+            execution_mode = _entry_mode(db)
+            parsed_data["execution_mode"] = execution_mode
+            row.parsed_json = json.dumps(parsed_data, ensure_ascii=False, allow_nan=False)
         items.append({
             "signal_id": row.id,
             "group_id": row.group_id,
@@ -381,6 +390,7 @@ def pending(
             "entry_high": parsed.entry_high,
             "sl": parsed.sl,
             "tp": parsed.tp or [],
+            "entry_mode": execution_mode,
             "confidence": parsed.confidence,
             "created_at": wib_iso(row.created_at),
             # SQLite returns naive datetimes for UTC values; normalize before
@@ -425,9 +435,6 @@ def report(payload: ExecutionReport, db: Session = Depends(get_db)) -> dict[str,
             return {"status": signal.status, "duplicate": True}
     elif signal.status != "CLAIMED":
         raise HTTPException(status_code=409, detail="Signal belum diklaim oleh EA")
-    if is_execution and _demo_mode(db):
-        raise HTTPException(status_code=409, detail="Backend masih dalam demo mode; eksekusi live ditolak")
-
     ticket = str(payload.ticket) if payload.ticket is not None else None
     if is_execution and ticket:
         trade = db.execute(select(Trade).where(Trade.ticket == ticket)).scalar_one_or_none()
@@ -470,7 +477,7 @@ def report(payload: ExecutionReport, db: Session = Depends(get_db)) -> dict[str,
     else:
         signal.status = payload.status
     db.add(SystemLog(
-        level="INFO" if payload.status in {"EXECUTED", "DRY_RUN"} else "WARN",
+        level="INFO" if payload.status == "EXECUTED" else "WARN",
         source="EA",
         message=f"Signal {signal.id}: {payload.status}" + (f" — {payload.reason}" if payload.reason else ""),
     ))

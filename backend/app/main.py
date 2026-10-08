@@ -42,7 +42,6 @@ async def lifespan(_: FastAPI):
     with SessionLocal() as db:
         seed_admin(db, config)
         defaults = (
-            ("demo_mode", "true"),
             ("confidence_threshold", "0.75"),
             ("kill_switch", "false"),
             ("max_market_deviation_pct", "5.0"),
@@ -52,7 +51,7 @@ async def lifespan(_: FastAPI):
         )
         retired_controls = (
             "default_symbol", "max_daily_loss_money", "max_lot", "max_open_trades",
-            "max_signal_age_seconds", "allowed_symbols",
+            "max_signal_age_seconds", "allowed_symbols", "demo_mode",
         )
         for key in retired_controls:
             item = db.get(AppSetting, key)
@@ -250,22 +249,47 @@ def client_transactions_page(
     )
 
 
-@app.get("/downloads/MT5FollowerCopyEA.ex5", response_class=FileResponse, include_in_schema=False)
-def download_mt5_follower_copy_ea(_: int = Depends(require_client_id)) -> FileResponse:
+@app.get("/downloads/MT5FollowerCopyEA.mq5", response_class=FileResponse, include_in_schema=False)
+def download_mt5_follower_copy_ea_source(_: int = Depends(require_client_id)) -> FileResponse:
     return FileResponse(
-        path=PROJECT_ROOT / "mt5" / "MT5FollowerCopyEA.ex5",
-        filename="MT5FollowerCopyEA.ex5",
-        media_type="application/octet-stream",
+        path=PROJECT_ROOT / "mt5" / "MT5FollowerCopyEA.mq5",
+        filename="MT5FollowerCopyEA.mq5",
+        media_type="text/plain",
     )
 
 
 @app.get("/downloads/TelegramSignalEA.ex5", response_class=FileResponse, include_in_schema=False)
-def download_telegram_signal_ea(_: str = Depends(require_admin)) -> FileResponse:
+def download_telegram_signal_ea_binary(_: str = Depends(require_admin)) -> FileResponse:
+    return _compiled_mt5_ea_download("TelegramSignalEA.ex5")
+
+
+@app.get("/downloads/TelegramSignalEA.mq5", response_class=FileResponse, include_in_schema=False)
+def download_telegram_signal_ea_source(_: str = Depends(require_admin)) -> FileResponse:
     return FileResponse(
-        path=PROJECT_ROOT / "mt5" / "TelegramSignalEA.ex5",
-        filename="TelegramSignalEA.ex5",
+        path=PROJECT_ROOT / "mt5" / "TelegramSignalEA.mq5",
+        filename="TelegramSignalEA.mq5",
+        media_type="text/plain",
+    )
+
+
+def _compiled_mt5_ea_download(filename: str) -> FileResponse:
+    source_path = PROJECT_ROOT / "mt5" / filename.replace(".ex5", ".mq5")
+    binary_path = PROJECT_ROOT / "mt5" / filename
+    if not binary_path.is_file() or source_path.stat().st_mtime > binary_path.stat().st_mtime:
+        raise HTTPException(
+            status_code=410,
+            detail="Binary EA belum diperbarui. Unduh source .mq5 dan compile di MetaEditor.",
+        )
+    return FileResponse(
+        path=binary_path,
+        filename=filename,
         media_type="application/octet-stream",
     )
+
+
+@app.get("/downloads/MT5FollowerCopyEA.ex5", response_class=FileResponse, include_in_schema=False)
+def download_mt5_follower_copy_ea_binary(_: int = Depends(require_client_id)) -> FileResponse:
+    return _compiled_mt5_ea_download("MT5FollowerCopyEA.ex5")
 
 
 @app.get("/parser-test", response_class=HTMLResponse)

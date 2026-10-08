@@ -10,7 +10,6 @@ from .time_utils import WIB, as_utc, wib_day_start_utc_naive
 
 
 DEFAULT_CONTROLS = {
-    "demo_mode": True,
     "kill_switch": False,
     "max_market_deviation_pct": 5.0,
 }
@@ -44,11 +43,9 @@ def risk_state(db: Session, now: datetime | None = None) -> dict[str, object]:
     raw_deviation = controls["max_market_deviation_pct"]
     max_deviation = float(raw_deviation) if isinstance(raw_deviation, (int, float)) and not isinstance(raw_deviation, bool) and math.isfinite(raw_deviation) and 0.1 <= raw_deviation <= 100 else 5.0
     kill_switch = controls["kill_switch"] is True
-    demo_mode = controls["demo_mode"] is not False
     daily_loss = max(0.0, -daily_profit)
 
     controls.update({
-        "demo_mode": demo_mode,
         "kill_switch": kill_switch,
         "daily_profit": round(daily_profit, 2),
         "daily_loss": round(daily_loss, 2),

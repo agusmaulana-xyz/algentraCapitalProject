@@ -19,7 +19,6 @@
     <div class="cards">
       <div class="card"><span>Total signal</span><b id="signals-total">&mdash;</b><small>Semua sinyal yang tercatat.</small></div>
       <div class="card"><span>Tereksekusi</span><b id="signals-executed">&mdash;</b><small>Order yang diterima terminal MT5.</small></div>
-      <div class="card"><span>Demo / dry run</span><b id="signals-simulated">&mdash;</b><small>Disimulasikan tanpa membuka order.</small></div>
       <div class="card"><span>Pending</span><b id="signals-pending">&mdash;</b><small>Menunggu diklaim oleh EA.</small></div>
       <div class="card"><span>Ditolak / gagal</span><b id="signals-rejected">&mdash;</b><small>Periksa alasan pada log sistem.</small></div>
       <div class="card"><span>Diabaikan</span><b id="signals-ignored">&mdash;</b><small>Bukan sinyal atau tidak lolos aturan.</small></div>
@@ -61,7 +60,7 @@
 
     <section id="settings">
       <span class="eyebrow">Risk & configuration</span><h2>Settings</h2>
-      <p class="section-help">Pengaturan ini memengaruhi validasi sinyal dan guard backend. Periksa semuanya sebelum mematikan Demo mode.</p>
+      <p class="section-help">Pengaturan ini memengaruhi validasi sinyal dan guard backend. Trading berjalan live saat sinyal dieksekusi; gunakan kill switch untuk menjeda distribusi sinyal.</p>
       <p class="muted">API key Gemini disimpan di `.env` dan tidak dikirim kembali ke browser. Perubahan berlaku langsung untuk parser; Telegram API ID/HASH tetap di `.env`.</p>
       <form id="gemini-form" class="form-grid">
         <p class="field-help">API key Gemini dikelola melalui environment layanan. Ubah key di konfigurasi layanan lalu mulai ulang aplikasi.</p>
@@ -75,7 +74,7 @@
           <label>Symbol mapping (JSON)<small class="field-help">Alias simbol pesan ke nama simbol broker, misalnya GOLD ke XAUUSD.</small><textarea id="symbol-mapping"></textarea></label>
           <p class="field-help">Signal hanya diproses untuk XAUUSD. Signal yang belum masuk posisi kedaluwarsa setelah satu jam.</p>
           <label>Deviasi harga maksimal (%)<small class="field-help">Tolak market entry jika harganya terlalu jauh dari harga sinyal.</small><input type="number" id="max-market-deviation" min="0.1" step="0.1"></label>
-          <label><input type="checkbox" id="demo-mode"> Demo mode backend<small class="field-help">Backend menolak laporan eksekusi saat aktif. Input DemoMode di EA MT5 diatur terpisah; samakan keduanya.</small></label>
+          <label>Mode entry<small class="field-help">Single membuka satu order (zona entry memakai harga tengah dan TP pertama). Partial membagi order sesuai beberapa TP atau dua sisi zona entry.</small><select id="entry-mode"><option value="PARTIAL">Partial entry</option><option value="SINGLE">Single entry</option></select></label>
           <label><input type="checkbox" id="allow-updates"> Izinkan update signal<small class="field-help">Aktifkan instruksi pengelolaan posisi seperti close atau geser SL.</small></label>
           <label><input type="checkbox" id="kill-switch"> Pause trading / kill switch<small class="field-help">Hentikan distribusi sinyal ke EA sampai dimatikan kembali.</small></label>
         </div>
@@ -114,7 +113,7 @@ const $ = (selector) => document.querySelector(selector);
     }
     async function loadStatsAndSignals() {
       const [stats, signals] = await Promise.all([api("/api/stats"), api("/api/signals?limit=5")]);
-      for (const key of ["signals_total","signals_executed","signals_simulated","signals_pending","signals_rejected","signals_ignored","active_clients","winrate","total_profit"]) {
+      for (const key of ["signals_total","signals_executed","signals_pending","signals_rejected","signals_ignored","active_clients","winrate","total_profit"]) {
         const el = $(`#${key.replaceAll("_", "-")}`); if (el) el.textContent = key === "winrate" ? `${stats[key]}%` : key === "total_profit" ? Number(stats[key]).toFixed(2) : stats[key];
       }
       $("#wins-losses").textContent = `${stats.wins} / ${stats.losses}`;
@@ -124,7 +123,7 @@ const $ = (selector) => document.querySelector(selector);
       $("#telegram-account").textContent = stats.telegram_account || "";
       $("#gemini-status").textContent = stats.gemini_configured ? "READY" : "KEY BELUM DIATUR";
       $("#gemini-model").textContent = stats.gemini_model;
-      $("#trading-mode").textContent = stats.kill_switch ? "PAUSED" : stats.demo_mode ? "DEMO" : "LIVE";
+      $("#trading-mode").textContent = stats.kill_switch ? "PAUSED" : "LIVE";
       $("#trading-guard").textContent = stats.kill_switch ? "Trading dijeda oleh kill switch" : `${stats.open_trades} posisi EA terbuka · tanpa batas jumlah`;
       $("#daily-loss").textContent = Number(stats.daily_loss).toFixed(2);
       draw("#signals-table", ["time","group","raw","parsed","confidence","status","ticket","profit"], signals.map((signal) => ({
@@ -175,7 +174,7 @@ const $ = (selector) => document.querySelector(selector);
       $("#confidence-threshold").value=settings.confidence_threshold ?? 0.75;
       $("#symbol-mapping").value=JSON.stringify(settings.symbol_mapping ?? {GOLD:"XAUUSD",XAU:"XAUUSD",EMAS:"XAUUSD"},null,2);
       $("#max-market-deviation").value=settings.max_market_deviation_pct ?? 5;
-      $("#demo-mode").checked=settings.demo_mode ?? true;
+      $("#entry-mode").value=settings.entry_mode ?? "PARTIAL";
       $("#allow-updates").checked=settings.allow_updates ?? false;
       $("#kill-switch").checked=settings.kill_switch ?? false;
       $("#gemini-model-input").value=settings.gemini_model || "";
@@ -209,7 +208,7 @@ const $ = (selector) => document.querySelector(selector);
     $("#settings-form").addEventListener("submit",async(event)=>{
       event.preventDefault(); const message=$("#settings-message");
       try {
-        const values={confidence_threshold:Number($("#confidence-threshold").value),symbol_mapping:JSON.parse($("#symbol-mapping").value),max_market_deviation_pct:Number($("#max-market-deviation").value),demo_mode:$("#demo-mode").checked,allow_updates:$("#allow-updates").checked,kill_switch:$("#kill-switch").checked};
+        const values={confidence_threshold:Number($("#confidence-threshold").value),symbol_mapping:JSON.parse($("#symbol-mapping").value),max_market_deviation_pct:Number($("#max-market-deviation").value),entry_mode:$("#entry-mode").value,allow_updates:$("#allow-updates").checked,kill_switch:$("#kill-switch").checked};
         await api("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({values})});
         message.textContent="Settings tersimpan."; await loadSettings(); await refresh();
       } catch(error) { message.textContent=`Gagal: ${error.message}`; }

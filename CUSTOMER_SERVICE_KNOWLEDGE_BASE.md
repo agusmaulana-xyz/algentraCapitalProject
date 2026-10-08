@@ -34,7 +34,7 @@ Alamat portal yang dicantumkan pada proyek saat ini: [https://algentracapital.my
 - **Masuk:** `/login`.
 - **Lupa kata sandi:** `/forgot-password`.
 - **Portal akun MT5:** `/account` setelah masuk.
-- **Unduh EA Copy Trading:** tersedia dari bagian pemasangan EA di `/account` setelah masuk.
+- **Unduh source EA Copy Trading:** tersedia dari bagian pemasangan EA di `/account` setelah masuk; compile source `.mq5` dengan MetaEditor sebelum dipasang.
 
 Situs juga menyediakan pilihan tema terang/gelap dan tombol musik latar.
 
@@ -51,18 +51,18 @@ Situs juga menyediakan pilihan tema terang/gelap dan tombol musik latar.
 
 - Pelanggan memasang EA Copy Trading pada terminal MT5 untuk mengambil posisi terbuka yang dipublikasikan akun utama. Posisi terbuka yang dibuat manual di akun utama juga termasuk dalam snapshot yang dikirim EA saat ini.
 - EA follower menyinkronkan posisi terbuka, perubahan Stop Loss (SL)/Take Profit (TP), dan penutupan posisi sumber. Pending order sumber baru disalin setelah menjadi posisi terbuka.
+- Tidak ada mode simulasi: EA utama dan follower mengirim order live saat signal lolos validasi dan izin trading MT5 aktif. Jangan menjanjikan uji tanpa order.
 - Semua akun follower menerima sumber posisi Algentra yang sama; portal tidak menampilkan pilihan akun master lain.
 - Akun follower harus menggunakan mode **hedging**. Mode netting tidak didukung.
 - Jika pembaruan akun utama berhenti lebih dari 20 detik, sinkronisasi berhenti sementara. Posisi yang sudah terbuka di MT5 pelanggan tetap berada di akun broker dan tidak otomatis ditutup hanya karena EA atau koneksi berhenti.
 - `VolumeMultiplier` mengalikan volume sumber. Pengaturan ini **tidak** otomatis menyesuaikan lot berdasarkan saldo atau equity follower. Jangan memberi rekomendasi nilai multiplier atau ukuran lot.
-- Akun demo dan kompetisi dapat digunakan bila izin trading MT5 aktif. Untuk akun live, `AllowLiveTrading` harus diaktifkan secara sengaja; nilainya nonaktif secara default.
 - Jika nama simbol broker berbeda dari simbol sumber, EA menyediakan `SymbolSuffix` dan `SymbolMapCsv` untuk pemetaan. Jika pelanggan tidak yakin, arahkan ke dukungan teknis dan jangan menyarankan perubahan berisiko.
 
 ### 3. Portal klien
 
 Pelanggan dapat mendaftarkan hingga **10 akun follower MT5**, memberi nama, melihat status koneksi, mengubah detail akun, menonaktifkan/mengaktifkan akun, merotasi token, atau menghapus akun. Saat menambahkan akun dan membuat token, pelanggan memilih level ZERO, PRO, atau EXPERT untuk akun MT5 itu. ALGENTRA dapat melihat level akun yang terhubung ke sesi klien tersebut.
 
-Portal dapat menampilkan saldo, equity, floating profit, jenis akun (live/demo/kompetisi), serta hasil transaksi tertutup, jumlah transaksi menang/kalah, dan win rate. Data ini berasal dari laporan EA MT5. Mata uang yang berbeda ditampilkan terpisah, tidak dikonversi menjadi satu mata uang.
+Portal dapat menampilkan saldo, equity, floating profit, jenis akun yang dilaporkan MT5, serta hasil transaksi tertutup, jumlah transaksi menang/kalah, dan win rate. Data ini berasal dari laporan EA MT5. Mata uang yang berbeda ditampilkan terpisah, tidak dikonversi menjadi satu mata uang.
 
 Portal membutuhkan nama server broker dan nomor login MT5 untuk mendaftarkan akun. **Portal tidak meminta kata sandi broker.** EA mengirim laporan saldo dan histori transaksi MT5 agar data akun dapat ditampilkan.
 
@@ -92,21 +92,20 @@ Jika tombol daftar tidak tersedia dan beranda menampilkan hitung mundur, pendaft
 1. Masuk, lalu buka **Akun Copy Trading MT5** (`/account`).
 2. Saat menambahkan akun, pilih level untuk akun MT5 tersebut: **ZERO** (1 vCPU, RAM 1 GB, disk 20 GB) seharga **Rp 150.000**; **PRO** (2 vCPU, RAM 4 GB, disk 40 GB) seharga **Rp 200.000**; atau **EXPERT** (4 vCPU, RAM 8 GB, disk 80 GB) seharga **Rp 300.000**. Periode penagihan tidak ditentukan pada informasi yang tersedia.
 3. Isi nama akun (label), nama server broker persis seperti yang terlihat di terminal MT5, dan nomor login MT5. Setelah membuat pesanan, portal membuka **Riwayat transaksi** (`/transactions`); di sana client dapat melihat total pembayaran dan melanjutkan unggah bukti.
-4. QR pada tampilan sekarang hanya gambar DEMO dan tidak bisa dipindai; minta admin QRIS resmi sebelum melakukan pembayaran. Riwayat transaksi menyimpan status pesanan serta nota dan bukti pembayaran. Pesanan menunggu pemeriksaan admin. Jika transaksi diterima, akun MT5 akan dibuat dan tampil di portal. Client dapat memilih **Rotasi token** pada akun untuk melihat token EA.
+4. Riwayat transaksi menampilkan QRIS pembayaran, status pesanan, nota, dan bukti pembayaran. Pesanan menunggu pemeriksaan admin. Jika transaksi diterima, akun MT5 akan dibuat dan tampil di portal. Client dapat memilih **Rotasi token** pada akun untuk melihat token EA.
 5. Maksimal 10 akun/pesanan aktif per akun portal.
 
 Jangan memasukkan atau mengirim kata sandi broker kepada customer service.
 
 ### C. Memasang EA Copy Trading
 
-1. Unduh file **MT5FollowerCopyEA.ex5** dari portal klien.
-2. Di MT5 pilih **File → Open Data Folder**, buka `MQL5/Experts`, lalu salin file EA ke folder itu.
+1. Unduh source **MT5FollowerCopyEA.mq5** dari portal klien.
+2. Di MT5 pilih **File → Open Data Folder**, buka `MQL5/Experts`, lalu salin source `.mq5` ke folder tersebut. Buka file itu dengan MetaEditor dan tekan **F7** untuk compile.
 3. Pilih **Tools → Options → Expert Advisors**. Aktifkan **Allow WebRequest for listed URL**, lalu tambahkan alamat portal yang dipakai pelanggan (alamat default proyek: `https://algentracapital.my.id`).
 4. Dari **Navigator → Expert Advisors**, pasang EA Copy Trading pada chart.
 5. Isi `AccountToken` dengan token akun terkait. Pastikan `ServerURL` sama dengan alamat yang diizinkan di WebRequest.
-6. Aktifkan **Algo Trading** di terminal MT5 dan pastikan izin trading akun/EA tersedia.
-7. Uji dahulu menggunakan akun demo. Untuk akun live, `AllowLiveTrading` harus diaktifkan secara terpisah dan default-nya mati.
-8. Pastikan EA utama Algentra mengirim data. Portal akan menunjukkan status setelah EA follower dan sumber melapor.
+6. Tidak ada mode demo atau dry run: EA mengeksekusi dan menyalin order live saat sinyal valid dan izin trading MT5 aktif. Periksa simbol, ukuran lot, SL/TP, dan pengaturan risiko sebelum mengaktifkan Algo Trading.
+7. Aktifkan **Algo Trading** di terminal MT5 dan pastikan izin trading akun/EA tersedia. Pastikan EA utama Algentra mengirim data. Portal menunjukkan status setelah EA follower dan sumber melapor.
 
 Jika broker memakai nama simbol berbeda, misalnya menambahkan akhiran pada nama instrumen, EA mungkin membutuhkan pengaturan `SymbolSuffix` atau `SymbolMapCsv`.
 
@@ -127,9 +126,8 @@ Jika broker memakai nama simbol berbeda, misalnya menambahkan akhiran pada nama 
 - **Siap menyalin / tanda hijau:** EA follower melapor, izin trading terbaca aktif, dan EA utama melaporkan sumber baru-baru ini.
 - **Menunggu pembaruan dari akun utama:** EA follower tersambung, tetapi snapshot akun utama belum segar. Periksa apakah sumber sedang aktif.
 - **EA Copy Trading belum terhubung / offline:** periksa terminal tersambung, token benar, `ServerURL`, URL pada daftar WebRequest, dan apakah EA terpasang serta berjalan.
-- **Izin trading belum aktif:** periksa tombol **Algo Trading**, izin Expert Advisor pada terminal dan akun broker, serta `AllowLiveTrading` untuk akun live.
+- **Izin trading belum aktif:** periksa tombol **Algo Trading** serta izin Expert Advisor pada terminal dan akun broker.
 - **HTTP -1 / ERROR 4006:** pesan ini sendiri tidak membuktikan token salah. Pastikan `ServerURL` sama persis dengan URL yang diizinkan di **Allow WebRequest**. Jika masalah berlanjut, minta tangkapan tab **Experts** dengan token dan data sensitif disamarkan.
-- **LIVE COPYING OFF:** penyalinan live belum diizinkan. Periksa `AllowLiveTrading` dan izin MT5. Lakukan uji demo terlebih dahulu.
 - **Simbol tidak ditemukan atau cocok ke beberapa simbol:** kemungkinan nama instrumen di broker berbeda. Minta bantuan teknis untuk pengaturan suffix/pemetaan simbol.
 - **Saldo/performa belum muncul:** pastikan EA follower aktif dan terminal tersambung. Histori performa hanya menghitung transaksi tertutup yang sudah dilaporkan; mata uang akun berbeda dipisahkan.
 - **Harga watchlist lama:** halaman menyatakan status/waktu laporan. EA utama mungkin offline atau pasar mungkin tutup; harga terakhir bukan jaminan harga eksekusi.
@@ -142,7 +140,7 @@ Jika perlu mengirim tangkapan layar, minta pelanggan menyamarkan token, email, n
 2. Jangan pernah meminta kata sandi portal, kata sandi broker, kode OTP, token EA, API key, atau file `.env`. Jangan meminta pelanggan menempelkan token ke chat. Jika token hilang/terbuka, arahkan pelanggan untuk merotasi token dan memperbarui nilai di EA.
 3. Jangan memberi sinyal trading, saran beli/jual, rekomendasi risiko/lot/multiplier, prediksi harga, atau instruksi untuk menahan/menutup posisi tertentu. Jelaskan fitur teknis secara netral.
 4. Trading dapat menyebabkan kerugian. Equity, win rate, histori, atau hasil masa lalu tidak menjamin hasil masa depan. Data publik merepresentasikan akun utama dan dapat terlambat.
-5. Harga paket akun MT5: ZERO Rp 150.000, PRO Rp 200.000, dan EXPERT Rp 300.000. Periode penagihan tidak ditentukan. Gambar QR pada aplikasi adalah DEMO dan bukan sarana pembayaran; arahkan klien untuk meminta QRIS resmi dari admin. Bukti transaksi diperiksa admin sebelum akun dibuat. Deposit/withdrawal, modal trading minimum, broker tertentu yang direkomendasikan, target/garansi profit, waktu respons dukungan, dan status lisensi tidak ditetapkan; rujuk pertanyaan tersebut ke kanal resmi pada bagian Kontak.
+5. Harga paket akun MT5: ZERO Rp 150.000, PRO Rp 200.000, dan EXPERT Rp 300.000. Periode penagihan tidak ditentukan. QRIS ditampilkan pada halaman transaksi; bukti transaksi diperiksa admin sebelum akun dibuat. Deposit/withdrawal, modal trading minimum, broker tertentu yang direkomendasikan, target/garansi profit, waktu respons dukungan, dan status lisensi tidak ditetapkan; rujuk pertanyaan tersebut ke kanal resmi pada bagian Kontak.
 6. Untuk transaksi yang masih terbuka, jelaskan bahwa menghentikan EA, menonaktifkan/menghapus akun portal, atau putus koneksi tidak otomatis menutup posisi broker. Pelanggan perlu memeriksa dan mengelolanya langsung di MT5; customer service tidak menentukan apakah posisi harus ditutup.
 7. Untuk masalah koneksi yang belum teratasi, arahkan ke kanal yang tercantum saat itu pada **Beranda → Kontak**. Jangan membuat alamat kontak atau tautan sosial sendiri.
 
@@ -152,5 +150,5 @@ Jika perlu mengirim tangkapan layar, minta pelanggan menyamarkan token, email, n
 - **“Apakah Anda perlu password MT5 saya?”** — “Tidak. Portal hanya meminta nama server dan nomor login MT5 untuk pendaftaran; jangan kirim password broker atau token EA ke chat.”
 - **“Kenapa posisi belum tersalin?”** — “Periksa status EA di portal, koneksi terminal, token, URL WebRequest, Algo Trading, izin akun, mode hedging, dan apakah EA utama masih mengirim snapshot. Jika masih bermasalah, kirim status/error dari tab Experts setelah menyamarkan data sensitif.”
 - **“Kalau saya stop EA, posisi tertutup?”** — “Tidak otomatis. Posisi yang sudah terbuka tetap berada di terminal MT5 dan perlu dikelola langsung di akun broker.”
-- **“Berapa harga level akun?”** — “Paket ZERO Rp 150.000, PRO Rp 200.000, atau EXPERT Rp 300.000. Periode penagihan tidak ditentukan. QR pada aplikasi masih DEMO; silakan minta QRIS resmi dan unggah bukti transaksi untuk diperiksa admin.”
+- **“Berapa harga level akun?”** — “Paket ZERO Rp 150.000, PRO Rp 200.000, atau EXPERT Rp 300.000. Periode penagihan tidak ditentukan. QRIS dan total pesanan tersedia di halaman transaksi; unggah bukti pembayaran agar dapat diperiksa admin.”
 - **“Berapa modal trading minimumnya?”** — “Informasi modal trading minimum belum ditetapkan pada panduan yang tersedia. Silakan konfirmasi melalui kanal resmi di bagian Kontak pada situs.”

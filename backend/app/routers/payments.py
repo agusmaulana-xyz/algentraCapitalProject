@@ -267,10 +267,10 @@ async def retry_admin_notification(
     return {"notification_sent": await payment_review_bot.notify_order(order_id)}
 
 
-@router.get("/qris-demo.svg", include_in_schema=False)
-def demo_qris_image() -> FileResponse:
+@router.get("/qris.jpeg", include_in_schema=False)
+def qris_image() -> FileResponse:
     return FileResponse(
-        PROJECT_ROOT / "backend" / "app" / "static" / "qris_demo.svg",
-        media_type="image/svg+xml",
+        PROJECT_ROOT / "backend" / "app" / "static" / "qris.jpeg",
+        media_type="image/jpeg",
         headers={"Cache-Control": "public, max-age=3600"},
     )

@@ -31,7 +31,6 @@ input int DefaultTPPoints = 1000;
 input string SymbolSuffix = "";
 input string SymbolMapCsv = ""; // Optional source-to-broker mapping, e.g. XAUUSD=XAUUSDc,US30=US30.cash
 input string MarketWatchlistCsv = "XAUUSD,EURUSD,USDJPY,GBPUSD";
-input bool DemoMode = true;
 input double MaxMarketDeviationPct = 5.0;
 input int MaxRetries = 3;
 
@@ -546,7 +545,9 @@ void RepeatSavedReport(const long signal_id, const string symbol, const string a
    long ticket = (long)GlobalVariableGet(GlobalKey(signal_id, "T", leg));
    double price = GlobalVariableGet(GlobalKey(signal_id, "P", leg));
    double lots = GlobalVariableGet(GlobalKey(signal_id, "L", leg));
-   string status = state == 1 ? "EXECUTED" : state == 4 ? "DRY_RUN" : state == 3 ? "FAILED" : "REJECTED";
+   if(state == 4)
+      return;
+   string status = state == 1 ? "EXECUTED" : state == 3 ? "FAILED" : "REJECTED";
    SendReport(signal_id, status, ticket, symbol, action, lots, price, "Idempotent report retry", leg);
   }
 
@@ -1205,6 +1206,8 @@ void ProcessSignal(const string item)
    string tp_array = JsonValue(item, "tp");
    int tp_count = ArrayNumberCount(tp_array);
    int order_count = tp_count > 0 ? tp_count : (zone_order ? 2 : 1);
+   if(JsonValue(item, "entry_mode") == "SINGLE")
+      order_count = 1;
    string plan_error = "";
    double requested_entry = zone_order ? 0.0 : JsonNumber(item, "entry");
    if(bid > 0.0 && ask > 0.0 &&
@@ -1213,13 +1216,6 @@ void ProcessSignal(const string item)
                           bid, ask, plan_error))
      {
       RejectSignal(signal_id, symbol, action, plan_error, order_count);
-      return;
-     }
-   if(DemoMode)
-     {
-      SaveReport(signal_id, 4, 0, 0.0, 0.0);
-      SendReport(signal_id, "DRY_RUN", 0, symbol, action, 0.0, 0.0, "EA DemoMode enabled; no order sent");
-      g_signal_count++;
       return;
      }
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED) ||
@@ -1258,10 +1254,10 @@ void ProcessSignal(const string item)
       if(zone_order)
         {
          double leg_entry = 0.0;
-         if(tp_count == 0)
-            leg_entry = i == 0 ? entry_low : entry_high;
-         else if(order_count == 1)
+         if(order_count == 1)
             leg_entry = (entry_low + entry_high) / 2.0;
+         else if(tp_count == 0)
+            leg_entry = i == 0 ? entry_low : entry_high;
          else if(action == "BUY")
             leg_entry = entry_low + (entry_high - entry_low) * (double)i / (order_count - 1);
          else
@@ -1378,7 +1374,7 @@ void UpdatePanel()
    double winrate = closed > 0 ? (double)g_wins / closed * 100.0 : 0.0;
     Comment("TelegramSignalEA 1.101\n",
            "Backend: ", g_connection_status, "\n",
-           "Mode: ", DemoMode ? "DEMO / DRY RUN" : "LIVE", "\n",
+           "Mode: LIVE\n",
            "Signals this session: ", g_signal_count, "\n",
            "Win / Loss: ", g_wins, " / ", g_losses, " (", DoubleToString(winrate, 1), "%)\n",
            "Last signal: ", g_last_signal);

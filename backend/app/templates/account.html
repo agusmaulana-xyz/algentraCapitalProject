@@ -28,7 +28,7 @@
           </label>
           {% endfor %}
         </div>
-        <p class="field-help">Total pembayaran mengikuti harga paket yang dipilih. QRIS di halaman berikut adalah gambar contoh sampai diganti dengan QRIS resmi.</p>
+        <p class="field-help">Total pembayaran mengikuti harga paket yang dipilih. QRIS untuk pembayaran ditampilkan pada halaman transaksi.</p>
       </fieldset>
       <label>Nama akun<input name="label" maxlength="80" placeholder="Copy Trading 1" required></label>
       <label>Broker server<input name="server" maxlength="128" placeholder="BrokerName-Live" required></label>
@@ -50,7 +50,7 @@
 
   <section>
     <h2>Akun Copy Trading Anda</h2>
-    <p class="section-help">Hubungkan hingga 10 akun Copy Trading. Tanda hijau berarti EA akun client aktif, izin trading MT5 menyala, dan EA utama mengirim pembaruan dalam 20 detik terakhir. Akun live, demo, dan kompetisi dapat terhubung; saldo ditampilkan dalam mata uang akun, termasuk unit cent broker.</p>
+    <p class="section-help">Hubungkan hingga 10 akun Copy Trading. Tanda hijau berarti EA akun client aktif, izin trading MT5 menyala, dan EA utama mengirim pembaruan dalam 20 detik terakhir. EA menyalin posisi sebagai order live; saldo ditampilkan dalam mata uang akun, termasuk unit cent broker.</p>
     <div id="accounts" class="grid"></div>
   </section>
 
@@ -58,19 +58,19 @@
     <h2>Pasang EA Copy Trading</h2>
     <p class="section-help">EA utama Algentra menerbitkan semua posisi terbuka, termasuk posisi yang dibuka manual dari MT5. EA Copy Trading juga mengirim saldo dan riwayat transaksi MT5 ke portal ini.</p>
     <div class="toolbar">
-      <a class="workspace-tag" href="/downloads/MT5FollowerCopyEA.ex5">Unduh EA Copy Trading</a>
+      <a class="workspace-tag" href="/downloads/MT5FollowerCopyEA.mq5">Unduh source EA Copy Trading</a>
     </div>
     <ol>
       <li>Hubungkan akun Copy Trading di atas. Salin token yang muncul; token hanya terlihat saat dibuat atau dirotasi.</li>
-      <li>Unduh EA Copy Trading. Di MT5, pilih <strong>File → Open Data Folder</strong>, buka folder <code>MQL5/Experts</code>, lalu salin file <code>.ex5</code> ke sana. File siap dipakai tanpa compile.</li>
+      <li>Di MT5, pilih <strong>File → Open Data Folder</strong>, buka folder <code>MQL5/Experts</code>, lalu salin file <code>.mq5</code> yang diunduh ke sana. Buka file itu di MetaEditor dan tekan <strong>F7</strong>; hasil compile <code>.ex5</code> siap digunakan di folder tersebut.</li>
       <li>Di MT5, pilih <strong>Tools → Options → Expert Advisors</strong>, aktifkan <em>Allow WebRequest for listed URL</em>, lalu tambahkan <code>https://algentracapital.my.id</code>.</li>
       <li>Dari <strong>Navigator → Expert Advisors</strong>, pasang EA Copy Trading di chart. Isi <code>AccountToken</code> dengan token akun tersebut, pastikan <code>ServerURL</code> benar, lalu aktifkan <strong>Algo Trading</strong>.</li>
-      <li>Pastikan EA utama Algentra aktif dan uji EA Copy Trading di akun demo. <code>AllowLiveTrading</code> nonaktif secara default. Atur <code>VolumeMultiplier</code> sesuai kebutuhan sebelum mengaktifkan trading live.</li>
+      <li>Pastikan EA utama Algentra aktif. EA Copy Trading akan menyalin posisi live saat izin trading MT5 aktif; atur <code>VolumeMultiplier</code> sesuai kebutuhan sebelum menjalankannya.</li>
     </ol>
     <div class="notice-box" role="note" aria-label="Bantuan pesan status EA Copy Trading">
       <h3>Arti pesan di chart MT5</h3>
       <p><strong>HTTP -1 / ERROR 4006:</strong> EA belum mendapat jawaban dari server. Kode 4006 berarti MT5 menemukan data array yang tidak valid saat EA berjalan; pesan ini sendiri belum membuktikan token salah. Pastikan URL <code>ServerURL</code> sama dengan alamat yang diizinkan di <em>Allow WebRequest</em>. Jika masih muncul, kirim tangkapan tab <strong>Experts</strong> kepada dukungan. Jangan kirim token.</p>
-      <p><strong>LIVE COPYING OFF:</strong> EA Copy Trading belum diizinkan membuka posisi live. Periksa opsi <code>AllowLiveTrading</code>, <strong>Algo Trading</strong>, dan izin trading akun pada MT5. Uji lebih dulu di akun demo.</p>
+      <p><strong>TRADING OFF:</strong> Periksa <strong>Algo Trading</strong> serta izin trading terminal, akun, dan Expert Advisor di MT5.</p>
     </div>
     <p class="notice-box">Akun Copy Trading harus memakai mode <strong>hedging</strong>. Volume salinan mengikuti volume sumber dikalikan <code>VolumeMultiplier</code>; nilainya tidak menyesuaikan ekuitas secara otomatis. Jika pembaruan dari akun utama terhenti lebih dari 20 detik, sinkronisasi berhenti. Posisi yang sudah terbuka tetap berada di MT5 jika EA berhenti.</p>
     <p class="section-help">Jangan bagikan token EA. Jika token hilang atau terekspos, pilih <strong>Rotasi token</strong> dan perbarui token di EA Copy Trading.</p>
@@ -147,7 +147,7 @@ function addAccountCard(account) {
     ready: `Siap menyalin pada akun ${modeLabel(account.trade_mode)}: EA Copy Trading dan akun utama terhubung.`,
     waiting_for_source: "EA Copy Trading terhubung; menunggu pembaruan dari akun utama.",
     offline: "EA Copy Trading belum terhubung. Periksa token, ServerURL, dan Allow WebRequest.",
-    trading_disabled: "Koneksi aktif, tetapi izin trading MT5 atau AllowLiveTrading belum aktif.",
+    trading_disabled: "Koneksi aktif, tetapi izin trading MT5 belum aktif.",
     not_real_account: "Mode akun MT5 belum dikenali.",
     disabled: "Akun Copy Trading ini dinonaktifkan."
   };

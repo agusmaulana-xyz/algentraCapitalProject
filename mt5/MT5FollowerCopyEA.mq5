@@ -13,7 +13,6 @@ input double MaxEntryDeviationPercent = 0.0; // 0 disables the late-entry gate f
 input int MaxSlippagePoints = 20;
 input string SymbolSuffix = "";
 input string SymbolMapCsv = ""; // Optional source-to-broker mapping, e.g. XAUUSDc=GOLD
-input bool AllowLiveTrading = false;
 
 CTrade g_trade;
 string g_connection_status = "starting";
@@ -174,11 +173,6 @@ string AccountTradeModeText()
    if(mode == ACCOUNT_TRADE_MODE_REAL) return "real";
    if(mode == ACCOUNT_TRADE_MODE_CONTEST) return "contest";
    return "demo";
-  }
-
-bool TradingOptInAllowsAccount()
-  {
-   return AccountInfoInteger(ACCOUNT_TRADE_MODE) != ACCOUNT_TRADE_MODE_REAL || AllowLiveTrading;
   }
 
 bool TrySelectBrokerSymbol(const string candidate, string &resolved)
@@ -398,7 +392,7 @@ void ReportAccountState()
       DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 8),
       DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 8),
       currency, AccountTradeModeText(),
-      TradingOptInAllowsAccount() ? "true" : "false",
+      "true",
       (TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && AccountInfoInteger(ACCOUNT_TRADE_ALLOWED)) ? "true" : "false",
       (MQLInfoInteger(MQL_TRADE_ALLOWED) && AccountInfoInteger(ACCOUNT_TRADE_EXPERT)) ? "true" : "false",
       CurrentOpenPositionIds(), deals_json);
@@ -605,11 +599,6 @@ void PollAndCopy()
    for(int i = 0; i < total; i++)
       source_tickets[i] = JsonStringValue(objects[i], "ticket");
 
-   if(!TradingOptInAllowsAccount())
-     {
-      g_connection_status = "connected / live account copying disabled";
-      return;
-     }
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED) ||
       !AccountInfoInteger(ACCOUNT_TRADE_ALLOWED) || !AccountInfoInteger(ACCOUNT_TRADE_EXPERT))
      {
@@ -686,7 +675,7 @@ int OnInit()
    EventSetMillisecondTimer(PollIntervalMs);
    ReportAccountState();
    PollAndCopy();
-   Print("[MT5FollowerCopyEA] initialized; demo/contest accounts can copy when MT5 trading is enabled. Real accounts require AllowLiveTrading=true. Allow ServerURL in MT5 WebRequest options.");
+   Print("[MT5FollowerCopyEA] initialized; live copying is enabled when MT5 trading permissions are enabled. Allow ServerURL in MT5 WebRequest options.");
    return INIT_SUCCEEDED;
   }
 
@@ -704,6 +693,6 @@ void OnTimer()
    Comment("Algentra MT5 Copy Trading\nBackend: ", g_connection_status,
            "\nManaged positions: ", CountManagedPositions(),
            "\nSaldo: ", AccountInfoString(ACCOUNT_CURRENCY), " ", DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2),
-           "\nCopying permission: ", TradingOptInAllowsAccount() ? "ON" : "OFF",
+           "\nCopying permission: ON",
            "\nLaporan akun: ", g_account_report_status);
   }

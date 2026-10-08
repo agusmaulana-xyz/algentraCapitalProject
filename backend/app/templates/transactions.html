@@ -224,10 +224,10 @@ function renderOrders(force = false) {
     if (actions.childElementCount) card.append(actions);
 
     if (order.status === "PENDING_PAYMENT" && expandedPaymentOrderId === order.id) {
-      const qr = document.createElement("img"); qr.className = "transaction-qr"; qr.src = "/api/payments/qris-demo.svg";
-      qr.alt = "Gambar contoh QRIS DEMO, tidak dapat dipindai";
+      const qr = document.createElement("img"); qr.className = "transaction-qr"; qr.src = "/api/payments/qris.jpeg";
+      qr.alt = "QRIS pembayaran Algentra Capital";
       const warning = document.createElement("p"); warning.className = "transaction-note";
-      warning.textContent = "QR ini hanya contoh dan tidak dapat dipindai. Ganti dengan QRIS resmi sebelum menerima pembayaran.";
+      warning.textContent = "Pindai QRIS ini untuk membayar dan pastikan jumlah pembayaran sesuai total pesanan.";
       card.append(qr, warning);
       if (showProofFormForOrderId !== order.id) {
         addButton(card, "Saya sudah bayar", () => { showProofFormForOrderId = order.id; renderOrders(true); });

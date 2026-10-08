@@ -17,14 +17,18 @@ from ..schemas import SettingsUpdate
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 ALLOWED_SETTINGS = {
-    "confidence_threshold", "symbol_mapping", "demo_mode", "allow_updates",
-    "kill_switch", "max_market_deviation_pct", "registration_open",
+    "confidence_threshold", "symbol_mapping", "allow_updates",
+    "kill_switch", "max_market_deviation_pct", "registration_open", "entry_mode",
 }
 SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9._]{1,32}$")
 
 
 def _validate_setting(key: str, value: object) -> object:
-    if key in {"demo_mode", "allow_updates", "kill_switch", "registration_open"}:
+    if key == "entry_mode":
+        if not isinstance(value, str) or value not in {"SINGLE", "PARTIAL"}:
+            raise HTTPException(status_code=422, detail="entry_mode harus SINGLE atau PARTIAL")
+        return value
+    if key in {"allow_updates", "kill_switch", "registration_open"}:
         if not isinstance(value, bool):
             raise HTTPException(status_code=422, detail=f"Setting '{key}' harus boolean")
         return value
@@ -70,7 +74,7 @@ def read_settings(db: Session = Depends(get_db)) -> dict[str, object]:
     for item in db.query(AppSetting).all():
         if item.key == REGISTRATION_AUTO_OPEN_KEY or item.key in {
             "default_symbol", "max_daily_loss_money", "max_lot", "max_open_trades",
-            "max_signal_age_seconds", "allowed_symbols",
+            "max_signal_age_seconds", "allowed_symbols", "demo_mode",
         }:
             continue
         try:
@@ -78,6 +82,7 @@ def read_settings(db: Session = Depends(get_db)) -> dict[str, object]:
         except (TypeError, json.JSONDecodeError):
             continue
     config = get_settings()
+    values.setdefault("entry_mode", "PARTIAL")
     values[REGISTRATION_OPEN_KEY] = registration_is_open(db)
     values["gemini_configured"] = bool(config.gemini_api_key and config.gemini_api_key.get_secret_value())
     values["gemini_model"] = config.gemini_model
