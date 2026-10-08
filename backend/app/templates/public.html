@@ -93,12 +93,13 @@
 
   .equity-layout { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: stretch; gap: clamp(22px, 4vw, 48px); }
   .equity-info, .equity-chart { display: flex; flex-direction: column; min-width: 0; }
-  .equity-value { display: block; margin: 8px 0 18px; font-size: clamp(32px, 4.4vw, 46px); font-weight: 600; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .equity-chart { overflow: hidden; }
+  .equity-value { display: block; min-width: 0; margin: 8px 0 18px; font-size: clamp(24px, 4.4vw, 46px); font-weight: 600; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .equity-stats { display: grid; }
   .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); }
   .stat:last-child { border-bottom: 1px solid var(--border); }
   .stat small { color: var(--text-2); font-size: 13px; }
-  .stat b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .stat b { min-width: 0; overflow: hidden; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
   .equity-updated { display: block; margin-top: 12px; color: var(--text-2); font-size: 12px; }
 
   .chart-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
@@ -108,10 +109,10 @@
   .chart-timeframe:hover { color: var(--text); }
   .chart-timeframe[aria-pressed="true"] { color: var(--accent-ink); background: var(--accent); }
   .chart-timeframe:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .delta-chip { padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .delta-chip { max-width: 100%; min-width: 0; overflow: hidden; padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
   .delta-chip:empty { display: none; }
-  .chart-wrap { position: relative; flex: 1; min-height: 210px; margin-top: 12px; overflow-x: auto; overflow-y: hidden; scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
-  #equity-chart { position: relative; display: block; min-width: 100%; height: 100%; overflow: visible; color: var(--accent); }
+  .chart-wrap { position: relative; flex: none; width: 100%; height: 220px; min-height: 0; max-height: 220px; margin-top: 12px; overflow-x: auto; overflow-y: hidden; scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
+  #equity-chart { position: relative; display: block; min-width: 100%; height: 100%; max-height: 100%; overflow: hidden; color: var(--accent); }
   #equity-chart[hidden], #equity-chart-empty[hidden], #equity-chart-meta[hidden], #equity-chart-gap[hidden], #equity-chart-gap-label[hidden] { display: none; }
   .chart-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 6; fill: none; }
   .chart-gap { fill: var(--surface); opacity: .48; }
@@ -126,6 +127,7 @@
   .chart-price-tag-text { fill: var(--accent-ink); font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; font-variant-numeric: tabular-nums; }
   .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; color: var(--text-2); font-size: 14px; text-align: center; }
   .chart-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--text-2); font-size: 12px; }
+  .chart-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .watchlist-panel .panel-head { margin-bottom: 12px; }
   .quote-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -223,7 +225,7 @@
     .community-emblem { width: 48px; height: 48px; border-radius: 14px; }
     .community-count { grid-column: 1 / -1; justify-content: flex-start; }
     .panel { padding: 16px; }
-    .chart-wrap { min-height: 170px; }
+    .chart-wrap { height: 190px; max-height: 190px; }
     .quote-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .quote-card { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "sym bid ask" "meta meta meta"; align-items: center; column-gap: 18px; row-gap: 6px; padding: 12px 14px; }
     .quote-card .quote-symbol { grid-area: sym; }
@@ -686,6 +688,8 @@
     const highs = candles.map((candle) => candle.high);
     low.textContent = money(Math.min(...values, ...lows), currency);
     high.textContent = money(Math.max(...values, ...highs), currency);
+    low.title = low.textContent;
+    high.title = high.textContent;
     const now = Date.now();
     $("#equity-chart-first").textContent = `Mulai ${wib(new Date(equitySessionStart(now)), { hour: "2-digit", minute: "2-digit" })}`;
     $("#equity-chart-latest").textContent = `Sekarang ${wib(new Date(now), { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
@@ -802,6 +806,9 @@
       value.textContent = money(master.equity, master.currency);
       balance.textContent = money(master.balance, master.currency);
       floating.textContent = money(fp, master.currency);
+      value.title = money(master.equity, master.currency);
+      balance.title = money(master.balance, master.currency);
+      floating.title = money(fp, master.currency);
       floating.dataset.tone = tone(fp);
       updated.textContent = master.updated_at ? `Diperbarui ${wib(master.updated_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : "";
     } else {
@@ -809,6 +816,7 @@
       value.textContent = "—";
       balance.textContent = "—";
       floating.textContent = "—"; floating.removeAttribute("data-tone");
+      value.removeAttribute("title"); balance.removeAttribute("title"); floating.removeAttribute("title");
       updated.textContent = "Equity akan tampil setelah EA utama mengirim laporan akun MT5.";
     }
     renderQuotes(data.market_quotes, data.market_quotes_online);
