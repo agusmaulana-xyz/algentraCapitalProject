@@ -70,7 +70,7 @@ Token EA hanya ditampilkan saat dibuat atau dirotasi. Rotasi membuat token lama 
 
 ### 4. Halaman performa publik
 
-Halaman publik menampilkan data akun utama MT5, seperti saldo, equity, floating profit, perubahan/grafik equity sejak reset sesi pukul 07.00 WIB, status laporan EA, dan harga watchlist bila tersedia. Grafik menyediakan pilihan M1, M5, M15, H1, rentang equity, dan garis equity terakhir. Data ini berasal dari akun utama, bukan gabungan akun pelanggan dan bukan proyeksi hasil pelanggan. Harga atau equity terakhir dapat menjadi usang saat EA offline atau pasar tutup.
+Halaman publik menampilkan data akun utama MT5, seperti saldo, equity, floating profit, perubahan/grafik garis equity sejak reset sesi pukul 07.00 WIB, status laporan EA, dan harga watchlist bila tersedia. Tinggi grafik dibatasi agar perubahan equity tidak mengubah tata letak halaman. Data ini berasal dari akun utama, bukan gabungan akun pelanggan dan bukan proyeksi hasil pelanggan. Harga atau equity terakhir dapat menjadi usang saat EA offline atau pasar tutup.
 
 Situs juga menampilkan jumlah akun klien yang telah menyelesaikan verifikasi email. Angka tersebut hanya jumlah akun terverifikasi, bukan jumlah pelanggan aktif atau bukti hasil investasi.
 

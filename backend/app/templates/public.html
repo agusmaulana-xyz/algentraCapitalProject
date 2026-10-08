@@ -104,27 +104,18 @@
 
   .chart-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
   .chart-caption { color: var(--text-2); font-size: 13px; font-weight: 600; }
-  .chart-timeframes { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
-  .chart-timeframe { min-width: 38px; min-height: 30px; padding: 0 8px; border: 0; border-radius: 7px; color: var(--text-2); background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; transition: color .15s ease, background .15s ease; }
-  .chart-timeframe:hover { color: var(--text); }
-  .chart-timeframe[aria-pressed="true"] { color: var(--accent-ink); background: var(--accent); }
-  .chart-timeframe:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .delta-chip { max-width: 100%; min-width: 0; overflow: hidden; padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
   .delta-chip:empty { display: none; }
-  .chart-wrap { position: relative; flex: none; width: 100%; height: 220px; min-height: 0; max-height: 220px; margin-top: 12px; overflow-x: auto; overflow-y: hidden; scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
-  #equity-chart { position: relative; display: block; min-width: 100%; height: 100%; max-height: 100%; overflow: hidden; color: var(--accent); }
+  .chart-wrap { position: relative; flex: none; width: 100%; height: 220px; min-height: 0; max-height: 220px; margin-top: 12px; overflow: hidden; }
+  #equity-chart { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: hidden; color: var(--accent); }
   #equity-chart[hidden], #equity-chart-empty[hidden], #equity-chart-meta[hidden], #equity-chart-gap[hidden], #equity-chart-gap-label[hidden] { display: none; }
   .chart-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 6; fill: none; }
   .chart-gap { fill: var(--surface); opacity: .48; }
   .chart-gap-label { fill: var(--text-2); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
   .chart-axis-label { fill: var(--text-2); font-size: 10px; font-variant-numeric: tabular-nums; }
-  .chart-candle-wick { stroke-width: 1.25; }
-  .chart-candle-body { stroke-width: 1; }
-  .chart-candle-up { stroke: var(--pos); fill: var(--pos); }
-  .chart-candle-down { stroke: var(--neg); fill: var(--neg); }
-  .chart-price-line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 5 4; opacity: .9; }
-  .chart-price-tag { fill: var(--accent); }
-  .chart-price-tag-text { fill: var(--accent-ink); font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; font-variant-numeric: tabular-nums; }
+  .chart-area { opacity: .22; }
+  .chart-line { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-point { fill: currentColor; stroke: var(--panel, #16211c); stroke-width: 4; }
   .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; color: var(--text-2); font-size: 14px; text-align: center; }
   .chart-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--text-2); font-size: 12px; }
   .chart-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -320,23 +311,17 @@
           <div class="equity-chart">
             <div class="chart-head">
               <span class="chart-caption">Realtime Equity</span>
-              <div class="chart-timeframes" role="group" aria-label="Timeframe grafik equity">
-                <button class="chart-timeframe" type="button" data-timeframe="1" aria-pressed="false">M1</button>
-                <button class="chart-timeframe" type="button" data-timeframe="5" aria-pressed="false">M5</button>
-                <button class="chart-timeframe" type="button" data-timeframe="15" aria-pressed="true">M15</button>
-                <button class="chart-timeframe" type="button" data-timeframe="60" aria-pressed="false">H1</button>
-              </div>
               <span id="equity-chart-delta" class="delta-chip" title="Perubahan equity sejak sesi dimulai pukul 07.00 WIB"></span>
             </div>
             <div id="equity-chart-wrap" class="chart-wrap">
-              <div id="equity-chart-empty" class="chart-empty">Candle sesi baru mulai terbentuk setelah pukul 07.00 WIB saat EA utama melaporkan equity.</div>
-              <svg id="equity-chart" viewBox="0 0 640 200" role="img" aria-label="Grafik candlestick equity akun utama sejak pukul 07.00 WIB" hidden>
+              <div id="equity-chart-empty" class="chart-empty">Grafik akan terisi setelah EA utama melaporkan equity.</div>
+              <svg id="equity-chart" viewBox="0 0 640 200" role="img" aria-label="Grafik equity akun utama sejak pukul 07.00 WIB" hidden>
+                <defs><linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".22"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
                 <rect id="equity-chart-gap" class="chart-gap" hidden/>
                 <path id="equity-chart-grid" class="chart-grid"/>
-                <g id="equity-chart-candles"></g>
-                <line id="equity-chart-price-line" class="chart-price-line"/>
-                <rect id="equity-chart-price-tag" class="chart-price-tag" rx="3"/>
-                <text id="equity-chart-price-label" class="chart-price-tag-text"></text>
+                <path id="equity-chart-area" class="chart-area" fill="url(#equityFill)"/>
+                <path id="equity-chart-line" class="chart-line"/>
+                <circle id="equity-chart-point" class="chart-point" r="5"/>
                 <text id="equity-chart-gap-label" class="chart-gap-label" hidden>Riwayat belum tersedia</text>
                 <g id="equity-chart-y-labels" class="chart-axis-label"></g>
                 <g id="equity-chart-x-labels" class="chart-axis-label"></g>
@@ -503,92 +488,39 @@
   let activeEquityAccountKey = null;
   const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
   const wrap = $("#equity-chart-wrap");
-  let equityTimeframeMinutes = 15;
-  const timeframeButtons = [...document.querySelectorAll(".chart-timeframe")];
-  const selectedTimeframe = () => equityTimeframeMinutes === 60 ? "H1" : `M${equityTimeframeMinutes}`;
   const equitySessionStart = (timestamp = Date.now()) => {
     const jakartaTime = new Date(timestamp + WIB_OFFSET_MS);
     if (jakartaTime.getUTCHours() < 7) jakartaTime.setUTCDate(jakartaTime.getUTCDate() - 1);
     jakartaTime.setUTCHours(7, 0, 0, 0);
     return jakartaTime.getTime() - WIB_OFFSET_MS;
   };
-  const getEquityCandles = () => {
-    const sessionStart = equitySessionStart();
-    const minuteCandles = new Map();
-    for (const candle of equityCandles) {
-      const timestamp = new Date(candle.minute).getTime();
-      const open = Number(candle.open), high = Number(candle.high), low = Number(candle.low), close = Number(candle.close);
-      if (!Number.isFinite(timestamp) || timestamp < sessionStart || ![open, high, low, close].every(Number.isFinite)) continue;
-      minuteCandles.set(Math.floor(timestamp / 60000) * 60000, {
-        time: Math.floor(timestamp / 60000) * 60000, open, high, low, close, currency: candle.currency || "",
-        observedAt: new Date(candle.observed_at).getTime() || 0
-      });
-    }
-    for (const point of liveCurve) {
-      const timestamp = new Date(point.hour).getTime(), equity = Number(point.equity);
-      if (!Number.isFinite(timestamp) || timestamp < sessionStart || !Number.isFinite(equity)) continue;
-      const minute = Math.floor(timestamp / 60000) * 60000;
-      const candle = minuteCandles.get(minute);
-      if (candle) {
-        candle.high = Math.max(candle.high, equity);
-        candle.low = Math.min(candle.low, equity);
-        if (timestamp >= (candle.observedAt || 0)) {
-          candle.close = equity;
-          candle.observedAt = timestamp;
-        }
-      } else {
-        minuteCandles.set(minute, {
-          time: minute, open: equity, high: equity, low: equity, close: equity,
-          currency: point.currency || "", observedAt: timestamp
-        });
-      }
-    }
-    const intervalMs = equityTimeframeMinutes * 60000;
-    const grouped = new Map();
-    for (const candle of [...minuteCandles.values()].sort((left, right) => left.time - right.time)) {
-      const bucket = sessionStart + Math.floor((candle.time - sessionStart) / intervalMs) * intervalMs;
-      const aggregate = grouped.get(bucket);
-      if (aggregate) {
-        aggregate.high = Math.max(aggregate.high, candle.high);
-        aggregate.low = Math.min(aggregate.low, candle.low);
-        aggregate.close = candle.close;
-        aggregate.currency = candle.currency || aggregate.currency;
-      } else {
-        grouped.set(bucket, { ...candle, time: bucket });
-      }
-    }
-    return [...grouped.values()];
-  };
   const drawChart = () => {
-    const candles = getEquityCandles();
-    if (!candles.length) return;
+    const curve = lastCurve.filter((point) => Number.isFinite(new Date(point.hour).getTime()) && Number.isFinite(Number(point.equity)));
+    if (!curve.length) return;
     const svg = $("#equity-chart");
     const rect = wrap.getBoundingClientRect();
-    const viewportWidth = Math.round(rect.width) || 640;
+    const width = Math.round(rect.width) || 640;
     const height = Math.round(rect.height) || 200;
     const sessionStart = equitySessionStart();
-    const intervalMs = equityTimeframeMinutes * 60000;
     const now = Date.now();
-    const elapsedIntervals = Math.max(1, Math.ceil((now - sessionStart) / intervalMs));
-    const values = candles.flatMap((candle) => [candle.high, candle.low]);
-    const currentPrice = Number(lastCurve.at(-1)?.equity);
-    if (Number.isFinite(currentPrice)) values.push(currentPrice);
+    const times = curve.map((point) => new Date(point.hour).getTime());
+    const values = curve.map((point) => Number(point.equity));
     const min = Math.min(...values), max = Math.max(...values);
     const padding = Math.max((max - min) * 0.1, Math.max(Math.abs(max) * 0.002, 0.01));
     const lower = min - padding, upper = max + padding, spread = upper - lower;
-    const padLeft = 8, padRight = 88;
+    const padLeft = 8, padRight = Math.min(90, Math.max(72, width * 0.25));
     const padTop = 14, padBottom = 30;
     const plotH = height - padTop - padBottom;
-    const width = Math.max(viewportWidth, padLeft + padRight + elapsedIntervals * 8);
-    const wasAtRight = wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft < 24;
-    svg.style.width = `${width}px`;
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const coords = values.map((value, index) => ({
+      x: padLeft + Math.max(0, Math.min(1, (times[index] - sessionStart) / Math.max(1, now - sessionStart))) * (width - padLeft - padRight),
+      y: padTop + (upper - value) * plotH / spread
+    }));
+    const line = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+    const base = height - padBottom;
     const plotRight = width - padRight;
-    const plotWidth = plotRight - padLeft;
-    const intervalWidth = plotWidth / elapsedIntervals;
     const gap = $("#equity-chart-gap"), gapLabel = $("#equity-chart-gap-label");
-    const firstTime = candles[0].time;
-    const gapWidth = padLeft + (firstTime - sessionStart) / intervalMs * intervalWidth - padLeft;
+    const gapWidth = coords[0].x - padLeft;
     if (gapWidth > 110) {
       gap.removeAttribute("hidden");
       gap.setAttribute("x", padLeft); gap.setAttribute("y", padTop);
@@ -597,113 +529,66 @@
       gapLabel.setAttribute("x", padLeft + gapWidth / 2);
       gapLabel.setAttribute("y", padTop + plotH / 2);
       gapLabel.textContent = gapWidth > 220
-        ? `Belum ada data sebelum ${wib(new Date(firstTime), { hour: "2-digit", minute: "2-digit" })}`
+        ? `Belum ada data sebelum ${wib(new Date(times[0]), { hour: "2-digit", minute: "2-digit" })}`
         : "Belum ada data";
     } else {
       gap.setAttribute("hidden", ""); gapLabel.setAttribute("hidden", "");
     }
-    $("#equity-chart-grid").setAttribute("d", [0, 1, 2, 3, 4].map((k) => `M${padLeft} ${(padTop + k * plotH / 4).toFixed(1)}H${plotRight}`).join(" "));
+    $("#equity-chart-grid").setAttribute("d", [0, 1, 2, 3].map((k) => `M${padLeft} ${(padTop + k * plotH / 3).toFixed(1)}H${plotRight}`).join(" "));
+    $("#equity-chart-line").setAttribute("d", line);
+    $("#equity-chart-area").setAttribute("d", `${line} L${coords.at(-1).x.toFixed(1)} ${base} L${coords[0].x.toFixed(1)} ${base} Z`);
+    $("#equity-chart-point").setAttribute("cx", coords.at(-1).x);
+    $("#equity-chart-point").setAttribute("cy", coords.at(-1).y);
     const yLabels = $("#equity-chart-y-labels"), xLabels = $("#equity-chart-x-labels");
     yLabels.replaceChildren(); xLabels.replaceChildren();
     const svgNS = "http://www.w3.org/2000/svg";
-    [0, 1, 2, 3, 4].forEach((index) => {
-      const value = upper - spread * index / 4;
+    [0, 1, 2].forEach((index) => {
+      const value = upper - spread * index / 2;
       const label = document.createElementNS(svgNS, "text");
-      label.setAttribute("x", plotRight + padRight - 4);
-      label.setAttribute("y", padTop + plotH * index / 4 + 4);
+      label.setAttribute("x", width - 4);
+      label.setAttribute("y", padTop + plotH * index / 2 + 4);
       label.setAttribute("text-anchor", "end");
-      label.textContent = fmt(value, 2, 2);
+      label.textContent = money(value, curve.at(-1).currency || "");
       yLabels.append(label);
     });
-    const candleGroup = $("#equity-chart-candles");
-    const candleNodes = document.createDocumentFragment();
-    const candleWidth = Math.max(2, Math.min(18, intervalWidth * 0.62));
-    const y = (value) => padTop + (upper - value) * plotH / spread;
-    for (const candle of candles) {
-      const x = padLeft + ((candle.time - sessionStart) / intervalMs + 0.5) * intervalWidth;
-      const className = candle.close >= candle.open ? "chart-candle-up" : "chart-candle-down";
-      const wick = document.createElementNS(svgNS, "line");
-      wick.setAttribute("x1", x); wick.setAttribute("x2", x);
-      wick.setAttribute("y1", y(candle.high)); wick.setAttribute("y2", y(candle.low));
-      wick.setAttribute("class", `chart-candle-wick ${className}`);
-      candleNodes.append(wick);
-      const body = document.createElementNS(svgNS, "rect");
-      const bodyTop = y(Math.max(candle.open, candle.close));
-      const bodyHeight = Math.max(1.5, Math.abs(y(candle.open) - y(candle.close)));
-      body.setAttribute("x", x - candleWidth / 2); body.setAttribute("y", bodyTop);
-      body.setAttribute("width", candleWidth); body.setAttribute("height", bodyHeight);
-      body.setAttribute("class", `chart-candle-body ${className}`);
-      candleNodes.append(body);
-    }
-    candleGroup.replaceChildren(candleNodes);
-    const priceLine = $("#equity-chart-price-line"), priceTag = $("#equity-chart-price-tag"), priceLabel = $("#equity-chart-price-label");
-    if (Number.isFinite(currentPrice)) {
-      const priceY = y(currentPrice);
-      priceLine.removeAttribute("hidden");
-      priceLine.setAttribute("x1", padLeft); priceLine.setAttribute("x2", plotRight);
-      priceLine.setAttribute("y1", priceY); priceLine.setAttribute("y2", priceY);
-      priceTag.removeAttribute("hidden");
-      priceTag.setAttribute("x", plotRight + 4); priceTag.setAttribute("y", priceY - 9);
-      priceTag.setAttribute("width", padRight - 8); priceTag.setAttribute("height", 18);
-      priceLabel.removeAttribute("hidden");
-      priceLabel.setAttribute("x", plotRight + padRight / 2);
-      priceLabel.setAttribute("y", priceY);
-      priceLabel.textContent = fmt(currentPrice, 2, 2);
-      priceLabel.setAttribute("aria-label", money(currentPrice, candles.at(-1).currency || ""));
-      priceLabel.setAttribute("title", money(currentPrice, candles.at(-1).currency || ""));
-    }
-    const timeTicks = Math.max(2, Math.floor(plotWidth / 90) + 1);
+    const timeTicks = width < 460 ? 3 : 5;
     for (let index = 0; index < timeTicks; index++) {
       const ratio = index / (timeTicks - 1);
       const label = document.createElementNS(svgNS, "text");
       label.setAttribute("x", padLeft + ratio * (plotRight - padLeft));
       label.setAttribute("y", height - 5);
       label.setAttribute("text-anchor", index === 0 ? "start" : index === timeTicks - 1 ? "end" : "middle");
-      label.textContent = wib(new Date(sessionStart + ratio * (now - sessionStart)), { hour: "2-digit", minute: "2-digit" });
+      label.textContent = wib(new Date(sessionStart + ratio * Math.max(0, now - sessionStart)), { hour: "2-digit", minute: "2-digit" });
       xLabels.append(label);
     }
-    if (wasAtRight) wrap.scrollLeft = wrap.scrollWidth;
   };
-  let equityCandles = [];
   const showEquityChart = (curve) => {
     lastCurve = curve;
-    const candles = getEquityCandles();
     const svg = $("#equity-chart"), empty = $("#equity-chart-empty"), meta = $("#equity-chart-meta");
     const delta = $("#equity-chart-delta"), low = $("#equity-low"), high = $("#equity-high");
-    if (!curve.length || !candles.length) {
+    if (!curve.length) {
       svg.setAttribute("hidden", ""); meta.hidden = true; empty.hidden = false;
       delta.textContent = ""; delta.removeAttribute("data-tone");
       low.textContent = "—"; high.textContent = "—";
       return;
     }
     empty.hidden = true; svg.removeAttribute("hidden"); meta.hidden = false;
-    svg.setAttribute("aria-label", `Grafik candlestick equity akun utama timeframe ${selectedTimeframe()} sejak pukul 07.00 WIB`);
+    svg.setAttribute("aria-label", "Grafik equity akun utama sejak pukul 07.00 WIB");
     const currency = curve.at(-1).currency || "";
     const values = curve.map((point) => Number(point.equity));
     const change = values.at(-1) - values[0];
     const pct = values[0] ? change / values[0] * 100 : 0;
     delta.textContent = `${signed(change, currency ? ` ${currency}` : "")} (${signed(pct, "%")})`;
     delta.dataset.tone = tone(change);
-    const lows = candles.map((candle) => candle.low);
-    const highs = candles.map((candle) => candle.high);
-    low.textContent = money(Math.min(...values, ...lows), currency);
-    high.textContent = money(Math.max(...values, ...highs), currency);
+    low.textContent = money(Math.min(...values), currency);
+    high.textContent = money(Math.max(...values), currency);
     low.title = low.textContent;
     high.title = high.textContent;
     const now = Date.now();
     $("#equity-chart-first").textContent = `Mulai ${wib(new Date(equitySessionStart(now)), { hour: "2-digit", minute: "2-digit" })}`;
     $("#equity-chart-latest").textContent = `Sekarang ${wib(new Date(now), { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
-    $(".chart-caption").textContent = `Realtime Equity · ${selectedTimeframe()}`;
     drawChart();
   };
-  timeframeButtons.forEach((button) => button.addEventListener("click", () => {
-    equityTimeframeMinutes = Number(button.dataset.timeframe);
-    timeframeButtons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
-    if (lastCurve.length) {
-      showEquityChart(lastCurve);
-      wrap.scrollLeft = wrap.scrollWidth;
-    }
-  }));
   if (window.ResizeObserver) new ResizeObserver(drawChart).observe(wrap);
 
   /* ---------- Watchlist ---------- */
@@ -792,7 +677,6 @@
       activeEquityAccountKey = master.account_key;
       liveCurve = [];
       equityHistory = [];
-      equityCandles = [];
     }
     const status = $("#master-account-status");
     if (master.online) setStatus(status, "EA utama online", "live");
@@ -837,7 +721,6 @@
       const cutoff = equitySessionStart();
       equityHistory = data.equity_curve.filter((point) => new Date(point.hour).getTime() >= cutoff);
     }
-    if (Array.isArray(data.equity_candles)) equityCandles = data.equity_candles;
     const sessionCutoff = equitySessionStart();
     equityHistory = equityHistory.filter((point) => new Date(point.hour).getTime() >= sessionCutoff);
     liveCurve = liveCurve.filter((point) => new Date(point.hour).getTime() >= sessionCutoff);
