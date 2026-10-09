@@ -16,12 +16,12 @@ from .models import AppSetting, Signal, SystemLog, utc_now
 DEFAULT_SYMBOL_MAPPING = {"XAUUSD": "XAUUSD", "GOLD": "XAUUSD", "XAU": "XAUUSD", "EMAS": "XAUUSD"}
 _TRADE_ACTION_RE = re.compile(r"\b(?:BUY|SELL|LONG|SHORT|BELI|JUAL)\b", re.IGNORECASE)
 _SIGNAL_MARKER_RE = re.compile(
-    r"\b(?:TP\s*\d*|TAKE[\s_-]*PROFIT|TARGET\s*\d*|SL|STOP[\s_-]*LOSS|ENTRY|ZONE|NOW|MARKET|LIMIT|STOP)\b",
+    r"\b(?:TP\s*[\d⁰¹²³⁴⁵⁶⁷⁸⁹]*|TAKE[\s_-]*PROFIT|TARGET\s*[\d⁰¹²³⁴⁵⁶⁷⁸⁹]*|SL|STOP[\s_-]*LOSS|ENTRY|ZONE|NOW|MARKET|LIMIT|STOP)\b",
     re.IGNORECASE,
 )
 _PRICE_RE = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?")
 _TRADE_RESULT_RE = re.compile(
-    r"\b(?:TP\s*\d*|SL|STOP\s*LOSS)\s*(?:HIT|KEN[A]?|REACHED|TERCAPAI)\b|"
+    r"\b(?:TP\s*[\d⁰¹²³⁴⁵⁶⁷⁸⁹]*|SL|STOP\s*LOSS)\s*(?:HIT|KEN[A]?|REACHED|TERCAPAI)\b|"
     r"\b(?:CLOSED|CLOSE|PROFIT|LOSS)\s+(?:TRADE|POSITION|POSISI)\b|"
     r"\b(?:CLOSE|TUTUP)\s+(?:NOW|ALL|POSITION|POSISI|SEKARANG|SEMUA)\b|"
     r"\b(?:MOVE|ADJUST|GESER|PINDAH|UBAH)\b.{0,30}\b(?:SL|STOP\s*LOSS|BE|BREAKEVEN)\b",
@@ -99,6 +99,60 @@ def _is_gold_symbol_alias(symbol: str | None) -> bool:
         return True
     candidate = re.sub(r"\s+", "", symbol).upper()
     return candidate.startswith(("XAUUSD", "GOLD", "XAU", "EMAS"))
+
+
+def _prefer_farthest_target_when_needed(classification: SignalClassification) -> SignalClassification:
+    """Keep the final TP when nearer targets cannot satisfy this signal's SL risk."""
+    targets = classification.tp or []
+    if (
+        classification.type != "NEW_SIGNAL"
+        or classification.action not in {"BUY", "SELL"}
+        or classification.sl is None
+        or not math.isfinite(classification.sl)
+        or classification.sl <= 0
+        or len(targets) < 2
+        or any(not math.isfinite(target) or target <= 0 for target in targets)
+    ):
+        return classification
+
+    farthest = max(targets) if classification.action == "BUY" else min(targets)
+    reference = classification.entry
+    if classification.entry_low is not None and classification.entry_high is not None:
+        reference = classification.entry_high if classification.action == "BUY" else classification.entry_low
+
+    # Market signals have no entry reference yet. Keep the final target so the EA
+    # can validate its SL/TP distance against the live quote before placing an order.
+    if reference is None:
+        if classification.action == "BUY" and classification.sl >= min(targets):
+            return classification
+        if classification.action == "SELL" and classification.sl <= max(targets):
+            return classification
+        return classification.model_copy(update={
+            "tp": [farthest],
+            "reason": f"Target terjauh {farthest:g} dipilih; EA memvalidasi rasio risiko dari quote live",
+        })
+    if not math.isfinite(reference) or reference <= 0:
+        return classification
+    if classification.action == "BUY" and (
+        classification.sl >= reference or any(target <= reference for target in targets)
+    ):
+        return classification
+    if classification.action == "SELL" and (
+        classification.sl <= reference or any(target >= reference for target in targets)
+    ):
+        return classification
+
+    nearest = min(targets, key=lambda target: abs(target - reference))
+    risk_distance = abs(reference - classification.sl)
+    nearest_reward = abs(nearest - reference)
+    farthest_reward = abs(farthest - reference)
+    if risk_distance <= nearest_reward or risk_distance > farthest_reward:
+        return classification
+
+    return classification.model_copy(update={
+        "tp": [farthest],
+        "reason": f"Target terjauh {farthest:g} dipilih karena TP terdekat lebih pendek dari risiko SL",
+    })
 
 
 def validate_classification(
@@ -252,6 +306,8 @@ class SignalService:
                 db.commit()
                 db.refresh(row)
                 return ProcessResult("FAILED", row.id, None, None, "Parser tidak tersedia")
+
+        classification = _prefer_farthest_target_when_needed(classification)
 
         mapping = _setting(db, "symbol_mapping", {})
         if not isinstance(mapping, dict):
