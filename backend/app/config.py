@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = Field(default=None, validation_alias="TELEGRAM_BOT_TOKEN")
     telegram_admin_chat_id: str | None = Field(default=None, validation_alias="TELEGRAM_ADMIN_CHAT_ID")
     ea_api_key: SecretStr | None = Field(default=None, validation_alias="EA_API_KEY")
+    copier_worker_api_key: SecretStr | None = Field(default=None, validation_alias="COPIER_WORKER_API_KEY")
     email_smtp_host: str | None = Field(default=None, validation_alias="EMAIL_SMTP_HOST")
     email_smtp_port: int = Field(default=587, validation_alias="EMAIL_SMTP_PORT", ge=1, le=65535)
     email_smtp_username: str | None = Field(default=None, validation_alias="EMAIL_SMTP_USERNAME")
@@ -98,6 +99,12 @@ class Settings(BaseSettings):
                 raise ValueError("EA_API_KEY must contain at least 24 characters")
             if any(marker in ea_key.casefold() for marker in ("replace-with", "change-this", "changethis", "your-api-key")):
                 raise ValueError("EA_API_KEY masih memakai placeholder; ganti sebelum menjalankan EA")
+        if self.copier_worker_api_key is not None:
+            worker_key = self.copier_worker_api_key.get_secret_value()
+            if len(worker_key) < 32:
+                raise ValueError("COPIER_WORKER_API_KEY minimal 32 karakter")
+            if any(marker in worker_key.casefold() for marker in ("replace-with", "change-this", "your-api-key")):
+                raise ValueError("COPIER_WORKER_API_KEY masih memakai placeholder")
         smtp_values = (self.email_smtp_host, self.email_smtp_username, self.email_smtp_password, self.email_from)
         if any(smtp_values) and not all(smtp_values):
             raise ValueError("EMAIL_SMTP_HOST, EMAIL_SMTP_USERNAME, EMAIL_SMTP_PASSWORD, dan EMAIL_FROM harus diisi bersama")

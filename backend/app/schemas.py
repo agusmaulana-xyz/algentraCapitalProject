@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -45,6 +45,7 @@ class MT5AccountCreate(BaseModel):
     server: str = Field(min_length=1, max_length=128)
     login: str = Field(min_length=1, max_length=32)
     plan: Literal["ZERO", "PRO", "EXPERT"]
+    execution_mode: Literal["EA", "MANAGED"] = "EA"
     role: Literal["follower"] = "follower"
 
 
@@ -56,6 +57,33 @@ class MT5AccountUpdate(BaseModel):
 
 class MT5AccountActive(BaseModel):
     active: bool
+
+
+class ManagedCopySetup(BaseModel):
+    broker_password: str = Field(min_length=1, max_length=128)
+    follower_symbol: str = Field(default="XAUUSD", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    mode_lot: Literal["tetap", "rasio"] = "rasio"
+    ratio_lot: float = Field(default=1.0, gt=0, le=5, allow_inf_nan=False)
+    lot_tetap: float = Field(default=0.01, gt=0, le=5, allow_inf_nan=False)
+    max_lot_per_order: float = Field(default=0.05, gt=0, le=5, allow_inf_nan=False)
+    max_lot_total: float = Field(default=0.10, gt=0, le=10, allow_inf_nan=False)
+    max_open_positions: int = Field(default=3, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def validate_lot_caps(self) -> "ManagedCopySetup":
+        if self.max_lot_per_order > self.max_lot_total:
+            raise ValueError("Batas lot per order tidak boleh melebihi batas total lot terbuka")
+        return self
+
+
+class ManagedCopyActive(BaseModel):
+    active: bool
+    acknowledge_live_risk: bool = False
+
+
+class ManagedCopyWorkerStatus(BaseModel):
+    status: Literal["STARTING", "RUNNING", "ERROR", "STOPPED"]
+    message: str | None = Field(default=None, max_length=240)
 
 
 class CSChatMessageRequest(BaseModel):

@@ -1,0 +1,14 @@
+# Local credentials and runtime configuration. Keep *.example.json tracked.
+config/*.json
+!config/*.example.json
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+logs/
+state/
+runtime/
+heartbeat_*.txt
+*.log

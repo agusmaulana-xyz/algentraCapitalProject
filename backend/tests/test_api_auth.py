@@ -209,17 +209,17 @@ def test_dashboard_mutations_require_csrf_and_validate_risk_settings():
         )
         assert login.status_code == 200
         csrf = login.json()["csrf_token"]
-        payload = {"values": {"max_daily_loss_money": 50, "max_lot": 0.5, "max_open_trades": 2, "allowed_symbols": ["XAUUSD", "EURUSDm"]}}
+        payload = {"values": {"kill_switch": True, "max_market_deviation_pct": 50, "symbol_mapping": {"GOLD": "XAUUSDm"}}}
         assert client.put("/api/settings", json=payload).status_code == 403
         response = client.put("/api/settings", headers={"X-CSRF-Token": csrf}, json=payload)
         assert response.status_code == 200
-        assert response.json()["max_daily_loss_money"] == 50.0
-        invalid = client.put("/api/settings", headers={"X-CSRF-Token": csrf}, json={"values": {"max_lot": 0}})
+        assert response.json()["max_market_deviation_pct"] == 50.0
+        invalid = client.put("/api/settings", headers={"X-CSRF-Token": csrf}, json={"values": {"max_market_deviation_pct": 0}})
         assert invalid.status_code == 422
         restored = client.put(
             "/api/settings",
             headers={"X-CSRF-Token": csrf},
-            json={"values": {"kill_switch": False, "max_daily_loss_money": 100, "max_lot": 5, "max_open_trades": 3, "max_signal_age_seconds": 120, "max_market_deviation_pct": 5, "allowed_symbols": []}},
+            json={"values": {"kill_switch": False, "max_market_deviation_pct": 5, "symbol_mapping": {"GOLD": "XAUUSD"}}},
         )
         assert restored.status_code == 200
 

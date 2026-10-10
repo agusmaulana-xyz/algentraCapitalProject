@@ -88,12 +88,20 @@ def migrate_schema() -> None:
         additions = {
             "token_ciphertext": "TEXT",
             "plan": "VARCHAR(16) NOT NULL DEFAULT 'ZERO'",
+            "execution_mode": "VARCHAR(16) NOT NULL DEFAULT 'EA'",
         }
         missing = {name: sql_type for name, sql_type in additions.items() if name not in columns}
         if missing:
             with engine.begin() as connection:
                 for name, sql_type in missing.items():
                     connection.execute(text(f"ALTER TABLE mt5_accounts ADD COLUMN {name} {sql_type}"))
+    if "payment_orders" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("payment_orders")}
+        if "execution_mode" not in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE payment_orders ADD COLUMN execution_mode VARCHAR(16) NOT NULL DEFAULT 'EA'")
+                )
 
 
 def get_db() -> Generator[Session, None, None]:

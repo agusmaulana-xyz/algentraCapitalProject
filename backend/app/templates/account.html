@@ -4,18 +4,34 @@
 {% block content %}
 <main id="main" tabindex="-1" class="page-shell">
   <div class="page-heading">
-    <div><span class="eyebrow">PORTAL KLIEN / COPY TRADING</span><h1>Akun Copy Trading MT5</h1>
-      <p class="page-description">Hubungkan akun MT5 untuk menyalin posisi dari akun utama Algentra.</p>
+    <div><span class="eyebrow">PORTAL KLIEN / COPY TRADING</span><h1>Akun Copy Trading</h1>
+      <p class="page-description">Daftarkan akun follower dan atur layanan salin posisi dari portal ini.</p>
     </div>
-    <p class="heading-aside">Token EA hanya terlihat saat dibuat atau dirotasi.</p>
+    <p class="heading-aside">Password broker tidak ditampilkan kembali setelah disimpan.</p>
   </div>
 
   <section>
     <h2>Hubungkan akun Copy Trading</h2>
-    <p class="section-help">Pilih paket, isi detail akun MT5, lalu lanjutkan ke pembayaran. Akun Copy Trading dibuat setelah admin menyetujui bukti transaksi. Kami tidak meminta atau menyimpan kata sandi broker.</p>
+    <p class="section-help">Pilih cara menjalankan akun, paket, dan detail akun broker. Akun dibuat setelah pembayaran disetujui. Untuk layanan dikelola server, password broker dienkripsi dan hanya dikirim ke worker copier yang terautentikasi.</p>
     <form id="account-form" class="form-grid account-connect-form">
       <fieldset class="plan-picker">
-        <legend>Pilih level akun MT5</legend>
+        <legend>Cara menjalankan copy trading</legend>
+        <div class="plan-options">
+          <label class="plan-option" for="execution-managed">
+            <input id="execution-managed" type="radio" name="execution_mode" value="MANAGED" {% if managed_copy_enabled %}checked{% else %}disabled{% endif %} required>
+            <span class="plan-option__name">Dikelola server</span>
+            <span>Pengaturan melalui website. MT5 berjalan di server layanan, bukan di komputer Anda.</span>
+          </label>
+          <label class="plan-option" for="execution-ea">
+            <input id="execution-ea" type="radio" name="execution_mode" value="EA" {% if not managed_copy_enabled %}checked{% endif %} required>
+            <span class="plan-option__name">Pasang EA sendiri</span>
+            <span>Anda menjalankan terminal MT5 dan EA Copy Trading di perangkat/VPS sendiri.</span>
+          </label>
+        </div>
+      </fieldset>
+      <p id="managed-copy-service-status" class="status" role="status" aria-live="polite"></p>
+      <fieldset class="plan-picker">
+        <legend>Pilih paket layanan</legend>
         <div class="plan-options">
           {% for code, plan in client_plans.items() %}
           <label class="plan-option" for="plan-{{ code }}">
@@ -31,8 +47,8 @@
         <p class="field-help">Total pembayaran mengikuti harga paket yang dipilih. QRIS untuk pembayaran ditampilkan pada halaman transaksi.</p>
       </fieldset>
       <label>Nama akun<input name="label" maxlength="80" placeholder="Copy Trading 1" required></label>
-      <label>Broker server<input name="server" maxlength="128" placeholder="BrokerName-Live" required></label>
-      <label>Nomor login MT5<input name="login" maxlength="32" inputmode="numeric" required></label>
+      <label>Server broker<input name="server" maxlength="128" placeholder="BrokerName-Live" required></label>
+      <label>Nomor akun broker<input name="login" maxlength="32" inputmode="numeric" required></label>
       <div><button type="submit">Lanjutkan ke pembayaran</button></div>
     </form>
     <p id="account-message" class="status" role="status"></p>
@@ -41,8 +57,8 @@
   </section>
 
   <section>
-    <h2>Saldo dan performa akun MT5</h2>
-    <p class="section-help">Saldo setiap akun diperbarui dari terminal MT5. Performa dihitung dari riwayat transaksi MT5 yang sudah ditutup. Nilai dengan mata uang berbeda ditampilkan terpisah.</p>
+    <h2>Saldo dan performa akun</h2>
+    <p class="section-help">Worker managed melaporkan saldo, ekuitas, posisi terbuka, dan transaksi follower ke portal. Nilai dengan mata uang berbeda ditampilkan terpisah.</p>
     <div id="client-balance-groups" class="grid"></div>
     <div id="client-performance-groups" class="grid client-performance-groups"></div>
     <p id="client-performance-updated" class="muted" aria-live="polite"></p>
@@ -50,13 +66,13 @@
 
   <section>
     <h2>Akun Copy Trading Anda</h2>
-    <p class="section-help">Hubungkan hingga 10 akun Copy Trading. Tanda hijau berarti EA akun client aktif, izin trading MT5 menyala, dan EA utama mengirim pembaruan dalam 20 detik terakhir. EA menyalin posisi sebagai order live; saldo ditampilkan dalam mata uang akun, termasuk unit cent broker.</p>
+    <p class="section-help">Kelola hingga 10 akun. Pilih <strong>Mulai copy trading</strong> hanya setelah mengecek login, ukuran lot, dan batas risiko. Job server akan menjalankan order live pada akun broker Anda.</p>
     <div id="accounts" class="grid"></div>
   </section>
 
-  <section>
+  <section id="ea-install-section" hidden>
     <h2>Pasang EA Copy Trading</h2>
-    <p class="section-help">EA utama Algentra menerbitkan semua posisi terbuka, termasuk posisi yang dibuka manual dari MT5. EA Copy Trading juga mengirim saldo dan riwayat transaksi MT5 ke portal ini.</p>
+    <p class="section-help">Petunjuk ini berlaku untuk akun yang memilih menjalankan EA sendiri. Akun yang dikelola server tidak perlu mengikuti langkah MT5 ini di komputer client.</p>
     <div class="toolbar">
       <a class="workspace-tag" href="/downloads/MT5FollowerCopyEA.mq5">Unduh source EA Copy Trading</a>
     </div>
@@ -106,6 +122,8 @@ const balanceGroupsBox = document.querySelector("#client-balance-groups");
 const performanceGroupsBox = document.querySelector("#client-performance-groups");
 const performanceUpdated = document.querySelector("#client-performance-updated");
 const clientPlans = {{ client_plans | tojson }};
+let managedFormDirty = false;
+let managedWorkerReady = {{ 'true' if managed_copy_enabled else 'false' }};
 
 const formatMoney = (value, currency) => `${Number(value || 0).toLocaleString("id-ID", {minimumFractionDigits:2, maximumFractionDigits:2})} ${currency || ""}`.trim();
 const modeLabel = (mode) => ({real:"Live", demo:"Demo", contest:"Kompetisi"}[mode] || mode || "MT5");
@@ -132,10 +150,115 @@ function showToken(title, token, accountId) {
   tokenBox.append(heading, text, value, copy);
 }
 
+function addManagedAccountCard(card, account, plan) {
+  const title = document.createElement("h3"); title.textContent = account.label;
+  const detail = document.createElement("p"); detail.textContent = `Dikelola server · ${account.login} · ${account.server} · ${plan.name}`;
+  const profile = account.managed_copy || {configured:false, active:false, status:"SETUP_REQUIRED"};
+  const state = document.createElement("p"); state.className = "muted";
+  state.textContent = `${profile.active ? "Copy aktif" : "Copy dijeda"} · Worker terakhir terhubung: ${profile.last_seen_at ? new Date(profile.last_seen_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) : "belum terhubung"}`;
+  const stateLabels = {
+    SETUP_REQUIRED: "Masukkan password broker dan atur batas copy terlebih dahulu.",
+    PAUSED: "Copy trading dijeda. Tidak ada order baru yang dikirim.",
+    STARTING: "Permintaan diterima. Menunggu worker copier mengambil job.",
+    RUNNING: "Worker copier tersambung. Periksa terminal dan akun broker secara berkala.",
+    OFFLINE: "Worker copier tidak mengirim heartbeat terbaru. Akun tidak sedang disinkronkan.",
+    ERROR: profile.status_message || "Worker copier melaporkan kendala. Periksa server dan akun broker.",
+    STOPPED: "Worker copier berhenti. Periksa konfigurasi server."
+  };
+  const connection = document.createElement("div");
+  connection.className = `account-state account-state--${profile.status === "RUNNING" ? "ready" : profile.status === "PAUSED" || profile.status === "SETUP_REQUIRED" ? "disabled" : "offline"}`;
+  connection.setAttribute("role", "status");
+  const connectionText = document.createElement("span"); connectionText.textContent = stateLabels[profile.status] || stateLabels.SETUP_REQUIRED;
+  connection.append(connectionText);
+
+  const form = document.createElement("form"); form.className = "form-grid";
+  const fields = {};
+  const addInput = (name, label, type, value, min, max, step) => {
+    const wrapper = document.createElement("label"); wrapper.textContent = label;
+    const input = document.createElement("input"); input.name = name; input.type = type;
+    if (value !== undefined) input.value = value;
+    if (min !== undefined) input.min = min;
+    if (max !== undefined) input.max = max;
+    if (step !== undefined) input.step = step;
+    if (type === "number") input.required = true;
+    wrapper.append(input); form.append(wrapper); fields[name] = input;
+  };
+  addInput("broker_password", "Password akun broker", "password", undefined);
+  fields.broker_password.autocomplete = "off";
+  fields.broker_password.maxLength = 128;
+  fields.broker_password.required = true;
+  fields.broker_password.placeholder = profile.configured ? "Masukkan ulang untuk mengganti password tersimpan" : "Password trading akun follower";
+  addInput("follower_symbol", "Nama simbol XAUUSD di broker", "text", profile.follower_symbol || "XAUUSD");
+  fields.follower_symbol.maxLength = 64;
+  fields.follower_symbol.pattern = "[A-Za-z0-9._-]+";
+  const modeLabel = document.createElement("label"); modeLabel.textContent = "Metode ukuran lot";
+  const mode = document.createElement("select"); mode.name = "mode_lot";
+  for (const [value, label] of [["rasio", "Rasio terhadap lot sumber"], ["tetap", "Lot tetap"]]) {
+    const option = document.createElement("option"); option.value = value; option.textContent = label; mode.append(option);
+  }
+  mode.value = profile.mode_lot || "rasio"; modeLabel.append(mode); form.append(modeLabel);
+  fields.mode_lot = mode;
+  addInput("ratio_lot", "Pengali lot rasio", "number", profile.ratio_lot ?? 1, "0.01", "5", "0.01");
+  addInput("lot_tetap", "Lot tetap", "number", profile.lot_tetap ?? 0.01, "0.01", "5", "0.01");
+  addInput("max_lot_per_order", "Batas lot per order", "number", profile.max_lot_per_order ?? 0.05, "0.01", "5", "0.01");
+  addInput("max_lot_total", "Batas total lot terbuka", "number", profile.max_lot_total ?? 0.1, "0.01", "10", "0.01");
+  addInput("max_open_positions", "Maksimum posisi terbuka", "number", profile.max_open_positions ?? 3, "1", "50", "1");
+  form.addEventListener("input", () => { managedFormDirty = true; });
+  form.addEventListener("change", () => { managedFormDirty = true; });
+  const save = document.createElement("button"); save.type = "submit"; save.textContent = profile.configured ? "Simpan pengaturan" : "Simpan kredensial dan pengaturan"; form.append(save);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault(); statusBox.textContent = "";
+    const data = Object.fromEntries(new FormData(form).entries());
+    for (const key of ["ratio_lot", "lot_tetap", "max_lot_per_order", "max_lot_total", "max_open_positions"]) data[key] = Number(data[key]);
+    try {
+      await api(`/api/mt5/accounts/${account.id}/managed-copy`, {method:"PUT", body:JSON.stringify(data)});
+      managedFormDirty = false;
+      statusBox.textContent = "Pengaturan tersimpan. Copy trading masih dijeda.";
+      await loadAccounts();
+    } catch (error) { statusBox.textContent = error.message; }
+  });
+
+  const controls = document.createElement("div"); controls.className = "toolbar";
+  const toggle = document.createElement("button"); toggle.type = "button";
+  toggle.className = profile.active ? "secondary" : "";
+  toggle.textContent = profile.active ? "Jeda copy trading" : "Mulai copy trading (live)";
+  toggle.disabled = !profile.configured || (!profile.active && !managedWorkerReady);
+  toggle.addEventListener("click", async () => {
+    const active = !profile.active;
+    if (active && !confirm("Konfirmasi: job ini akan mengirim order live ke akun broker Anda. Pastikan akun demo sudah diuji, login/server benar, serta batas lot dan posisi sesuai. Lanjutkan?")) return;
+    try {
+      await api(`/api/mt5/accounts/${account.id}/managed-copy/active`, {method:"PUT", body:JSON.stringify({active, acknowledge_live_risk:active})});
+      await loadAccounts();
+    } catch (error) { statusBox.textContent = error.message; }
+  });
+  const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger"; remove.textContent = "Hapus akun";
+  remove.addEventListener("click", async () => {
+    if (!confirm(`Hapus akun ${account.label} (${account.login})? Jeda copy trading terlebih dahulu.`)) return;
+    try { await api(`/api/mt5/accounts/${account.id}`, {method:"DELETE"}); await loadAccounts(); }
+    catch (error) { statusBox.textContent = error.message; }
+  });
+  controls.append(toggle, remove);
+  const balance = document.createElement("p"); balance.className = "muted";
+  balance.className = "account-balance";
+  balance.textContent = account.balance == null
+    ? "Saldo follower menunggu laporan worker."
+    : `Saldo ${formatMoney(account.balance, account.currency)} · Ekuitas ${formatMoney(account.equity, account.currency)} · Floating ${formatMoney(account.floating_profit, account.currency)}`;
+  const balanceTime = document.createElement("small"); balanceTime.className = "muted account-balance-time";
+  balanceTime.textContent = account.state_updated_at
+    ? `Data akun diperbarui ${new Date(account.state_updated_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"})} WIB`
+    : "Belum menerima laporan saldo dari worker.";
+  card.append(title, detail, state, connection, form, controls, balance, balanceTime);
+}
+
 function addAccountCard(account) {
   const card = document.createElement("article"); card.className = "card";
   const title = document.createElement("h3"); title.textContent = account.label;
   const plan = clientPlans[account.plan] || clientPlans.ZERO;
+  if (account.execution_mode === "MANAGED") {
+    addManagedAccountCard(card, account, plan);
+    accountsBox.append(card);
+    return;
+  }
   const detail = document.createElement("p"); detail.textContent = `Akun Copy Trading · ${account.login} · ${account.server} · ${plan.name} (${plan.vcpu}, RAM ${plan.ram}, Disk ${plan.disk}) · Rp ${Number(plan.price_idr).toLocaleString("id-ID")}`;
   const state = document.createElement("p"); state.className = "muted";
   state.textContent = `${account.active ? "Aktif" : "Nonaktif"} · Terakhir terhubung: ${account.last_seen_at ? new Date(account.last_seen_at).toLocaleString("id-ID", {timeZone:"Asia/Jakarta"}) : "belum ada koneksi"}`;
@@ -220,12 +343,25 @@ function renderClientSummary(data) {
 
 async function loadAccounts() {
   try {
-    const [accounts, performance] = await Promise.all([
+    const [accounts, performance, managedService] = await Promise.all([
       api("/api/mt5/accounts", {cache:"no-store"}),
-      api("/api/mt5/performance", {cache:"no-store"})
+      api("/api/mt5/performance", {cache:"no-store"}),
+      api("/api/mt5/copier/status", {cache:"no-store"})
     ]);
+    managedWorkerReady = managedService.available === true;
+    const managedMode = document.querySelector("#execution-managed");
+    const eaMode = document.querySelector("#execution-ea");
+    managedMode.disabled = !managedWorkerReady;
+    if (!managedWorkerReady && managedMode.checked) eaMode.checked = true;
+    document.querySelector("#managed-copy-service-status").textContent = managedWorkerReady
+      ? "Worker managed copy online. Akun managed dapat didaftarkan dan dijalankan."
+      : managedService.configured
+        ? "Worker managed copy offline. Layanan managed belum dapat dipesan atau dimulai."
+        : "Layanan managed belum dikonfigurasi di server. Anda tetap dapat memilih Pasang EA sendiri.";
     renderClientSummary(performance);
     accountsBox.replaceChildren();
+    const eaSection = document.querySelector("#ea-install-section");
+    eaSection.hidden = !accounts.some((account) => account.execution_mode !== "MANAGED");
     if (!accounts.length) { accountsBox.textContent = "Belum ada akun MT5."; return; }
     accounts.forEach(addAccountCard);
   } catch (error) { statusBox.textContent = error.message; }
@@ -244,6 +380,6 @@ document.querySelector("#account-form").addEventListener("submit", async (event)
 });
 
 loadAccounts();
-setInterval(() => { if (!document.hidden) loadAccounts(); }, 5000);
+setInterval(() => { if (!document.hidden && !managedFormDirty) loadAccounts(); }, 5000);
 </script>
 {% endblock %}

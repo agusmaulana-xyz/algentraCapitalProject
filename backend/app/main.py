@@ -233,7 +233,11 @@ def client_account_page(
     return templates.TemplateResponse(
         request=request,
         name="account.html",
-        context={"csrf_token": request.session["csrf_token"], "client_plans": CLIENT_PLANS},
+        context={
+            "csrf_token": request.session["csrf_token"],
+            "client_plans": CLIENT_PLANS,
+            "managed_copy_enabled": get_settings().copier_worker_api_key is not None,
+        },
     )
 
 

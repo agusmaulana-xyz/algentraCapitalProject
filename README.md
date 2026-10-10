@@ -35,6 +35,14 @@ Jika situs mengembalikan halaman Cloudflare **502**, uji origin langsung dari VP
 
 Database SQLite dibuat otomatis pada jalur yang ditentukan. Atur `BACKUP_DIR` pada environment layanan ke folder backup di disk/lokasi terpisah. Buat task harian Windows Task Scheduler yang menjalankan `run-backup.bat`; skrip menggunakan SQLite online backup API dan mempertahankan 14 salinan terakhir. Pulihkan dengan menyalin file backup saat aplikasi berhenti, lalu mulai ulang layanan. Uji restore sebelum peluncuran. Perubahan Gemini hanya menerima nama model dari dashboard; simpan API key di environment layanan.
 
+## Layanan managed copy untuk akun client
+
+Mode **Dikelola server** membolehkan client mengatur follower melalui `/account`; client tidak perlu memasang MT5 atau EA di komputernya. Akun tetap dijeda sampai client menyimpan detail broker, menetapkan batas lot, lalu menekan **Mulai copy trading (live)** dan menyetujui konfirmasi. Password broker disimpan terenkripsi menggunakan key turunan `APP_SECRET_KEY`, tidak dikembalikan ke halaman client, dan hanya diberikan ke worker yang memakai `COPIER_WORKER_API_KEY`.
+
+Worker berada di subfolder `copyTrading/` dan membutuhkan Windows dengan terminal MT5 serta package MetaTrader5. Untuk VPS, atur `COPIER_WORKER_API_KEY` yang sama pada backend dan akun service Windows, gunakan terminal template follower yang bersih dan terpisah dari master, lalu ikuti [panduan managed worker](copyTrading/README.md#managed-copy-dari-portal-client). Tanpa worker online, permintaan tersimpan tetapi akun tidak menyalin posisi. Jika `APP_SECRET_KEY` diganti, password managed yang tersimpan tidak dapat dibuka; client perlu menyimpan ulang kredensial dari portal.
+
+Untuk menjalankan di lokal, mulai backend dengan `run.bat`, login-kan terminal MT5 sumber, lalu dari root folder proyek jalankan `.venv\Scripts\python.exe copyTrading\scripts\run_managed_worker.py`. Helper membaca worker key dari `.env`; `copyTrading/config/managed-worker.json` harus mengarah ke backend lokal dan `copyTrading/config/master.json` ke terminal sumber yang login. Lalu buka `/account` sebagai client. Akun follower baru diproses setelah pembelian disetujui, detail broker dan batas risiko disimpan, dan client secara sadar mengaktifkan copy live.
+
 ## Endpoint M1
 
 - `GET /health`
@@ -42,6 +50,7 @@ Database SQLite dibuat otomatis pada jalur yang ditentukan. Atur `BACKUP_DIR` pa
 - `POST /api/auth/login` untuk admin, `POST /api/auth/client-login` untuk klien, `POST /api/auth/logout`, pendaftaran melalui `POST /api/auth/register`, `POST /api/auth/resend-code`, dan `POST /api/auth/verify-email`, serta reset kata sandi melalui `POST /api/auth/password-reset/request` dan `POST /api/auth/password-reset/confirm`. Halaman reset: `GET /forgot-password`.
 - Portal klien: `/account`; pengelolaan terminal melalui `GET/POST /api/mt5/accounts`, `PUT /api/mt5/accounts/{id}`, `PUT /api/mt5/accounts/{id}/active`, dan `POST /api/mt5/accounts/{id}/rotate-token`.
 - Copy posisi MT5: `POST /api/ea/master/snapshot` memakai `X-API-Key` dari EA Telegram; `GET /api/mt5/follower/positions` memakai `X-Account-Token` khusus untuk setiap terminal follower.
+- Managed copy: client membuat pesanan melalui `/api/payments/orders`, mengatur `/api/mt5/accounts/{id}/managed-copy`, dan mengaktifkan atau menjeda lewat `/api/mt5/accounts/{id}/managed-copy/active`. Worker Windows memakai `GET /api/mt5/copier/jobs` dan endpoint status/laporan dengan `X-Copier-Worker-Key`.
 - `GET /api/stats`
 - `GET /api/signals?limit=100&offset=0`
 - `GET /api/logs?limit=100&offset=0&level=INFO&search=...`
@@ -141,7 +150,7 @@ SL dan setiap TP divalidasi terhadap seluruh zona: SL BUY harus di bawah batas b
 
 ## Test
 
-Jalankan dari folder proyek: `.venv\Scripts\python -m pytest backend/tests` di Windows atau `.venv/bin/python -m pytest backend/tests` di Linux/macOS.
+Jalankan backend tests dari folder proyek: `.venv\Scripts\python -m pytest backend/tests` di Windows atau `.venv/bin/python -m pytest backend/tests` di Linux/macOS. Jalankan worker tests di Windows dengan `$env:PYTHONPATH="copyTrading/src"; .venv\Scripts\python.exe -m pytest copyTrading/tests`.
 
 ## Belum teruji
 

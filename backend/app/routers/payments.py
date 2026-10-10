@@ -5,6 +5,7 @@ import secrets
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from typing import Literal
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,7 +15,7 @@ from ..config import PROJECT_ROOT
 from ..database import get_db
 from ..models import ClientUser, MT5Account, PaymentOrder, utc_now
 from ..payment_bot import MAX_PROOF_BYTES, payment_proof_path, payment_review_bot
-from ..routers.mt5 import require_client_id
+from ..routers.mt5 import _managed_worker_online, require_client_id
 from ..time_utils import wib_iso
 
 
@@ -27,8 +28,9 @@ MAX_ACCOUNTS_PER_USER = 10
 class PaymentOrderCreate(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     server: str = Field(min_length=1, max_length=128)
-    login: str = Field(min_length=1, max_length=32)
+    login: str = Field(min_length=1, max_length=32, pattern=r"^\d+$")
     plan: str = Field(pattern=r"^(ZERO|PRO|EXPERT)$")
+    execution_mode: Literal["EA", "MANAGED"] = "EA"
 
 
 def _order_payload(order: PaymentOrder) -> dict[str, object]:
@@ -39,6 +41,7 @@ def _order_payload(order: PaymentOrder) -> dict[str, object]:
         "server": order.server,
         "login": order.login,
         "plan": order.plan,
+        "execution_mode": order.execution_mode,
         "total_idr": order.total_idr,
         "status": order.status,
         "has_proof": order.proof_filename is not None,
@@ -107,6 +110,9 @@ def create_payment_order(
 
     # Serialize order creation so simultaneous tabs cannot exceed the account limit.
     db.execute(text("BEGIN IMMEDIATE"))
+    if payload.execution_mode == "MANAGED" and not _managed_worker_online(db):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Layanan managed copy belum tersedia atau worker sedang offline")
     user = db.get(ClientUser, owner_id)
     if user is None:
         db.rollback()
@@ -139,6 +145,28 @@ def create_payment_order(
             PaymentOrder.status.in_(ACTIVE_ORDER_STATUSES),
         )
     ).scalar_one_or_none()
+    if payload.execution_mode == "MANAGED":
+        duplicate_managed_account = db.execute(
+            select(MT5Account.id).where(
+                MT5Account.execution_mode == "MANAGED",
+                func.lower(MT5Account.server) == server.casefold(),
+                MT5Account.login == login,
+            )
+        ).scalar_one_or_none()
+        if duplicate_managed_account is not None:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Akun broker ini sudah terdaftar untuk layanan copy server")
+        duplicate_managed_order = db.execute(
+            select(PaymentOrder.id).where(
+                PaymentOrder.execution_mode == "MANAGED",
+                func.lower(PaymentOrder.server) == server.casefold(),
+                PaymentOrder.login == login,
+                PaymentOrder.status.in_(ACTIVE_ORDER_STATUSES),
+            )
+        ).scalar_one_or_none()
+        if duplicate_managed_order is not None:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Akun broker ini sudah memiliki pesanan layanan copy server")
     if duplicate_account is not None or duplicate_order is not None:
         db.rollback()
         raise HTTPException(status_code=409, detail="Server dan nomor login ini sudah terdaftar atau memiliki pesanan aktif")
@@ -150,6 +178,7 @@ def create_payment_order(
         server=server,
         login=login,
         plan=payload.plan,
+        execution_mode=payload.execution_mode,
         total_idr=plan["price_idr"],
     )
     db.add(order)

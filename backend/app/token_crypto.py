@@ -11,7 +11,7 @@ class TokenEncryptionError(Exception):
     pass
 
 
-def _fernet():
+def _fernet(purpose: bytes = b"algentra:mt5-account-token:v1"):
     try:
         from cryptography.fernet import Fernet
     except ImportError as exc:  # pragma: no cover - dependency is installed from requirements.txt
@@ -19,7 +19,7 @@ def _fernet():
 
     secret = get_settings().app_secret_key.get_secret_value().encode("utf-8")
     # Derive a purpose-specific encryption key without reusing APP_SECRET_KEY directly.
-    material = hmac.new(secret, b"algentra:mt5-account-token:v1", hashlib.sha256).digest()
+    material = hmac.new(secret, purpose, hashlib.sha256).digest()
     return Fernet(urlsafe_b64encode(material))
 
 
@@ -33,3 +33,14 @@ def decrypt_account_token(ciphertext: str) -> str:
     except Exception as exc:
         # Do not expose ciphertext or cryptography details in an API error.
         raise TokenEncryptionError("Token akun tidak dapat dipulihkan") from exc
+
+
+def encrypt_managed_copy_password(password: str) -> str:
+    return _fernet(b"algentra:managed-copy-password:v1").encrypt(password.encode("utf-8")).decode("ascii")
+
+
+def decrypt_managed_copy_password(ciphertext: str) -> str:
+    try:
+        return _fernet(b"algentra:managed-copy-password:v1").decrypt(ciphertext.encode("ascii")).decode("utf-8")
+    except Exception as exc:
+        raise TokenEncryptionError("Kredensial akun tidak dapat dipulihkan") from exc

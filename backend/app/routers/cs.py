@@ -133,7 +133,10 @@ def _account_context(accounts: list[MT5Account]) -> list[dict[str, object]]:
         "label": account.label,
         "active": account.active,
         "plan": account.plan,
-        "token_available_to_assistant": bool(account.active and account.token_ciphertext),
+        "execution_mode": account.execution_mode,
+        "token_available_to_assistant": bool(
+            account.active and account.execution_mode != "MANAGED" and account.token_ciphertext
+        ),
     } for account in accounts]
 
 
@@ -160,8 +163,16 @@ def _asks_for_token(message: str) -> bool:
 def _append_account_tokens(reply: str, accounts: list[MT5Account]) -> str:
     if not accounts:
         return reply + "\n\nSaya belum menemukan akun Copy Trading yang terhubung. Tambahkan akun di Portal Klien terlebih dahulu."
+    ea_accounts = [account for account in accounts if account.execution_mode != "MANAGED"]
+    managed_accounts = [account for account in accounts if account.execution_mode == "MANAGED"]
+    if not ea_accounts:
+        names = ", ".join(account.label for account in managed_accounts)
+        return reply + f"\n\nAkun {names} memakai layanan managed copy dan tidak memerlukan token EA. Atur dan mulai copy trading dari Portal Klien."
     lines = ["\n\nToken EA untuk akun Anda:"]
     for account in accounts:
+        if account.execution_mode == "MANAGED":
+            lines.append(f"- {account.label}: dikelola server; tidak memakai token EA.")
+            continue
         if not account.active:
             lines.append(f"- {account.label}: akun sedang nonaktif. Aktifkan akun dari Portal Klien sebelum memakai EA.")
         elif account.token_ciphertext:

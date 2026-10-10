@@ -5,7 +5,7 @@ import pytest
 
 from app.config import Settings
 from app.gemini_parser import GeminiParser, SignalClassification, regex_fallback
-from app.signal_service import validate_classification
+from app.signal_service import _prefer_farthest_target_when_needed, validate_classification
 
 
 def signal(action=None, *, order="MARKET", symbol=None, entry=None, tp=None, sl=None, confidence=0.96):
@@ -75,7 +75,7 @@ CASES = [
     ("LONG GOLD @ 2400 SL 2380 TARGET 2440", signal("BUY", symbol="GOLD", entry=2400, tp=[2440], sl=2380), "PENDING"),
     ("sell gold limit 2420 stop loss 2435 take profit 2400", signal("SELL", order="LIMIT", symbol="GOLD", entry=2420, tp=[2400], sl=2435), "PENDING"),
     ("XAUUSD BUY STOP 2405 TP 2420 SL 2390", signal("BUY", order="STOP", symbol="XAUUSD", entry=2405, tp=[2420], sl=2390), "PENDING"),
-    ("Sinyal beli EURUSD 1.08 SL 1.075 TP 1.09", signal("BUY", symbol="EURUSD", entry=1.08, tp=[1.09], sl=1.075), "PENDING"),
+    ("Sinyal beli EURUSD 1.08 SL 1.075 TP 1.09", signal("BUY", symbol="EURUSD", entry=1.08, tp=[1.09], sl=1.075), "REJECTED"),
     ("Buy now, tp 1.2345 sl 1.2300 💹", signal("BUY", tp=[1.2345], sl=1.23), "PENDING"),
     ("Masuk sell gold di 2380, TP 2360, SL 2390 ya", signal("SELL", symbol="GOLD", entry=2380, tp=[2360], sl=2390), "PENDING"),
     ("BUY NOW 📈 XAUUSD", signal("BUY", symbol="XAUUSD"), "PENDING"),
@@ -83,7 +83,7 @@ CASES = [
     ("Good morning! semoga cuan", signal(), "IGNORED"),
     ("Admin: entry gold BUY 2333 | TP1 2340 TP2 2345 | SL 2325", signal("BUY", symbol="GOLD", entry=2333, tp=[2340, 2345], sl=2325), "PENDING"),
     ("Sell XAUUSD @ market / take profits 2330 and 2320 / stop 2350", signal("SELL", symbol="XAUUSD", tp=[2330, 2320], sl=2350), "PENDING"),
-    ("GBPUSD buy stop 1.2800, stop loss 1.2750, take profit 1.2900", signal("BUY", order="STOP", symbol="GBPUSD", entry=1.28, tp=[1.29], sl=1.275), "PENDING"),
+    ("GBPUSD buy stop 1.2800, stop loss 1.2750, take profit 1.2900", signal("BUY", order="STOP", symbol="GBPUSD", entry=1.28, tp=[1.29], sl=1.275), "REJECTED"),
 ]
 
 
@@ -93,7 +93,7 @@ def test_mock_gemini_structured_output_reference_cases(message, expected, expect
     parser = GeminiParser(settings(), FakeClient(models), retry_delay=0)
 
     parsed = asyncio.run(parser.parse(message, context="BUY NOW" if message == "TP 4010 SL 3990" else None))
-    validation = validate_classification(parsed)
+    validation = validate_classification(_prefer_farthest_target_when_needed(parsed))
 
     assert parsed.action == expected["action"]
     assert parsed.type == expected["type"]

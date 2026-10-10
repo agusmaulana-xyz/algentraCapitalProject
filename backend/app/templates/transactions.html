@@ -121,7 +121,8 @@ function detailsFor(order) {
   addDetail(details, "Paket", `${plan.name} - ${plan.vcpu} - RAM ${plan.ram} - Disk ${plan.disk}`);
   addDetail(details, "Total pembayaran", money(order.total_idr));
   addDetail(details, "Nama akun", order.label);
-  addDetail(details, "Login MT5", `${order.login} - ${order.server}`);
+  addDetail(details, "Mode layanan", order.execution_mode === "MANAGED" ? "Dikelola server (MT5 berjalan di worker)" : "Pasang EA di MT5 sendiri");
+  addDetail(details, "Login broker", `${order.login} - ${order.server}`);
   addDetail(details, "Tanggal pesanan", orderDate(order.created_at));
   return details;
 }
@@ -202,7 +203,9 @@ function renderOrders(force = false) {
       }
     } else if (order.status === "APPROVED") {
       const complete = document.createElement("p"); complete.className = "transaction-note";
-      complete.textContent = "Pembayaran diterima dan akun Copy Trading sudah dibuat.";
+      complete.textContent = order.execution_mode === "MANAGED"
+        ? "Pembayaran diterima. Buka portal akun untuk mengatur kredensial broker; copy trading tetap dijeda sampai Anda memulainya."
+        : "Pembayaran diterima dan akun Copy Trading sudah dibuat.";
       card.append(complete);
       addButton(actions, "Buka akun Copy Trading", () => { window.location.assign("/account"); }, true);
     } else if (order.status === "REJECTED") {

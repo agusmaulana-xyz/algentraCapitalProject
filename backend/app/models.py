@@ -178,11 +178,35 @@ class MT5Account(Base):
     login: Mapped[str] = mapped_column(String(32), nullable=False)
     plan: Mapped[str] = mapped_column(String(16), default="ZERO", nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
+    execution_mode: Mapped[str] = mapped_column(String(16), default="EA", nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ManagedCopyProfile(Base):
+    """Encrypted broker access and bounded copy settings for server-managed followers."""
+
+    __tablename__ = "managed_copy_profiles"
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("mt5_accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    password_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    follower_symbol: Mapped[str] = mapped_column(String(64), default="XAUUSD", nullable=False)
+    mode_lot: Mapped[str] = mapped_column(String(16), default="rasio", nullable=False)
+    ratio_lot: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    lot_tetap: Mapped[float] = mapped_column(Float, default=0.01, nullable=False)
+    max_lot_per_order: Mapped[float] = mapped_column(Float, default=0.05, nullable=False)
+    max_lot_total: Mapped[float] = mapped_column(Float, default=0.10, nullable=False)
+    max_open_positions: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="PAUSED", nullable=False)
+    status_message: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
 
 class PaymentOrder(Base):
@@ -200,6 +224,7 @@ class PaymentOrder(Base):
     server: Mapped[str] = mapped_column(String(128), nullable=False)
     login: Mapped[str] = mapped_column(String(32), nullable=False)
     plan: Mapped[str] = mapped_column(String(16), nullable=False)
+    execution_mode: Mapped[str] = mapped_column(String(16), default="EA", nullable=False)
     total_idr: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="PENDING_PAYMENT", nullable=False)
     proof_filename: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -113,16 +113,15 @@ def test_ea_report_rejects_profit_result_sign_mismatch():
         ).status_code == 422
 
 
-def test_ea_pending_enforces_kill_switch_signal_age_and_symbol_allowlist():
+def test_ea_pending_enforces_kill_switch_expiry_and_xauusd_only():
     set_controls(
         kill_switch=True, max_daily_loss_money=0, max_lot=1,
-        max_open_trades=3, max_signal_age_seconds=120, max_market_deviation_pct=5,
-        allowed_symbols=["EURUSD"],
+        max_open_trades=3, max_market_deviation_pct=5,
     )
     now = utc_now()
     with SessionLocal() as db:
-        stale = Signal(group_id="risk-test", message_id="stale", raw_text="old", parsed_json=parsed_signal("EURUSD"), status="PENDING", created_at=now - timedelta(minutes=5))
-        forbidden = Signal(group_id="risk-test", message_id="forbidden", raw_text="wrong symbol", parsed_json=parsed_signal("XAUUSD"), status="PENDING", created_at=now)
+        stale = Signal(group_id="risk-test", message_id="stale", raw_text="old", parsed_json=parsed_signal("XAUUSD"), status="PENDING", created_at=now - timedelta(hours=2))
+        forbidden = Signal(group_id="risk-test", message_id="forbidden", raw_text="wrong symbol", parsed_json=parsed_signal("EURUSD"), status="PENDING", created_at=now)
         db.add_all([stale, forbidden])
         db.commit()
         stale_id, forbidden_id = stale.id, forbidden.id
@@ -145,7 +144,7 @@ def test_ea_pending_enforces_kill_switch_signal_age_and_symbol_allowlist():
         with SessionLocal() as db:
             db.query(Signal).filter(Signal.id.in_([stale_id, forbidden_id])).delete(synchronize_session=False)
             db.commit()
-        set_controls(kill_switch=False, max_daily_loss_money=100, max_lot=5, max_open_trades=3, max_signal_age_seconds=120, max_market_deviation_pct=5, allowed_symbols=[])
+        set_controls(kill_switch=False, max_daily_loss_money=100, max_lot=5, max_open_trades=3, max_market_deviation_pct=5)
 
 
 def test_pending_pins_single_entry_mode_for_execution_reports():

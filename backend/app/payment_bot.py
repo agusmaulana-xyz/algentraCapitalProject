@@ -8,7 +8,7 @@ import secrets
 from pathlib import Path
 
 import httpx
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from .client_plans import CLIENT_PLANS
@@ -68,13 +68,13 @@ def review_payment_order(order_id: int, decision: str) -> tuple[str, int | None]
         if plan is None or order.total_idr != plan["price_idr"]:
             db.rollback()
             return "INVALID_ORDER", None
-        duplicate = db.execute(
-            select(MT5Account.id).where(
-                MT5Account.owner_id == order.owner_id,
-                MT5Account.server == order.server,
-                MT5Account.login == order.login,
-            )
-        ).scalar_one_or_none()
+        duplicate_query = select(MT5Account.id).where(
+            func.lower(MT5Account.server) == order.server.casefold(),
+            MT5Account.login == order.login,
+        )
+        if order.execution_mode != "MANAGED":
+            duplicate_query = duplicate_query.where(MT5Account.owner_id == order.owner_id)
+        duplicate = db.execute(duplicate_query).scalar_one_or_none()
         if duplicate is not None:
             db.rollback()
             return "ACCOUNT_EXISTS", duplicate
@@ -86,9 +86,10 @@ def review_payment_order(order_id: int, decision: str) -> tuple[str, int | None]
             server=order.server,
             login=order.login,
             plan=order.plan,
+            execution_mode=order.execution_mode,
             role="follower",
             token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
-            token_ciphertext=encrypt_account_token(token),
+            token_ciphertext=encrypt_account_token(token) if order.execution_mode != "MANAGED" else None,
         )
         db.add(account)
         db.flush()

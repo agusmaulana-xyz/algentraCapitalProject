@@ -1,5 +1,6 @@
 import asyncio
 from datetime import timedelta
+from secrets import token_urlsafe
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -32,6 +33,27 @@ def _settings(**overrides):
     }
     values.update(overrides)
     return Settings(**values)
+
+
+def _seed_ea_account(owner_id: int, label: str, server: str, login: str) -> tuple[int, str]:
+    token = token_urlsafe(32)
+    with SessionLocal() as db:
+        account = MT5Account(
+            owner_id=owner_id,
+            label=label,
+            server=server,
+            login=login,
+            plan="ZERO",
+            role="follower",
+            execution_mode="EA",
+            token_hash=_token_hash(token),
+            token_ciphertext=encrypt_account_token(token),
+            active=True,
+        )
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+        return account.id, token
 
 
 def test_token_encryption_round_trips_and_does_not_store_plaintext():
@@ -74,7 +96,8 @@ def test_gemini_customer_service_uses_its_separate_key_and_model():
     assert keys_used[0] != _settings().gemini_api_key.get_secret_value()
     assert calls[0]["model"] == "customer-service-model"
     assert "Bagaimana cara daftar?" in calls[0]["contents"]
-    assert calls[0]["config"].thinking_config.thinking_level == "low"
+    thinking_level = calls[0]["config"].thinking_config.thinking_level
+    assert getattr(thinking_level, "value", thinking_level) == "LOW"
 
 
 def test_customer_service_timeout_is_independent_from_signal_parser_timeout():
@@ -135,14 +158,9 @@ def test_client_chat_is_private_and_only_returns_their_token(monkeypatch):
         })
         assert login.status_code == 200
         csrf = login.json()["csrf_token"]
-        create = client.post(
-            "/api/mt5/accounts",
-            headers={"X-CSRF-Token": csrf},
-            json={"label": "Akun Demo Saya", "server": "Broker-Demo", "login": "928281", "plan": "ZERO"},
+        account_id, token = _seed_ea_account(
+            user_id, "Akun Demo Saya", "Broker-Demo", "928281",
         )
-        assert create.status_code == 200
-        token = create.json()["token"]
-        account_id = create.json()["account"]["id"]
 
         response = client.post(
             "/api/cs/chat/message",
@@ -159,6 +177,7 @@ def test_client_chat_is_private_and_only_returns_their_token(monkeypatch):
             "label": "Akun Demo Saya",
             "active": True,
             "plan": "ZERO",
+            "execution_mode": "EA",
             "token_available_to_assistant": True,
         }]
         assert token not in repr(observed[-1])
@@ -283,16 +302,15 @@ def test_one_client_cannot_load_another_clients_chat_or_account_token(monkeypatc
         db.commit()
         owner_id = owner.id
 
+    _account_id, token = _seed_ea_account(
+        owner_id, "Akun Rahasia", "Broker-Private", "183920",
+    )
+
     with TestClient(app) as owner_client:
         owner_login = owner_client.post("/api/auth/client-login", json={
             "email": owner_email,
             "password": "Customer-service-test-123",
         })
-        token = owner_client.post(
-            "/api/mt5/accounts",
-            headers={"X-CSRF-Token": owner_login.json()["csrf_token"]},
-            json={"label": "Akun Rahasia", "server": "Broker-Private", "login": "183920", "plan": "ZERO"},
-        ).json()["token"]
         message = owner_client.post(
             "/api/cs/chat/message",
             headers={"X-CSRF-Token": owner_login.json()["csrf_token"]},
@@ -304,6 +322,7 @@ def test_one_client_cannot_load_another_clients_chat_or_account_token(monkeypatc
             "label": "Akun Rahasia",
             "active": True,
             "plan": "ZERO",
+            "execution_mode": "EA",
             "token_available_to_assistant": True,
         }]
 
