@@ -12,7 +12,40 @@ PROJECT_ROOT = COPY_TRADING_ROOT.parent
 WORKER_KEY_NAME = "COPIER_WORKER_API_KEY"
 
 
+def _bootstrap_local_configs() -> list[Path]:
+    """Create ignored runtime config files from tracked examples when absent."""
+    config_dir = COPY_TRADING_ROOT / "config"
+    pairs = (
+        (config_dir / "managed-worker.json", config_dir / "managed-worker.example.json"),
+        (config_dir / "master.json", config_dir / "master.example.json"),
+    )
+    created: list[Path] = []
+    for destination, example in pairs:
+        if destination.exists():
+            continue
+        if not example.is_file():
+            raise SystemExit(f"Contoh konfigurasi tidak ditemukan: {example}")
+        try:
+            destination.write_bytes(example.read_bytes())
+        except OSError as exc:
+            raise SystemExit(f"Gagal membuat konfigurasi {destination}: {exc}") from exc
+        created.append(destination)
+    return created
+
+
 def main() -> None:
+    if len(sys.argv) == 1:
+        created_configs = _bootstrap_local_configs()
+        if created_configs:
+            print("Konfigurasi lokal dibuat dari file contoh:")
+            for path in created_configs:
+                print(f"  {path}")
+            print(
+                "Sesuaikan managed-worker.json (API URL dan terminal_template_dir) "
+                "serta master.json (terminal_path dan folder_sinyal), lalu jalankan worker lagi."
+            )
+            return
+
     key = os.environ.get(WORKER_KEY_NAME)
     if not key:
         try:
