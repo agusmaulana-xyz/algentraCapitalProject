@@ -131,7 +131,9 @@ class ManagedWorker:
         try:
             with self.opener(request, timeout=15) as response:
                 result = json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        except HTTPError as exc:
+            raise RuntimeError(f"API worker gagal (HTTP {exc.code} pada {endpoint})") from exc
+        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"API worker gagal ({type(exc).__name__})") from exc
         if not isinstance(result, dict):
             raise RuntimeError("Respons API worker tidak valid")
